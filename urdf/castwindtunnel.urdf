@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<robot name="cast_flying_arena">
+
+  <link name="world">
+    <visual>
+      <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/cast/cast_simple_2.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <link name="wind_tunnel">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/wind_tunnel_down.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <joint name="some_joint" type="fixed">
+    <parent link="world"/>
+    <child link="wind_tunnel"/>
+    <origin rpy="0 0 1.5707" xyz="-0.1 -7.0 0"/>
+  </joint>
+
+
+</robot>

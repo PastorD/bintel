@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<robot name="cast_flying_arena">
+
+  <link name="world">
+    <visual>
+      <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/cast/cast_simple_2.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <link name="wind_tunnel">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/wind_tunnel_down.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <joint name="some_joint" type="fixed">
+    <parent link="world"/>
+    <child link="wind_tunnel"/>
+    <origin rpy="0 0 1.5707" xyz="-0.1 -7.0 0"/>
+  </joint>
+
+  <link name="bintel">
+    <visual>
+      <origin rpy="0.0 0 1.5707" xyz="0 0 0.008"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/inteldrone_frame.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <link name="laser">
+	<visual>
+      <origin rpy="1.5707  0 1.5707" xyz="0 -0.025 0.00"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/hokuyo_urg04lx.STL" scale="0.001 0.001 0.001"/>
+      </geometry>     
+    </visual>
+  </link>
+  
+  <joint name="laser_to_bintel" type="fixed">
+    <parent link="bintel"/>
+    <child link="laser"/>
+    <origin rpy="0 0 3.1415" xyz="0.03 0.0 0.05"/>
+  </joint>
+
+</robot>

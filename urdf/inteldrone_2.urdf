@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<robot name="intelaero">
+
+  <link name="bintel">
+    <visual>
+      <origin rpy="0.0 0 1.5707" xyz="0 0 0.008"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/inteldrone_frame.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <link name="laser">
+	<visual>
+      <origin rpy="1.5707  0 1.5707" xyz="0 -0.025 0.03"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/hokuyo_urg04lx.STL" scale="0.001 0.001 0.001"/>
+      </geometry>     
+    </visual>
+  </link>
+  
+  <joint name="laser_to_bintel" type="fixed">
+    <parent link="bintel"/>
+    <child link="laser"/>
+    <origin rpy="0 0 3.1415" xyz="0.03 0.0 0.05"/>
+  </joint>
+  
+    <link name="r200lidar">
+  </link>
+
+  <joint name="lidar_bintel" type="fixed">
+    <parent link="bintel"/>
+    <child link="r200lidar"/>
+    <origin rpy="0 0 3.1415" xyz="-0.11 0.0 -0.01"/>
+  </joint>
+  
+  
+  <link name="engineUR">
+  </link>
+  <joint name="bintel_t0_engineUR" type="fixed">
+    <parent link="bintel"/>
+    <child link="engineUR"/>
+    <origin rpy="0 0 3.1415" xyz="-0.125 0.125 0.02"/>
+  </joint>
+  
+  <link name="engineUL">
+  </link>
+  <joint name="bintel_t0_engineUL" type="fixed">
+    <parent link="bintel"/>
+    <child link="engineUL"/>
+    <origin rpy="0 0 3.1415" xyz="-0.125 -0.125 0.02"/>
+  </joint>
+
+
+ <link name="engineLR">
+  </link>
+  <joint name="bintel_t0_engineUR" type="fixed">
+    <parent link="bintel"/>
+    <child link="engineUR"/>
+    <origin rpy="0 0 3.1415" xyz="0.125 0.125 0.02"/>
+  </joint>
+  
+  <link name="engineLL">
+  </link>
+  <joint name="bintel_t0_engineUL" type="fixed">
+    <parent link="bintel"/>
+    <child link="engineUL"/>
+    <origin rpy="0 0 3.1415" xyz="0.125 -0.125 0.02"/>
+  </joint>
+
+</robot>

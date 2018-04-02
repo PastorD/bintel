@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot name="cast_flying_arena">
+
+  <link name="world">
+    <visual>
+      <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/cast/cast_simple_2.dae"/>
+      </geometry>
+    </visual>
+  </link>
+   
+
+</robot>

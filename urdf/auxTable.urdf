@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot name="auxTable">
+
+  <link name="auxTable">
+    <visual>
+      <origin rpy="0.0 0 0" xyz="0 0 0.910"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/auxTable.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  
+  <joint name="world_to_auxTable" type="fixed">
+    <parent link="world"/>
+    <child link="auxTable"/>
+    <origin rpy="0 0 0" xyz="0.0 0.0 0"/>
+  </joint>
+
+
+</robot>

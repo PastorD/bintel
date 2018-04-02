@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<robot name="shuttle">
+
+  <link name="base_link">
+    <visual>
+      <origin rpy="0.0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/shuttle.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+  <link name="world">
+  </link>
+  
+  <joint name="shuttle_to_world" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0 2 0.25"/>
+  </joint>
+
+</robot>

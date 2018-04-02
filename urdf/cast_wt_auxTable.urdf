@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<robot name="cast_flying_arena">
+
+  <link name="world">
+    <visual>
+      <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/cast/cast_simple_2.dae"/>
+      </geometry>
+    </visual>
+  </link>
+  
+
+  
+  <link name="auxTable">
+    <visual>
+      <origin rpy="0.0 0 0" xyz="0 0 0.910"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/auxTable.stl"/>
+      </geometry>
+    </visual>
+  </link>  
+  
+  
+  <joint name="world_to_auxTable" type="fixed">
+	<origin rpy="0 0 0" xyz="0.0 0.0 2"/>
+    <parent link="world"/>
+    <child link="auxTable"/>    
+  </joint>
+
+
+  <link name="wind_tunnel">
+    <visual>
+      <origin rpy="0.0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/wind_tunnel_down.dae"/>
+      </geometry>
+    </visual>
+  </link>  
+  
+  <joint name="world_to_wind_tunnel" type="fixed">
+	  <origin rpy="0 0 0" xyz="5 5 4"/>
+    <parent link="world"/>
+    <child link="wind_tunnel"/>    
+  </joint>
+
+  
+
+</robot>
