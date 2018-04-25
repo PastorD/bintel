@@ -6,9 +6,10 @@
   <arg name="gui" default="false" />
   <arg name="rvizconfig" default="$(find bintel_ros)/urdf/cast_urdf.rviz" />
 
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg robot_urdf)'" />
+
   
   <param name="cast_description" command="$(find xacro)/xacro --inorder '$(arg cast_urdf)'" />
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg robot_urdf)'" />
 
   <param name="use_gui" value="$(arg gui)"/>
 

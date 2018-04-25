@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="cast_flying_arena">
+<robot name="castarena">
 
   <link name="world">
     <visual>
@@ -9,12 +9,10 @@
       </geometry>
     </visual>
   </link>
-  
 
-  
   <link name="auxTable">
     <visual>
-      <origin rpy="0.0 0 0" xyz="0 0 0.910"/>
+      <origin rpy="0.0 0 0" xyz="0 0 0.930"/>
       <geometry>
         <mesh filename="package://bintel_ros/meshes/auxTable.stl"/>
       </geometry>
@@ -22,14 +20,14 @@
   </link>  
   
   
-  <joint name="world_to_auxTable" type="fixed">
+  <joint name="j1" type="fixed">
 	<origin rpy="0 0 0" xyz="0.0 0.0 2"/>
     <parent link="world"/>
     <child link="auxTable"/>    
   </joint>
 
 
-  <link name="wind_tunnel">
+  <link name="windtunnel">
     <visual>
       <origin rpy="0.0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -38,12 +36,10 @@
     </visual>
   </link>  
   
-  <joint name="world_to_wind_tunnel" type="fixed">
-	  <origin rpy="0 0 0" xyz="5 5 4"/>
+  <joint name="j2" type="fixed">
+	  <origin rpy="0 0 1.5707" xyz="0 -7.7 0"/>
     <parent link="world"/>
-    <child link="wind_tunnel"/>    
-  </joint>
-
-  
+    <child link="windtunnel"/>    
+  </joint>  
 
 </robot>
