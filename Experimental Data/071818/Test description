@@ -4,6 +4,8 @@ Initial test of drone with data streaming at 100 hz. The following maneuvers wer
 -Simple direction change close to ground
 -Hover far away from ground
 
+Collected data: Motor commands(PWM), IMU, Optitrack (position + attitude) @ ~100 hz
+
 Battery mass: 391.0 g
 Drone mass: 1153.6 g
 Total mass: 1544.6 g
