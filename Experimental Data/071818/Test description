@@ -1,0 +1,13 @@
+Initial test of drone with data streaming at 100 hz. The following maneuvers were done with manual control:
+-Take-off and landing
+-Rotation close to ground
+-Simple direction change close to ground
+-Hover far away from ground
+
+Battery mass: 391.0 g
+Drone mass: 1153.6 g
+Total mass: 1544.6 g
+Test time: 4:30 PM
+Test duration: 1h
+Weather: Sunny
+Temperature: 88 degrees
