@@ -8,12 +8,10 @@ Panels:
         - /Status1
         - /RobotModel1
         - /RobotModel2
-        - /RobotModel2/Links1
         - /TF1
         - /TF1/Frames1
         - /TF1/Tree1
         - /Axes1
-        - /LaserScan1
         - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 1088
@@ -35,7 +33,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: LaserScan
+    SyncSource: PointCloud2
 Visualization Manager:
   Class: ""
   Displays:
@@ -83,21 +81,54 @@ Visualization Manager:
       Collision Enabled: false
       Enabled: true
       Links:
-        All Links Enabled: false
+        All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        bintel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_rgb_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        engineLL:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        engineLR:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        engineUL:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        engineUR:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rollocopter:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -109,9 +140,45 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        base_link:
+          Value: true
+        bintel:
+          Value: true
+        camera_depth_frame:
+          Value: true
+        camera_depth_optical_frame:
+          Value: true
+        camera_ir2_frame:
+          Value: true
+        camera_ir2_optical_frame:
+          Value: true
+        camera_ir_frame:
+          Value: true
+        camera_ir_optical_frame:
+          Value: true
+        camera_link:
+          Value: true
+        camera_rgb_frame:
+          Value: true
+        camera_rgb_optical_frame:
+          Value: true
+        engineLL:
+          Value: true
+        engineLR:
+          Value: true
+        engineUL:
+          Value: true
+        engineUR:
+          Value: true
+        fcu:
+          Value: true
+        fcu_frd:
+          Value: true
         laser:
           Value: true
-        rollocopter:
+        local_origin:
+          Value: true
+        local_origin_ned:
           Value: true
         world:
           Value: true
@@ -122,7 +189,30 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          rollocopter:
+          bintel:
+            base_link:
+              {}
+            camera_link:
+              camera_depth_frame:
+                camera_depth_optical_frame:
+                  {}
+              camera_ir2_frame:
+                camera_ir2_optical_frame:
+                  {}
+              camera_ir_frame:
+                camera_ir_optical_frame:
+                  {}
+              camera_rgb_frame:
+                camera_rgb_optical_frame:
+                  {}
+            engineLL:
+              {}
+            engineLR:
+              {}
+            engineUL:
+              {}
+            engineUR:
+              {}
             laser:
               {}
       Update Interval: 0
@@ -146,7 +236,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 100
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -163,7 +253,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -175,7 +265,7 @@ Visualization Manager:
       Class: rviz/PointCloud2
       Color: 255; 255; 255
       Color Transformer: Intensity
-      Decay Time: 0
+      Decay Time: 100
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -219,25 +309,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 10.1933403
+      Distance: 0.00999999978
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
-      Focal Shape Fixed Size: false
+        X: -0.0924916044
+        Y: 0.685914457
+        Z: 0.299004823
+      Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.71979773
-      Target Frame: rollocopterArduino
+      Pitch: 0.405202538
+      Target Frame: bintel
       Value: Orbit (rviz)
-      Yaw: 5.022223
+      Yaw: 0.732219279
     Saved: ~
 Window Geometry:
   Displays:
