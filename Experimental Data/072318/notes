@@ -3,9 +3,10 @@ Vehicle: cintel
 Testers: Xichen Shi (pilot), Mike O'Connell (data collection), Guanya Shi
 Date: 07/23/2018
 
---Goals--
-: Test data collection setup
-: gather preliminary data for ground effect and free flight
+--General notes--
+goal: Test data collection setup
+goal: gather preliminary data for ground effect and free flight
+control: manual
 
 --Trial descriptions--
 test1: slow landing and take off
