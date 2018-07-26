@@ -18,7 +18,7 @@ Where the numeric parameters are specified in:
 The third numeric parameter is the interval between messages specified in microseconds. 
 
 # Setting Up Optitrack for Positioning
-To use Optitrack for positioning using ecf-EKF, first remap the vrpn topic publishing pose to /mavros/vision/pose. This is done when running the launch file mavros_optitrack.launch (which then runs vrpn_optitrack_positioning.launch which remaps the topic). Then, set the following parameters in QGroundControl:
+To use Optitrack for positioning using ecf-EKF, first remap the vrpn topic publishing pose to /mavros/vision_pose/pose. This is done when running the launch file mavros_optitrack.launch (which then runs vrpn_optitrack_positioning.launch which remaps the topic). Then, set the following parameters in QGroundControl:
 - EKF2_AID_MASK: Check vision position fusion, vision yaw fusion (uncheck everything else)
 - EKF2_HGT_MODE: Vision
 - SYS_MC_EST_GROUP: eclEKF
