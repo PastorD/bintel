@@ -1,0 +1,14 @@
+<launch>
+	<node
+		pkg="mavros"
+		name="mavros"
+		type="mavros_node"
+		args="_fcu_url:=tcp://127.0.0.1:5760
+		      _system_id:=2"
+		output="screen"
+	/>
+	<include 
+		file="/home/bgroupintel/catkin_ws/src/vrpn_client_ros/launch/optitrack_positioning.launch">
+		<arg name="server" value="192.168.1.2"/>
+	</include>
+</launch>
