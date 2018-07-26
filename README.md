@@ -1,10 +1,14 @@
 # Increasing the Data Stream Rate
 To increase the stream rate at the IMU (mavros/imu/data) and the motor commands (mavros/rc/out), run the following commands in ros:
+
 IMU:
+
   rosrun mavros mavcmd long 511 105 10000 0 0 0 0 0
+
   rosrun mavros mavcmd long 511 31 10000 0 0 0 0 0
 
 Controls:
+
   rosrun mavros mavcmd long 511 36 10000 0 0 0 0 0
 
 Where the numeric parameters are specified in:
