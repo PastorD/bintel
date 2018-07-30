@@ -11,6 +11,15 @@ This repository contains the code to use the Burdick Lab Intel Drone. Please don
 ```console
   $ roslaunch mavros_optitrack.launch
 ```
+- check that the time difference is small:
+```console
+  $ ntpdate -q other_computer_ip
+```
+- run ntp server to correct any time issues:
+```console
+  $ sudo ntpq -p
+```
+
 
 
 If you cannot see the topics from one machine to another make sure that the connectivy works:
@@ -22,6 +31,15 @@ If you cannot see the topics from one machine to another make sure that the conn
 - YOURIP is your network IP as seen when ifconfig is executed. If you are using a new computer your should fix your IP within the router to avoid conflicts.
 - ping between the two machines
 
+To visualize the drone within CAST you have to run their urdf models. Run the launch file:
+```console
+  $ roslaunch urdf/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+```
+![](urdf/urdf_screen.png)
+
+
+It will define the frames for the bintel, CAST and it will define the static tf between them. In addition, it will launch a rviz instance with the right configuration. 
+**NOTE:** if the CAD models or the frames are red it means optitrack is not publishing the correct pose. Check that the node is working.
 
 
 # Extra commands
