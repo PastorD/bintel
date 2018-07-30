@@ -1,15 +1,47 @@
-# Increasing the Data Stream Rate
+# Description
+This repository contains the code to use the Burdick Lab Intel Drone. Please don't include data in this repository and use the dedicated repository instead.
+
+# Usage
+- Turn on the drone
+- ssh into the drone
+```console
+  $ ssh bgroupintel@192.168.1.61
+```
+- execute the optitrack and mavros nodes inside the drone
+```console
+  $ roslaunch mavros_optitrack.launch
+```
+
+
+If you cannot see the topics from one machine to another make sure that the connectivy works:
+- Set up ROST_HOSTNAME and ROS_MASTER_URI
+```console
+  export ROS_MASTER_URI=http://192.168.1.61:11311 
+  export ROST_HOSTNAME=192.168.1.YOURIP:11311 
+```
+- YOURIP is your network IP as seen when ifconfig is executed. If you are using a new computer your should fix your IP within the router to avoid conflicts.
+- ping between the two machines
+
+
+
+# Extra commands
+## Increasing the Data Stream Rate
 To increase the stream rate at the IMU (mavros/imu/data) and the motor commands (mavros/rc/out), run the following commands in ros:
 
+
+
 IMU:
+```console
 
-  rosrun mavros mavcmd long 511 105 10000 0 0 0 0 0
+  $ rosrun mavros mavcmd long 511 105 10000 0 0 0 0 0
 
-  rosrun mavros mavcmd long 511 31 10000 0 0 0 0 0
+  $ rosrun mavros mavcmd long 511 31 10000 0 0 0 0 0
+```
 
 Controls:
-
-  rosrun mavros mavcmd long 511 36 10000 0 0 0 0 0
+```console
+  $ rosrun mavros mavcmd long 511 36 10000 0 0 0 0 0
+```
 
 Where the numeric parameters are specified in:
   https://mavlink.io/en/messages/common.html#MAV_CMD_GET_MESSAGE_INTERVAL (1st parameter)
@@ -17,7 +49,7 @@ Where the numeric parameters are specified in:
   
 The third numeric parameter is the interval between messages specified in microseconds. 
 
-# Setting Up Optitrack for Positioning
+## Setting Up Optitrack for Positioning
 To use Optitrack for positioning using ecf-EKF, first remap the vrpn topic publishing pose to /mavros/vision_pose/pose. This is done when running the launch file mavros_optitrack.launch (which then runs vrpn_optitrack_positioning.launch which remaps the topic). Then, set the following parameters in QGroundControl:
 - EKF2_AID_MASK: Check vision position fusion, vision yaw fusion (uncheck everything else)
 - EKF2_HGT_MODE: Vision
