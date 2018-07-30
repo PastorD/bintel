@@ -1,0 +1,30 @@
+<launch>
+
+	<arg name="rollLEFT" default="$(find bintel_ros)/urdf/rollocopterLEFT.urdf"/>  
+	<arg name="rollRIGHT" default="$(find bintel_ros)/urdf/rollocopterRIGHT.urdf"/>
+	
+	<param name="rolloLEFT" command="$(find xacro)/xacro --inorder '$(arg rollLEFT)'" />
+	<param name="rolloRIGHT" command="$(find xacro)/xacro --inorder '$(arg rollRIGHT)'" />
+  
+  <arg name="gui" default="false" />  
+  
+ 
+  <node name="joint_state_publisher_rollo_RIGHT" pkg="joint_state_publisher" type="joint_state_publisher">
+	<remap from="robot_description" to="rolloRIGHT" />
+  </node>  
+  
+  <node name="robot_state_publisher_rollo_RIGHT" pkg="robot_state_publisher" type="state_publisher">
+		<remap from="robot_description" to="rolloRIGHT" />
+  </node>  
+  
+  
+  
+  <node name="joint_state_publisher_rollo_LEFT" pkg="joint_state_publisher" type="joint_state_publisher">
+		<remap from="robot_description" to="rolloLEFT" />
+  </node>  
+  
+  <node name="robot_state_publisher_rollo_LEFT" pkg="robot_state_publisher" type="state_publisher">
+		<remap from="robot_description" to="rolloLEFT" />
+  </node>  
+
+</launch>

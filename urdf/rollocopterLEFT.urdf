@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<robot name="rollocopterLEFT">
+
+  <link name="rollocopterLEFT">	  
+  </link>
+  
+  <link name="laserLEFT">
+	<visual>
+      <origin rpy="0  0 1.5707" xyz=" 0 0 0"/>
+      <geometry>
+        <mesh filename="package://bintel_ros/meshes/hokuyo_urg04lx.STL" scale="0.001 0.001 0.001"/>
+      </geometry>     
+    </visual>
+  </link>
+  
+  <joint name="laser_to_bintel" type="fixed">
+    <parent link="rollocopterLEFT"/>
+    <child link="laserLEFT"/>
+    <origin rpy="0 -1.5707 3.1415" xyz="0.0 0 0"/>
+  </joint>
+
+
+</robot>
