@@ -33,7 +33,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -55,7 +55,7 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Alpha: 0.200000003
+    - Alpha: 0.100000001
       Class: rviz/RobotModel
       Collision Enabled: false
       Enabled: true
@@ -65,7 +65,7 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        world:
+        map:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -140,25 +140,15 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        RigidBody01:
+          Value: true
         base_link:
           Value: true
         bintel:
           Value: true
-        camera_depth_frame:
-          Value: true
         camera_depth_optical_frame:
           Value: true
-        camera_ir2_frame:
-          Value: true
-        camera_ir2_optical_frame:
-          Value: true
-        camera_ir_frame:
-          Value: true
-        camera_ir_optical_frame:
-          Value: true
         camera_link:
-          Value: true
-        camera_rgb_frame:
           Value: true
         camera_rgb_optical_frame:
           Value: true
@@ -170,17 +160,9 @@ Visualization Manager:
           Value: true
         engineUR:
           Value: true
-        fcu:
-          Value: true
-        fcu_frd:
-          Value: true
         laser:
           Value: true
-        local_origin:
-          Value: true
-        local_origin_ned:
-          Value: true
-        world:
+        map:
           Value: true
       Marker Scale: 0.200000003
       Name: TF
@@ -188,23 +170,17 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        world:
+        map:
+          RigidBody01:
+            {}
           bintel:
             base_link:
               {}
             camera_link:
-              camera_depth_frame:
-                camera_depth_optical_frame:
-                  {}
-              camera_ir2_frame:
-                camera_ir2_optical_frame:
-                  {}
-              camera_ir_frame:
-                camera_ir_optical_frame:
-                  {}
-              camera_rgb_frame:
-                camera_rgb_optical_frame:
-                  {}
+              camera_depth_optical_frame:
+                {}
+              camera_rgb_optical_frame:
+                {}
             engineLL:
               {}
             engineLR:
@@ -288,7 +264,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: world
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
@@ -309,7 +285,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.00999999978
+      Distance: 7.16054392
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -324,10 +300,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.405202538
+      Pitch: 0.49979645
       Target Frame: bintel
       Value: Orbit (rviz)
-      Yaw: 0.732219279
+      Yaw: 1.56221282
     Saved: ~
 Window Geometry:
   Displays:
