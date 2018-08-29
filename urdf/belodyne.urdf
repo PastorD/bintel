@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="aelodyne">
+
+  <link name="belodyne">
+  </link>
+  
+  <link name="velodyne">
+  </link>
+  
+  <joint name="laser_to_bintel" type="fixed">
+    <parent link="belodyne"/>
+    <child link="velodyne"/>
+    <origin rpy="0 1.57 0" xyz="0 0 0"/>
+  </joint>
+
+
+</robot>

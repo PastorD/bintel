@@ -1,0 +1,15 @@
+<launch>
+
+<arg name="belodyne_urdf" default="$(find bintel_ros)/urdf/belodyne.urdf"/>
+
+<param name="belodyne_robot" command="$(find xacro)/xacro --inorder '$(arg belodyne_urdf)'" />
+
+<node name="joint_state_publisher_rollo_RIGHT" pkg="joint_state_publisher" type="joint_state_publisher">
+	<remap from="robot_description" to="belodyne_robot" />
+  </node>  
+  
+  <node name="robot_state_publisher_rollo_RIGHT" pkg="robot_state_publisher" type="state_publisher">
+		<remap from="robot_description" to="belodyne_robot" />
+  </node>  
+
+</launch>
