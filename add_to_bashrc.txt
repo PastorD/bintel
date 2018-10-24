@@ -1,0 +1,19 @@
+
+## Added by setup_bashrc
+
+source ~/catkin_ws/devel/setup.bash
+
+# Extra Aliases
+alias ob='geany ~/.bashrc'
+alias nob='nano ~/.bashrc'
+alias cb='cd ~/catkin_ws && catkin build'
+alias sb='source ~/.bashrc'
+
+
+
+# ROS Network Communication
+#export ROS_MASTER_URI=http://192.168.1.123:11311 # if master is dpastorm-thinkpad
+export ROS_MASTER_URI=http://192.168.1.61:11311 # if master at NETGEAR22
+export ROS_HOSTNAME=192.168.1.61 # fixed when using NETGEAR22
+
+##
