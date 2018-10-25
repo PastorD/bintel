@@ -8,7 +8,7 @@
 		output="screen"
 	/>
 	<include 
-		file="/home/bgroupintel/catkin_ws/src/bintel/launch/vrpn_optitrack_positioning.launch">
+		file="/home/bintel/catkin_ws/src/bintel/launch/vrpn_optitrack_positioning.launch">
 		<arg name="server" value="192.168.1.2"/>
 	</include>
 	<node
@@ -16,5 +16,5 @@
 		name= "position_relay2"
 		type = "relay"
 		args="/vrpn_client_node/bintel/pose /mavros/vision_pose/pose"
-	</node>
+	/>
 </launch>
