@@ -8,7 +8,6 @@ Panels:
         - /Status1
         - /RobotModel1
         - /RobotModel2
-        - /TF1
         - /TF1/Frames1
         - /TF1/Tree1
         - /Axes1
@@ -33,7 +32,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: LaserScan
 Visualization Manager:
   Class: ""
   Displays:
@@ -140,8 +139,6 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        RigidBody01:
-          Value: true
         base_link:
           Value: true
         bintel:
@@ -160,7 +157,15 @@ Visualization Manager:
           Value: true
         engineUR:
           Value: true
+        fcu:
+          Value: true
+        fcu_frd:
+          Value: true
         laser:
+          Value: true
+        local_origin:
+          Value: true
+        local_origin_ned:
           Value: true
         map:
           Value: true
@@ -171,8 +176,6 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          RigidBody01:
-            {}
           bintel:
             base_link:
               {}
@@ -212,7 +215,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 100
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -229,7 +232,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -241,8 +244,8 @@ Visualization Manager:
       Class: rviz/PointCloud2
       Color: 255; 255; 255
       Color Transformer: Intensity
-      Decay Time: 100
-      Enabled: true
+      Decay Time: 10
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -259,7 +262,7 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -285,7 +288,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.16054392
+      Distance: 0.841778934
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
@@ -300,10 +303,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.49979645
+      Pitch: 0.624796689
       Target Frame: bintel
       Value: Orbit (rviz)
-      Yaw: 1.56221282
+      Yaw: 1.18221378
     Saved: ~
 Window Geometry:
   Displays:
