@@ -27,7 +27,7 @@ class optitrackReference():
         countMessages = 0
         state = 0
         self.pressed = 0
-        self.fixFrame = 'world'
+        self.fixFrame = 'map'
         rospy.loginfo('Node optitrackReference loaded. ')
         
         r = rospy.Rate(100)
