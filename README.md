@@ -99,7 +99,7 @@ To avoid inserting the password everytime you ssh using ssh-key authentification
 ```
 If you haven't created a ssh-key for your computer, use:
 
-``console
+```console
   $ ssh-keygen -t mykey
 ```
 where mykey is your name.
