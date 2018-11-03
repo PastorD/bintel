@@ -18,7 +18,10 @@ class gotooptitrack():
         # subscriber,
         self.local_pose = PoseStamped()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_cb)
-        
+        self.waypoint = PoseStamped()
+        self.waypoing.pose.position.x = 0
+        self.waypoing.pose.position.x = 0
+        self.waypoing.pose.position.x = 2
         
         while not rospy.is_shutdown():
                 user_input = raw_input('Press p got to waypoint...')
@@ -28,9 +31,10 @@ class gotooptitrack():
                     rospy.loginfo('key pressed')
                     self.local_pose_mod = self.local_pose
                     rospy.loginfo(self.local_pose_mod)
-                    self.local_pose_mod.pose.position.x =  self.local_pose_mod.pose.position.x + 1.0
+                    self.local_pose_mod.pose.position.x =  self.local_pose_mod.pose.position.x+1
                     rospy.loginfo(self.local_pose_mod)
-                    self.pub_sp.publish(self.local_pose_mod)
+                    
+                    self.pub_sp.publish(self.waypoint)
                 rate.sleep()
     
     def _local_pose_cb(self,data):
