@@ -13,7 +13,7 @@ class gotooptitrack():
         self.pub_sp = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
         
         rospy.init_node('gotowaypoint', anonymous=True)
-        rate = rospy.Rate(10) # 10hz
+        rate = rospy.Rate(50) # 10hz
         
         # subscriber,
         self.local_pose = PoseStamped()
