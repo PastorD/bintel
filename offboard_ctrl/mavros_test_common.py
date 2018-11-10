@@ -62,12 +62,13 @@ class MavrosTestCommon(unittest.TestCase):
         self.ext_state_sub = rospy.Subscriber('mavros/extended_state',
                                               ExtendedState,
                                               self.extended_state_callback)
-        self.global_pos_sub = rospy.Subscriber('mavros/global_position/global',
-                                               NavSatFix,
-                                               self.global_position_callback)
-        self.home_pos_sub = rospy.Subscriber('mavros/home_position/home',
-                                             HomePosition,
-                                             self.home_position_callback)
+        #Not used when flying in CAST:
+        self.global_pos_sub = True#rospy.Subscriber('mavros/global_position/global',
+                                   #            NavSatFix,
+                                    #           self.global_position_callback)
+        self.home_pos_sub = True#rospy.Subscriber('mavros/home_position/home',
+                                 #            HomePosition,
+                                  #           self.home_position_callback)
         self.local_pos_sub = rospy.Subscriber('mavros/local_position/pose',
                                               PoseStamped,
                                               self.local_position_callback)
