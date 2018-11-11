@@ -66,7 +66,7 @@ class MavrosOffboardPosctlTest(MavrosTestCommon):
         super(MavrosOffboardPosctlTest, self).setUp()
 
         self.pos = PoseStamped()
-        self.radius = 1
+        self.radius = 0.1
 
         self.pos_setpoint_pub = rospy.Publisher(
             'mavros/setpoint_position/local', PoseStamped, queue_size=1)
