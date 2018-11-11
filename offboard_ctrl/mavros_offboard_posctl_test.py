@@ -66,7 +66,7 @@ class MavrosOffboardPosctlTest(MavrosTestCommon):
         super(MavrosOffboardPosctlTest, self).setUp()
 
         self.pos = PoseStamped()
-        self.radius = 0.15
+        self.radius = 0.25
 
         self.pos_setpoint_pub = rospy.Publisher(
             'mavros/setpoint_position/local', PoseStamped, queue_size=1)
@@ -166,11 +166,11 @@ class MavrosOffboardPosctlTest(MavrosTestCommon):
         self.set_arm(True, 5)
 
         rospy.loginfo("run mission")
-        positions = ((0, 0, 0), (0, 0, 1),(0,0,0))
+        positions = ((0, 0, 2),(0,1,2),(0,0,2))
 
         for i in xrange(len(positions)):
             self.reach_position(positions[i][0], positions[i][1],
-                                positions[i][2], 30)
+                                positions[i][2], 60)
 
         self.set_mode("AUTO.LAND", 5)
         self.wait_for_landed_state(mavutil.mavlink.MAV_LANDED_STATE_ON_GROUND,
