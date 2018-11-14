@@ -60,9 +60,18 @@ Once everything has been checked, you are good to fly. The left lever at the bac
 Be ready to take manual control of the drone at any time
 
 ## Off-board mode
+
+OPTION 1
 + Arm the drone in position mode. 
 + Start a script publishing to command the drone, either /mavros/setpoint_position/pose or /mavros/setpoint_attitude. Make sure to publish at a high rate (>~20HZ??)
-+ Change to off-board mode in the radio. If you change to off-board mode before publishing it would reject the mode.
++ Change to off-board mode in the radio. If you change to off-board mode before publishing it would reject the mode
+
+OPTION 2
+Run the python file
+```console
+$ python  	mavros_offboard_posctl_test.py
+```
+The waypoints are written in the file.
 
 
 # Extra commands
@@ -89,6 +98,12 @@ Where the numeric parameters are specified in:
   https://github.com/PX4/Firmware/blob/4453e4201b7a245cff52beeb38a293161aea4c48/Tools/mavlink_px4.py#L506 (2nd parameter)
   
 The third numeric parameter is the interval between messages specified in microseconds. 
+
+To run all commands at once run the script:
+```console
+$ ./increase_rates.sh
+```
+
 
 ## Setting up SSH keys
 
