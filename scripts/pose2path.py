@@ -34,7 +34,7 @@ class pose2path():
 	    pose.header = data.header
 	    pose.pose = data.pose
 	    self.path.poses.append(pose)
-	    self.path_pub.publish(path)
+	    self.path_pub.publish(self.path)
 
 if __name__ == '__main__':
     try:
