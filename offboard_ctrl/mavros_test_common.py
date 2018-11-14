@@ -30,7 +30,7 @@ class MavrosTestCommon(unittest.TestCase):
         self.sub_topics_ready = {
             key: False
             for key in [
-                'alt', 'ext_state', 'global_pos', 'home_pos', 'local_pos',
+                'alt', 'ext_state', 'local_pos',
                 'mission_wp', 'state'
             ]
         }
