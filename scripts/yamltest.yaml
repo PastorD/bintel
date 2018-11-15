@@ -1,0 +1,19 @@
+system:
+  version: '1.0'
+  description: 'Intel Drone'
+  sensors:
+    - name: 'lidar'
+      type: 'lidar'
+      hardware: 'Hokuyo URG-04LX-UG01'
+      topic: '/scan'
+      topic_type: 'sensor_msgs/LaserScan'
+      pose: 'laser'
+      publish_points: '/points_lidar'
+
+    - name: 'realsense'
+      type: 'stereo'
+      hardware: 'Intel RealSense Depth Camera R200'
+      topic: '/camera/depth/points'
+      topic_type: 'sensor_msgs/PointCloud2'
+      pose: 'camera_depth_optical_frame'
+      publish_points: '/points_realsense'

@@ -5,6 +5,11 @@ from visualization_msgs.msg import Marker, MarkerArray
 import tf
 import argparse
 import copy
+from yaml import load, dump
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
 
 # Usage: use this node to publish a marker topic from a pose. 
 # For example: python pose2marker --reference '/vrpn_client_node/bintel/pose'
@@ -16,12 +21,16 @@ class seeBoundaryCorners():
         rospy.init_node('marker_node_boundary_array')
         self.marker_pub = rospy.Publisher('/boundary_box_array', MarkerArray, queue_size=10)
         boxArray = MarkerArray()
-        self.xmin = -1.0
-        self.xmax = +3.0
-        self.ymin = -2.0
-        self.ymax = +3.0
-        self.zmin = +1.0
-        self.zmax = +3.0
+
+        path = 'scripts/boundary.yaml'
+        data = load(file(path, 'r'), Loader=Loader)
+
+        self.xmin = data['boundary']['xmin']
+        self.xmax = data['boundary']['xmax']
+        self.ymin = data['boundary']['ymin']
+        self.ymax = data['boundary']['ymax']
+        self.zmin = data['boundary']['zmin']
+        self.zmax = data['boundary']['zmax']
 
         self.box_marker = Marker()
         self.box_marker.type = Marker.CUBE
