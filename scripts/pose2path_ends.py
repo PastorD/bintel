@@ -61,6 +61,7 @@ class pose2path():
 
         # create a grey box marker
         self.box_marker = Marker()
+
         self.box_marker.type = Marker.CUBE
         self.box_marker.scale.x = 0.2
         self.box_marker.scale.y = 0.2

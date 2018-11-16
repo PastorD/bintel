@@ -15,8 +15,7 @@ class pose2path():
         # Parse Input
         parser = argparse.ArgumentParser()
         parser.add_argument("reference", help="name of the optitrack frame used for reference")
-        
-        
+                
         args = parser.parse_args()
         self.reference = args.reference
         

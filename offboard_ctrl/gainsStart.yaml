@@ -1,0 +1,21 @@
+controller:
+	pitchPID:
+		kp: 1.0
+		kd: 1.0
+		ki: 1.0
+
+	rollPID:
+		kp: 1.0
+		kd: 1.0
+		ki: 1.0		
+
+	yawPID:
+		kp: 1.0
+		kd: 1.0
+		ki: 1.0
+
+  heightPID:
+    kp: 1.0
+    kd: 1.0
+    ki: 1.0
+		
