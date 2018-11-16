@@ -34,7 +34,7 @@ class seeBoundaryCorners():
 
         self.box_marker = Marker()
         self.box_marker.type = Marker.CUBE
-        self.box_marker.header.frame_id = 'world'
+        self.box_marker.header.frame_id = 'map'
         self.box_marker.scale.x = self.xmax - self.xmin
         self.box_marker.scale.y = self.ymax - self.ymin
         self.box_marker.scale.z = self.zmax - self.zmin
@@ -49,7 +49,7 @@ class seeBoundaryCorners():
 
         cornerMarker = Marker()
         cornerMarker.type = Marker.CUBE
-        cornerMarker.header.frame_id = 'world'
+        cornerMarker.header.frame_id = 'map'
         cornerMarker.scale.x = 0.05
         cornerMarker.scale.y = 0.05
         cornerMarker.scale.z = 0.05
