@@ -92,9 +92,9 @@ class goThrust():
 
         # Set Waypoint
         self.waypoint = PoseStamped()
-        self.waypoint.pose.position.x = 0
+        self.waypoint.pose.position.x = -1.4
         self.waypoint.pose.position.y = 0
-        self.waypoint.pose.position.z = 1.5
+        self.waypoint.pose.position.z = 1.2
         
         self.marker_pub = rospy.Publisher('/waypoint_marker', Marker, queue_size=10)
         self.waypoint_marker = Marker()
@@ -139,16 +139,15 @@ class goThrust():
                 data.pose.orientation.w)
         euler = tf.transformations.euler_from_quaternion(quaternion)
 
-        print 'roll is %5.2f deg, and pitch is %5.2f deg, and yaw is %5.2f deg' % (euler[0]*180/3.1425, euler[1]*180/3.1425, euler[2]*180/3.1425)
+        #print 'roll is %5.2f deg, and pitch is %5.2f deg, and yaw is %5.2f deg' % (euler[0]*180/3.1425, euler[1]*180/3.1425, euler[2]*180/3.1425)
         
-
         [self.cpitch,self.croll,self.cyaw,self.cheight] =  \
                     self.controller.genQUADcontrol(self.local_pose.pose,self.waypoint.pose)
 
-
+        print 'y command %5.2f, x command %5.2f, yaw command %5.2f, thrust %5.2f' % (self.croll, self.cpitch, self.cyaw, self.cheight + self.hoverth) 
         self.AttitudeTarget = AttitudeTarget()
         self.AttitudeTarget.orientation = Quaternion(*quaternion_from_euler(self.croll,self.cpitch,self.cyaw))
-        self.AttitudeTarget.thrust = -self.kz*(data.pose.position.z - self.waypoint.pose.position.z) + self.hoverth
+        self.AttitudeTarget.thrust = self.cheight + self.hoverth
 
         self.pub_sp.publish(self.AttitudeTarget)
         

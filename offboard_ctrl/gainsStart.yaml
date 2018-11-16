@@ -2,19 +2,19 @@ controller:
   pitchPID:
     kp: 1.0
     kd: 0.02
-    ki: 0.05
+    ki: 0.00
 
   rollPID:
     kp: 1.0
     kd: 0.02
-    ki: 0.05	
+    ki: 0.00	
 
   yawPID:
     kp: 1.0
     kd: 0.02
-    ki: 0.05
+    ki: 0.00
 
   heightPID:
-    kp: 1.0
+    kp: 0.05
     kd: 0.02
-    ki: 0.02
+    ki: 0.002
