@@ -15,9 +15,11 @@ class pose2path():
         # Parse Input
         parser = argparse.ArgumentParser()
         parser.add_argument("reference", help="name of the optitrack frame used for reference")
+        parser.add_argument("length",    help='length in seconds of the published path')
                 
         args = parser.parse_args()
         self.reference = args.reference
+        self.length = args.length
         
         # Init Node
         rospy.init_node('path_node')
