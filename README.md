@@ -131,7 +131,7 @@ To use Optitrack for positioning using ecf-EKF, first remap the vrpn topic publi
 - EKF2_HGT_MODE: Vision
 - SYS_MC_EST_GROUP: eclEKF
 
-The pose from the Optitrack system will now be fused with other sensors to estimate the position and orientation of the drone. Therefore, when booting the drone, its coordinate frame must be alligned with the Optitrack reference frame. Furthermore, the positioning can be verified by comparing the output of the topics /mavros/vision/pose and /mavros/local_position/pose. These topics should track each other closely. 
+The pose from the Optitrack system will now be fused with other sensors to estimate the position and orientation of the drone. Therefore, when booting the drone, its coordinate frame must be alligned with the Optitrack reference frame. Furthermore, the positioning can be verified by comparing the output of the topics /mavros/vision_pose/pose and /mavros/local_position/pose. These topics should track each other closely. 
 
 For more details see: https://dev.px4.io/en/ros/external_position_estimation.html (The reference uses LPE instead of ecfEKF, both methods should work equally well, LPE requires firmware modifications to activate the correct modules). 
 
