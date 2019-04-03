@@ -7,14 +7,14 @@
 		      _system_id:=2"
 		output="screen"
 	/>
-	<include 
-		file="/home/bintel/catkin_ws/src/bintel/launch/vrpn_optitrack_positioning.launch">
-		<arg name="server" value="192.168.1.2"/>
-	</include>
+	#<include 
+	#	file="$(find bintel_ros)/launch/vrpn_optitrack_positioning.launch">
+	#	<arg name="server" value="192.168.1.2"/>
+	#</include>
 	<node
 		pkg = "topic_tools"
 		name= "position_relay2"
 		type = "relay"
-		args="/vrpn_client_node/bintel/pose /mavros/vision_pose/pose"
+		args="/vrpn_client_node/$(env DRONE)/pose /mavros/vision_pose/pose"
 	/>
 </launch>

@@ -20,7 +20,7 @@
       #- FirstTracker
       #- SecondTracker
     </rosparam>
-    <remap from="/vrpn_client_node/bintel/pose" to="/mavros/vision_pose/pose"/>
+    <remap from="/vrpn_client_node/$(env DRONE)/pose" to="/mavros/vision_pose/pose"/>
   </node>
 
 </launch>
