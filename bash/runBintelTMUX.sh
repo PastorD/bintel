@@ -35,6 +35,11 @@ tmux send-keys -t 0 "roslaunch bintel_ros vrpn_optitrack_positioning.launch" C-m
 
 sleep 2
 
+############################# Optitrack ###########################################
+tmux send-keys -t 0 "rosbag record --split --size=1900 /mavros/vision_pose/pose /mavros/imu/data /mavros/rc/out /mavros/rc/in /mavros/local_position/pose /mavros/local_position/velocity /tf /
+" C-m
+
+sleep 2
 
 
 #######################################################################################
