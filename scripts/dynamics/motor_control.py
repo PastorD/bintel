@@ -9,6 +9,8 @@ import rospy
 import tf
 import argparse
 
+# This Script is used to command individual motors using mavros
+
 class motorControl():
     def __init__(self):
     
