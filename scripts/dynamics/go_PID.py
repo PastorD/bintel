@@ -128,7 +128,7 @@ class goThrust():
         rospy.sleep(2.)
         self.marker_pub.publish(self.waypoint_marker)
     
-	def _read_velocity(self,data):
+    def _read_velocity(self,data):
 		self.velocity = data
 
     def _send_command(self,data):
@@ -148,7 +148,7 @@ class goThrust():
         [self.cpitch,self.croll,self.cyaw,self.cheight] =  \
                     self.controller.genQUADcontrol(self.local_pose.pose,self.waypoint.pose,self.velocity)
 
-        print 'y command %5.2f, x command %5.2f, yaw command %5.2f, thrust %5.2f' % (self.croll, self.cpitch, self.cyaw, self.cheight + self.hoverth) 
+        #print 'y command %5.2f, x command %5.2f, yaw command %5.2f, thrust %5.2f' % (self.croll, self.cpitch, self.cyaw, self.cheight + self.hoverth) 
         self.AttitudeTarget = AttitudeTarget()
         self.AttitudeTarget.orientation = Quaternion(*quaternion_from_euler(self.croll,self.cpitch,self.cyaw))
         self.AttitudeTarget.thrust = self.cheight + self.hoverth
