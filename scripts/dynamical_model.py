@@ -19,6 +19,8 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
+import sparse_identification as sp
+
 
 class DynamicalModel():
     """
@@ -27,10 +29,11 @@ class DynamicalModel():
     def __init__(self):
         pass
 
-    def fitParameters(self,rosbagName):
+    def fitParameters(self,time,x,u,fitType):
         # Use the data from the rosbag and fit the model parameters
-        pass
-
+        
+        estimator = sp.sindy(l1=0.01, solver='lasso')
+        estimator.fit(A, b)#, eq=[C, d])
         
     def preProcessROSBAG(self,rosbagName):
         # Transform a ROSBAG into a timeseries signal
@@ -42,7 +45,8 @@ class DynamicalModel():
         for i in range(0,len(bag.get_type_and_topic_info()[1].values())):
             types.append(bag.get_type_and_topic_info()[1].values()[i][0])
 
-        position_raw = np.empty([bag.get_message_count(topic_filters=["/vrpn_client_node/bintel/pose"]),3])
+        npos = 3
+        position_raw = np.empty([bag.get_message_count(topic_filters=["/vrpn_client_node/bintel/pose"]),npos])
         time_pos = []
 
         k = 0
@@ -51,24 +55,26 @@ class DynamicalModel():
             time_pos.append(t.to_time())
             k = k + 1
 
-        rcout_raw = []
+        rcout_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/rc/out"]),4])
         time_rcout = []
-        
+
         k = 0
         for topic, msg, t in bag.read_messages(topics=['/mavros/rc/out']):
-            rcout_raw.append((msg.channels))
+            rcout_raw[k,:] = msg.channels[0:4]
             time_rcout.append(t.to_time())
             k = k + 1
         
-        
-        time = np.linspace(np.maximum(time_pos[0],time_rcout[0]),np.minimum(time_pos[-1],time_rcout[-1]),1000)
+        nt = 1000
+        time = np.linspace(np.maximum(time_pos[0],time_rcout[0]),np.minimum(time_pos[-1],time_rcout[-1]),nt)
         position_interp = []
-        for t in time:
-            position_interp.append(np.interp(t, time_pos, position_raw[:,1]))
 
-        rcout_interp = []
-        for t in time:
-            rcout_interp = np.interp(t, time_rcout, rcout_raw)
+        position_interp = np.empty([nt,npos])
+        for k in range(npos):
+            position_interp[:,k] = np.interp(time, time_pos, position_raw[:,k])
+
+        rcout_interp = np.empty([nt,4])
+        for k in range(4):
+            rcout_interp[:,k] = np.interp(time, time_rcout, rcout_raw[:,k])
 
         bag.close()
         return time, position_interp, rcout_interp
