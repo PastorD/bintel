@@ -14,19 +14,19 @@ class Robot():
     def __init__(self):
         pass
 
-def load_model(modelFileName):
-    with open(modelFileName, 'r') as stream:
+def load_model(model_file_name):
+    with open(model_file_name, 'r') as stream:
         model = load(stream)
     return model
 
-def controllerMain():
+def controller_main():
 
-    modelFileName = 'model_test.yaml'
-    model = load_model(modelFileName)
+    model_file_name = 'model_test.yaml'
+    model = load_model(model_file_name)
     
 
 if __name__ == '__main__':
     try:
-        controllerMain()
+        controller_main()
     except rospy.ROSInterruptException:
         pass

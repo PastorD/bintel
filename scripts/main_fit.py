@@ -20,17 +20,17 @@ class Robot():
 
 
 
-def fitMain():
+def fit_main():
     bagfilename = '/home/dpastorm/catkin_ws/src/bintel/Experimental Data/071818/2018-07-18-16-55-35.bag'
 
     model = DynamicalModel()
-    model.fitParameters(bagfilename, dataFormat='rosbag', fitType='SINDY')
-    model.saveModel('model_test.yaml')
+    model.fit_parameters(bagfilename, dataFormat='rosbag', fitType='SINDY')
+    model.save_to_file('model_test.yaml')
 
     
 
 if __name__ == '__main__':
     try:
-        fitMain()
+        fit_main()
     except rospy.ROSInterruptException:
         pass
