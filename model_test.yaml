@@ -1,0 +1,12 @@
+!!python/object:dynamical_model.DynamicalModel
+dataOrigin: /home/dpastorm/catkin_ws/src/bintel/Experimental Data/071818/2018-07-18-16-55-35.bag
+estimator: !!python/object:sparse_identification.core.sindy
+  l1: 0.01
+  l2: 0.0001
+  solver: lasso
+  tol: 0.001
+fitType: SINDY
+poly_lib: !!python/object:sklearn.preprocessing.data.PolynomialFeatures
+  degree: 2
+  include_bias: true
+  interaction_only: false

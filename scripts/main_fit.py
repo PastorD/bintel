@@ -13,20 +13,21 @@ import roslib
 
 from  dynamical_model import DynamicalModel
 
-#from yaml import load, dump
-#try:
-#    from yaml import CLoader as Loader, CDumper as Dumper
-#except ImportError:
-#    from yaml import Loader, Dumper
+
+class Robot():
+    def __init__(self):
+        pass
+
 
 
 def fitMain():
     bagfilename = '/home/dpastorm/catkin_ws/src/bintel/Experimental Data/071818/2018-07-18-16-55-35.bag'
 
     model = DynamicalModel()
-    time, position, rcout = model.preProcessROSBAG(bagfilename)
-    model.fitParameters(time,position,rcout, fitType='SINDY')
-    #model.saveModel('model_test.yaml')
+    model.fitParameters(bagfilename, dataFormat='rosbag', fitType='SINDY')
+    model.saveModel('model_test.yaml')
+
+    
 
 if __name__ == '__main__':
     try:
