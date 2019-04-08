@@ -11,7 +11,7 @@ import roslib
 #import argparse
 #import rosbag
 
-from  dynamical_model import DynamicalModel
+from  quadrotor_model import QuadrotorModel
 
 
 class Robot():
@@ -21,13 +21,13 @@ class Robot():
 
 
 def fitMain():
-    bagfilename = '/home/dpastorm/catkin_ws/src/bintel/Experimental Data/071818/2018-07-18-16-55-35.bag'
+    bagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_freeFlight.bag'
+    testbagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_ground.bag'
 
-    model = DynamicalModel()
-    model.fitParameters(bagfilename, dataFormat='rosbag', fitType='SINDY')
+    model = QuadrotorModel()
+    model.fitParameters(bagfilename, dataFormat='rosbag', fitType='SINDY', dt=0.1)
+    model.score(testbagfilename,  dataFormat='rosbag')
     model.saveModel('model_test.yaml')
-
-    
 
 if __name__ == '__main__':
     try:

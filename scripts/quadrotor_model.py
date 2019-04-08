@@ -61,7 +61,7 @@ class QuadrotorModel():
 
         return dstates
 
-    def fitParameters(self, dataFilename, dataFormat, fitType):
+    def fitParameters(self, dataFilename, dataFormat, fitType, dt=0.01):
         """
          Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
@@ -70,7 +70,7 @@ class QuadrotorModel():
         self.fitType = fitType
 
         if (dataFormat == 'rosbag'):
-            time, position, orientation, linvel, angvel, rcout = self.preProcessROSBAG(dataFilename)
+            time, position, orientation, linvel, angvel, rcout = self.preProcessROSBAG(dataFilename, dt=dt)
         elif (dataFormat == 'csv'):
             pass
         else:
@@ -88,10 +88,11 @@ class QuadrotorModel():
         self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
         Theta = self.createObservables(X, u)
 
-        self.estimator = sp.sindy(l1=0.00001, solver='lasso')
+        self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
+        print(self.estimator.coef_)
 
-    def preProcessROSBAG(self, rosbagName):
+    def preProcessROSBAG(self, rosbagName, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
         bag = rosbag.Bag(rosbagName)
 
@@ -145,8 +146,10 @@ class QuadrotorModel():
             time_rcout.append(t.to_time())
             k = k + 1
 
-        nt = 1000
-        time = np.linspace(np.maximum(time_pos[0], np.maximum(time_linvel[0], time_rcout[0])), np.minimum(time_pos[-1], np.minimum(time_linvel[-1], time_rcout[-1])), nt)
+        time_start = np.maximum(time_pos[0], np.maximum(time_linvel[0], time_rcout[0]))
+        time_end = np.minimum(time_pos[-1], np.minimum(time_linvel[-1], time_rcout[-1]))
+        nt = int(np.round((time_end-time_start)/dt))
+        time = np.linspace(time_start, time_end, nt)
 
         position_interp = np.empty([nt, npos])
         for k in range(npos):
@@ -188,9 +191,9 @@ class QuadrotorModel():
 
     def predictFullRHS(self, X, u):
 
-        if len(X.shape) == 1 and len(u.shape) == 1:
+        if len(X.shape) == 1 or len(u.shape) == 1:
             X = X.reshape((1,-1))
-            u = u.reshape((1, -1))
+            u = u.reshape((1,-1))
 
         Theta = self.createObservables(X[:, 7:], u)
         return np.concatenate((self.getKinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
@@ -213,3 +216,92 @@ class QuadrotorModel():
 
     def computeRHS(self):
         pass
+
+    def score(self, dataFilename, dataFormat):
+        import matplotlib.pyplot as plt
+        from sklearn.metrics import mean_squared_error
+
+        self.dataOrigin = dataFilename
+
+        if (dataFormat == 'rosbag'):
+            time, position, orientation, linvel, angvel, rcout = self.preProcessROSBAG(dataFilename)
+        elif (dataFormat == 'csv'):
+            pass
+        else:
+            exit("Data format should be 'rosbag' or 'csv'")
+
+        x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
+        u = self.mixControlInputs(rcout)
+        dt = time[1]-time[0]
+
+        k = int(np.round(0.1/dt)) #k-step ahead prediction
+        x_sim = np.zeros((x_all.shape))
+        x_sim[:k,:] = np.copy(x_all[:k,:])
+
+        #Simulate model performance:
+        for ii, t in enumerate(time):
+            if ii+k >= len(time):
+                break
+            x_temp = x_all[ii,:]
+            for jj in range(k):
+                x_temp = x_temp + self.predictFullRHS(x_temp,u[ii+jj,:])*dt
+            x_sim[ii+k,:] = x_temp
+
+
+        fig, axs = plt.subplots(3, 1)
+        axs[0].plot(time, x_all[:,0], time, x_sim[:,0])
+        #axs[0].set_xlim(0, 2)
+        axs[0].set_xlabel('time')
+        axs[0].set_ylabel('x')
+        axs[0].grid(True)
+        axs[1].plot(time, x_all[:, 1], time, x_sim[:,1])
+        # axs[0].set_xlim(0, 2)
+        axs[1].set_xlabel('time')
+        axs[1].set_ylabel('y')
+        axs[1].grid(True)
+        axs[2].plot(time, x_all[:, 2], time, x_sim[:,2])
+        # axs[0].set_xlim(0, 2)
+        axs[2].set_xlabel('time')
+        axs[2].set_ylabel('z')
+        axs[2].grid(True)
+        plt.show()
+
+        fig, axs = plt.subplots(4, 1)
+        axs[0].plot(time, x_all[:, 3], time, x_sim[:, 3])
+        # axs[0].set_xlim(0, 2)
+        axs[0].set_xlabel('time')
+        axs[0].set_ylabel('qw')
+        axs[0].grid(True)
+        axs[1].plot(time, x_all[:, 4], time, x_sim[:, 4])
+        # axs[0].set_xlim(0, 2)
+        axs[1].set_xlabel('time')
+        axs[1].set_ylabel('qx')
+        axs[1].grid(True)
+        axs[2].plot(time, x_all[:, 5], time, x_sim[:, 5])
+        # axs[0].set_xlim(0, 2)
+        axs[2].set_xlabel('time')
+        axs[2].set_ylabel('qy')
+        axs[2].grid(True)
+        axs[3].plot(time, x_all[:, 6], time, x_sim[:, 6])
+        # axs[0].set_xlim(0, 2)
+        axs[3].set_xlabel('time')
+        axs[3].set_ylabel('qz')
+        axs[3].grid(True)
+        plt.show()
+
+        x_err = mean_squared_error(x_all[:,0],x_sim[:,0])
+        y_err = mean_squared_error(x_all[:, 1], x_sim[:, 1])
+        z_err = mean_squared_error(x_all[:, 2], x_sim[:, 2])
+        qw_err = mean_squared_error(x_all[:, 3], x_sim[:, 3])
+        qx_err = mean_squared_error(x_all[:, 4], x_sim[:, 4])
+        qy_err = mean_squared_error(x_all[:, 5], x_sim[:, 5])
+        qz_err = mean_squared_error(x_all[:, 6], x_sim[:, 6])
+        print("MSE x: ", x_err)
+        print("MSE y: ", y_err)
+        print("MSE z: ", z_err)
+        print("MSE qw: ", qw_err)
+        print("MSE qx: ", qx_err)
+        print("MSE qy: ", qy_err)
+        print("MSE qz: ", qz_err)
+
+
