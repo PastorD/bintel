@@ -238,6 +238,7 @@ class QuadrotorModel():
         import string
         from datetime import datetime
         from sklearn.metrics import mean_squared_error
+        from scipy.integrate import odeint
 
         self.dataOrigin = dataFilename
 
@@ -261,9 +262,15 @@ class QuadrotorModel():
             if ii+k >= len(time):
                 break
             x_temp = x_all[ii,:]
+
+            #TODO: make better integration scheme work
+            #x_ode = odeint(self.ode_sim_model, x_temp, time[ii:ii+k], args=(u[ii:ii+k,:],))
+            # x_sim[ii+k,:] = x_ode[-1,:]
+
             for jj in range(k):
                 x_temp = x_temp + self.predictFullRHS(x_temp,u[ii+jj,:])*dt
-            x_sim[ii+k,:] = x_temp
+            x_sim[ii + k, :] = x_temp
+
 
 
         fig, axs = plt.subplots(3, 1)
@@ -321,5 +328,10 @@ class QuadrotorModel():
         print("MSE qx: ", qx_err)
         print("MSE qy: ", qy_err)
         print("MSE qz: ", qz_err)
+
+    def ode_sim_model(self, X, t, u):
+        """Function to be used for ode-simulation only"""
+        dxdt = self.predictFullRHS(X,u)
+        return dxdt.flatten()
 
 
