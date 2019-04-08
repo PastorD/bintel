@@ -32,6 +32,7 @@ from scipy.linalg import block_diag
 #    that will be used in the sparse regression problem.
 from sklearn.preprocessing import PolynomialFeatures
 from sys import exit
+import os.path
 class DynamicalModel():
     """
     Class for a generic dynamical model of the form \dot{x} = f(x,u)
@@ -39,17 +40,17 @@ class DynamicalModel():
     def __init__(self):
         pass
 
-    def fit_parameters(self,data_filename,data_format,fit_type):
+    def fit_parameters(self,data_filename,fit_type):
         """
          Use data to fit the model parameters
         """
 
         self.data_path = data_filename
         self.fit_type = fit_type
-
-        if (data_format=='rosbag'):
+        data_format = os.path.splitext(data_filename)[1]
+        if (data_format=='.bag'):
             time, position, rcout = self.read_ROSBAG(data_filename)
-        elif (data_format=='csv'):
+        elif (data_format=='.csv'):
             pass
         else:
             exit("Data format should be 'rosbag' or 'csv'")
