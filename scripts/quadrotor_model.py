@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+    #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
@@ -42,9 +42,28 @@ class QuadrotorModel():
     def __init__(self):
         pass
 
+    def getKinematics(self, states):
+        """
+        :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
+        :return: current derivative of position and quaternian states (States where kinematics relationship is known
+                    so no need for learning)
+        """
+        dstates = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
+        dstates[0,:3] = np.transpose(np.dot(np.eye(3), states[7:10,0])) #\pos{pos}=velocity
+        q_w, q_x, q_y, q_z = states[3:7,0]
+        omg_w = 0.0
+        omg_x, omg_y, omg_z = states[10:,0]
+        dstates[0,3:7] = 0.5*np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
+                         omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
+                         -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
+                         omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z], dtype=np.float64) # \pos{quaternian}
+        dstates[0,3:7] = dstates[0,3:7]/np.linalg.norm(dstates[0,3:7]) # Normalize quaterniantmt
+
+        return dstates
+
     def fitParameters(self, dataFilename, dataFormat, fitType):
         """
-         Use data to fit the model parameters
+         Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
 
         self.dataOrigin = dataFilename
@@ -57,23 +76,20 @@ class QuadrotorModel():
         else:
             exit("Data format should be 'rosbag' or 'csv'")
 
-        x = position
-        from sparse_identification.utils import derivative
-        dt = time[1] - time[1]
-        # xdot = derivative(x,dt)
+        x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
+        x_learn = np.concatenate((linvel, angvel), axis=1)
+        u = self.mixControlInputs(rcout)
 
-        X = x
+        from sparse_identification.utils import derivative
+        dt = time[1] - time[0]
+        xdot_learn = derivative(x_learn,dt)
+        X = x_learn
 
         self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
-        # lib = self.poly_lib.fit_transform(X)
-        # Theta = block_diag(lib, lib, lib)
-        # n_lib = self.poly_lib.n_output_features_
+        Theta = self.createObservables(X, u)
 
-        # b = xdot.flatten(order='F')
-        # A = Theta
-
-        self.estimator = sp.sindy(l1=0.01, solver='lasso')
-        # self.estimator.fit(A, b)
+        self.estimator = sp.sindy(l1=0.00001, solver='lasso')
+        self.estimator.fit(Theta, xdot_learn)
 
     def preProcessROSBAG(self, rosbagName):
         # Transform a ROSBAG into a timeseries signal
@@ -155,10 +171,37 @@ class QuadrotorModel():
         bag.close()
         return time, position_interp, orientation_interp, linvel_interp, angvel_interp, rcout_interp
 
+    def createObservables(self, X, u):
+        obsX = self.poly_lib.fit_transform(X)
+
+        Theta = np.concatenate((obsX, np.multiply(obsX, u[:, 0:1]), np.multiply(obsX, u[:, 1:2]),
+                                np.multiply(obsX, u[:, 2:3]), np.multiply(obsX, u[:, 3:4])), axis=1)
+        return Theta
+
+    def mixControlInputs(self, raw_controls, min_pwm=1000.0):
+        """
+        :param raw_controls: PWM commands for each rotor
+        :return: transformed control inputs by standard mixing
+        """
+        B = np.array([[1, 1, 1, 1],[0, 1, 0, -1], [-1, 0, 1, 0],[-1, 1, -1, 1]])
+        return np.dot(np.square(raw_controls-min_pwm)/min_pwm**2,np.transpose(B))
+
+    def predictFullRHS(self, X, u):
+
+        if len(X.shape) == 1 and len(u.shape) == 1:
+            X = X.reshape((1,-1))
+            u = u.reshape((1, -1))
+
+        Theta = self.createObservables(X[:, 7:], u)
+        return np.concatenate((self.getKinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
+
     def saveModel(self, yaml_filename):
+        pass
+        #TODO: Fix saving of learned model
+
         # save the model on a yaml file
-        with open(yaml_filename, 'w') as outfile:
-            dump(self, outfile, default_flow_style=False)
+        #with open(yaml_filename, 'w') as outfile:
+         #   dump(self, outfile, default_flow_style=False)
 
     def loadModel(self, yaml_filename):
         # Load the model from the yaml file
