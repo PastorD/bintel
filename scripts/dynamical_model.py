@@ -129,7 +129,7 @@ class DynamicalModel():
 
 
     def compute_desired_attitude(self):
-        pass
+        return AttitudeTarget()
 
     def compute_RHS(self):
         pass

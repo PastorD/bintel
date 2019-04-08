@@ -21,10 +21,16 @@ class Robot():
     """
     def __init__(self):
 
-        model_file_name = 'model_test.yaml'
+        self.model_file_name = 'model_test.yaml'
 
         self.init_ROS()        
-        self.model = self.load_model(model_file_name)
+        self.model = self.load_model(self.model_file_name)
+
+        while not rospy.is_shutdown():
+            AttitudeTarget = self.model.compute_desired_attitude()
+            self.pub_sp.publish(AttitudeTarget)
+            self.rate.sleep()
+
         
 
     def load_model(self,model_file_name):
@@ -32,15 +38,15 @@ class Robot():
             model = load(stream)
         return model
 
-    def ROS_init(self,):
+    def init_ROS(self,):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
             
-        rospy.init_node('gotowaypoint', anonymous=True)
-        self.rate = rospy.Rate(60) # 10hz
+        rospy.init_node('controller_bintel', anonymous=True)
+        self.rate = rospy.Rate(60) 
 
-        self.controller = QUAD_position_controller('offboard_ctrl/gainsStart.yaml')
+        #self.controller = QUAD_position_controller('offboard_ctrl/gainsStart.yaml')
             
-            # Subscribe to local position
+        # Subscribe to local position
         self.local_pose = PoseStamped()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
         rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
