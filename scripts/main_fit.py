@@ -23,10 +23,11 @@ class Robot():
 def fitMain():
     bagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_freeFlight.bag'
     testbagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_ground.bag'
+    figure_path = 'figures/'
 
     model = QuadrotorModel()
     model.fitParameters(bagfilename, dataFormat='rosbag', fitType='SINDY', dt=0.1)
-    model.score(testbagfilename,  dataFormat='rosbag')
+    #model.score(testbagfilename,  dataFormat='rosbag', figure_path=figure_path)
     model.saveModel('model_test.yaml')
 
 if __name__ == '__main__':

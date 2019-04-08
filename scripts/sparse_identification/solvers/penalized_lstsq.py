@@ -151,7 +151,6 @@ def lasso(A, b, l1=0, l2=0, C=None, d=None, x0=None, opts=None, tol=1e-2):
         raise ValueError('The l1-penalization weight cannot be larger than 1.')
 
     if l1 <= 1:
-        print("IS ACTUALLY RUNNING")
         # --> Sets up the inequality constraint matrix for the convex optimization.
         I = matrix(0.0, (n,n))
         I[::n+1] = 1.0

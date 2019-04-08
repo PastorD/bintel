@@ -87,10 +87,11 @@ class QuadrotorModel():
 
         self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
         Theta = self.createObservables(X, u)
+        Theta = self.normalizeTheta(Theta, prediction=False)
 
         self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
-        print(self.estimator.coef_)
+        #print(self.estimator.coef_)
 
     def preProcessROSBAG(self, rosbagName, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -181,6 +182,23 @@ class QuadrotorModel():
                                 np.multiply(obsX, u[:, 2:3]), np.multiply(obsX, u[:, 3:4])), axis=1)
         return Theta
 
+    def normalizeTheta(self, Theta, prediction=False):
+        if not prediction:
+            self.theta_mean = np.mean(Theta, axis=0)
+            self.theta_mean[0] = 0.0 #Keep intercept term at 1
+
+        Theta = Theta - self.theta_mean
+
+        if not prediction:
+            self.theta_var = np.var(Theta, axis=0)
+
+            #Do not adjust columns with small variance to ensure numerical stability
+            small_inds = np.where(self.theta_var < 1e-3)
+            self.theta_var[small_inds] = 1
+
+        Theta = np.divide(Theta, self.theta_var)
+        return Theta
+
     def mixControlInputs(self, raw_controls, min_pwm=1000.0):
         """
         :param raw_controls: PWM commands for each rotor
@@ -196,15 +214,13 @@ class QuadrotorModel():
             u = u.reshape((1,-1))
 
         Theta = self.createObservables(X[:, 7:], u)
+        Theta = self.normalizeTheta(Theta, prediction=True)
         return np.concatenate((self.getKinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
 
     def saveModel(self, yaml_filename):
-        pass
-        #TODO: Fix saving of learned model
-
         # save the model on a yaml file
-        #with open(yaml_filename, 'w') as outfile:
-         #   dump(self, outfile, default_flow_style=False)
+        with open(yaml_filename, 'w') as outfile:
+            dump(self, outfile, default_flow_style=False)
 
     def loadModel(self, yaml_filename):
         # Load the model from the yaml file
@@ -217,8 +233,10 @@ class QuadrotorModel():
     def computeRHS(self):
         pass
 
-    def score(self, dataFilename, dataFormat):
+    def score(self, dataFilename, dataFormat, figure_path=""):
         import matplotlib.pyplot as plt
+        import string
+        from datetime import datetime
         from sklearn.metrics import mean_squared_error
 
         self.dataOrigin = dataFilename
@@ -264,7 +282,7 @@ class QuadrotorModel():
         axs[2].set_xlabel('time')
         axs[2].set_ylabel('z')
         axs[2].grid(True)
-        plt.show()
+        plt.savefig(figure_path + "positions_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         fig, axs = plt.subplots(4, 1)
         axs[0].plot(time, x_all[:, 3], time, x_sim[:, 3])
@@ -287,7 +305,7 @@ class QuadrotorModel():
         axs[3].set_xlabel('time')
         axs[3].set_ylabel('qz')
         axs[3].grid(True)
-        plt.show()
+        plt.savefig(figure_path + "quaternions_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         x_err = mean_squared_error(x_all[:,0],x_sim[:,0])
         y_err = mean_squared_error(x_all[:, 1], x_sim[:, 1])
