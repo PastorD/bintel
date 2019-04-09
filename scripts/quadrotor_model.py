@@ -1,40 +1,30 @@
-    #!/usr/bin/env python
+#!/usr/bin/env python
+
+
+import numpy as np
+import argparse
+from sys import exit
+import os.path
+from yaml import load, dump
+
 import rospy
+import roslib
+import tf
+import rosbag
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
 from mavros_msgs.msg import AttitudeTarget
 from tf.transformations import quaternion_from_euler
-import numpy as np
 
-import roslib
-import tf
-import argparse
-import rosbag
-
-from yaml import load, dump
-
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
-
-# --> Import SINDy library
-#
 import sparse_identification as sp
-
-# --> Import some features of scipy to simulate the systems
-#    or for matrix manipulation.
 from scipy.integrate import odeint
 from scipy.linalg import block_diag
-
-# --> Import the PolynomialFeatures function from the sklearn
-#    package to easily create the library of candidate functions
-#    that will be used in the sparse regression problem.
 from sklearn.preprocessing import PolynomialFeatures
-from sys import exit
+
+from dynamical_model import DynamicalModel
 
 
-class QuadrotorModel():
+class QuadrotorModel(DynamicalModel):
     """
     Class for a control-affine quadrotor dynamical model of the form \dot{x} = f(x) + g(x)u with known kinematics
     """
@@ -42,7 +32,7 @@ class QuadrotorModel():
     def __init__(self):
         pass
 
-    def getKinematics(self, states):
+    def get_kinematics(self, states):
         """
         :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
         :return: current derivative of position and quaternian states (States where kinematics relationship is known
@@ -61,24 +51,25 @@ class QuadrotorModel():
 
         return dstates
 
-    def fitParameters(self, dataFilename, dataFormat, fitType, dt=0.01):
+    def fit_parameters(self, data_filename, fit_type, dt=0.01):
         """
          Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
 
-        self.dataOrigin = dataFilename
-        self.fitType = fitType
-
-        if (dataFormat == 'rosbag'):
-            time, position, orientation, linvel, angvel, rcout = self.preProcessROSBAG(dataFilename, dt=dt)
-        elif (dataFormat == 'csv'):
+        # Load data
+        self.data_path = data_filename
+        self.fit_type = fit_type
+        data_format = os.path.splitext(data_filename)[1]
+        if (data_format=='.bag'):
+            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(data_filename, dt=dt)
+        elif (data_format=='.csv'):
             pass
         else:
             exit("Data format should be 'rosbag' or 'csv'")
 
         x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
         x_learn = np.concatenate((linvel, angvel), axis=1)
-        u = self.mixControlInputs(rcout)
+        u = self.mix_control_inputs(rcout)
 
         from sparse_identification.utils import derivative
         dt = time[1] - time[0]
@@ -86,16 +77,16 @@ class QuadrotorModel():
         X = x_learn
 
         self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
-        Theta = self.createObservables(X, u)
-        Theta = self.normalizeTheta(Theta, prediction=False)
+        Theta = self.create_observables(X, u)
+        Theta = self.normalize_theta(Theta, prediction=False)
 
         self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
-        #print(self.estimator.coef_)
+        
 
-    def preProcessROSBAG(self, rosbagName, dt = 0.01):
+    def read_ROSBAG(self, rosbag_name, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
-        bag = rosbag.Bag(rosbagName)
+        bag = rosbag.Bag(rosbag_name)
 
         # See topics and types for debugging
         topics = bag.get_type_and_topic_info()[1].keys()
@@ -175,14 +166,14 @@ class QuadrotorModel():
         bag.close()
         return time, position_interp, orientation_interp, linvel_interp, angvel_interp, rcout_interp
 
-    def createObservables(self, X, u):
+    def create_observables(self, X, u):
         obsX = self.poly_lib.fit_transform(X)
 
         Theta = np.concatenate((obsX, np.multiply(obsX, u[:, 0:1]), np.multiply(obsX, u[:, 1:2]),
                                 np.multiply(obsX, u[:, 2:3]), np.multiply(obsX, u[:, 3:4])), axis=1)
         return Theta
 
-    def normalizeTheta(self, Theta, prediction=False):
+    def normalize_theta(self, Theta, prediction=False):
         if not prediction:
             self.theta_mean = np.mean(Theta, axis=0)
             self.theta_mean[0] = 0.0 #Keep intercept term at 1
@@ -199,7 +190,7 @@ class QuadrotorModel():
         Theta = np.divide(Theta, self.theta_var)
         return Theta
 
-    def mixControlInputs(self, raw_controls, min_pwm=1000.0):
+    def mix_control_inputs(self, raw_controls, min_pwm=1000.0):
         """
         :param raw_controls: PWM commands for each rotor
         :return: transformed control inputs by standard mixing
@@ -207,30 +198,20 @@ class QuadrotorModel():
         B = np.array([[1, 1, 1, 1],[0, 1, 0, -1], [-1, 0, 1, 0],[-1, 1, -1, 1]])
         return np.dot(np.square(raw_controls-min_pwm)/min_pwm**2,np.transpose(B))
 
-    def predictFullRHS(self, X, u):
+    def predict_full_RHS(self, X, u):
 
         if len(X.shape) == 1 or len(u.shape) == 1:
             X = X.reshape((1,-1))
             u = u.reshape((1,-1))
 
-        Theta = self.createObservables(X[:, 7:], u)
-        Theta = self.normalizeTheta(Theta, prediction=True)
-        return np.concatenate((self.getKinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
+        Theta = self.create_observables(X[:, 7:], u)
+        Theta = self.normalize_theta(Theta, prediction=True)
+        return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
 
-    def saveModel(self, yaml_filename):
-        # save the model on a yaml file
-        with open(yaml_filename, 'w') as outfile:
-            dump(self, outfile, default_flow_style=False)
-
-    def loadModel(self, yaml_filename):
-        # Load the model from the yaml file
-        with open(yaml_filename, 'r') as stream:
-            self = load(stream)
-
-    def computeDesiredAttitude(self):
+    def compute_desired_attitude(self):
         pass
 
-    def computeRHS(self):
+    def compute_RHS(self):
         pass
 
     def score(self, dataFilename, dataFormat, figure_path=""):
@@ -243,7 +224,7 @@ class QuadrotorModel():
         self.dataOrigin = dataFilename
 
         if (dataFormat == 'rosbag'):
-            time, position, orientation, linvel, angvel, rcout = self.preProcessROSBAG(dataFilename)
+            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(dataFilename)
         elif (dataFormat == 'csv'):
             pass
         else:
@@ -268,7 +249,7 @@ class QuadrotorModel():
             # x_sim[ii+k,:] = x_ode[-1,:]
 
             for jj in range(k):
-                x_temp = x_temp + self.predictFullRHS(x_temp,u[ii+jj,:])*dt
+                x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt
             x_sim[ii + k, :] = x_temp
 
 
@@ -331,7 +312,7 @@ class QuadrotorModel():
 
     def ode_sim_model(self, X, t, u):
         """Function to be used for ode-simulation only"""
-        dxdt = self.predictFullRHS(X,u)
+        dxdt = self.predict_full_RHS(X,u)
         return dxdt.flatten()
 
 
