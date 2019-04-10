@@ -8,7 +8,7 @@ from yaml import load, dump
 import rospy
 import roslib
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
-from mavros_msgs.msg import AttitudeTarget
+from mavros_msgs.msg import AttitudeTarget, RCOut
 from visualization_msgs.msg import Marker
 
 # Project
@@ -43,18 +43,25 @@ class Robot():
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
             
         rospy.init_node('controller_bintel', anonymous=True)
-        self.rate = rospy.Rate(60) 
+        self.main_loop_rate = 60
+        self.rate = rospy.Rate(self.main_loop_rate) 
           
         # - Subscribe to local position
         self.local_pose = PoseStamped()
+        self.velocity = TwistStamped()
+        self.rc_out = RCOut()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
         rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+        rospy.Subscriber('/mavros/rc/out', RCOut, self._read_rc_out)
 
     def _read_velocity(self,data):
 		self.velocity = data
 
     def _read_position(self,data):
         self.local_pose = data
+
+    def _read_rc_out(self,data):
+        self.rc_out = data
 
 
 if __name__ == '__main__':

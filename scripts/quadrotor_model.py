@@ -231,7 +231,7 @@ class QuadrotorModel(DynamicalModel):
             exit("Data format should be 'rosbag' or 'csv'")
 
         x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        u = self.mixControlInputs(rcout)
+        u = self.mix_control_inputs(rcout)
         dt = time[1]-time[0]
 
         k = int(np.round(0.1/dt)) #k-step ahead prediction
