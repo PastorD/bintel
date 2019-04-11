@@ -3,6 +3,7 @@
 # Python Common
 import argparse
 from yaml import load, dump
+import position_controller
 
 # ROS 
 import rospy
@@ -27,9 +28,10 @@ class Robot():
 
         self.init_ROS()        
         self.model = self.load_model(self.model_file_name)
+        self.controller = position_controller.PositionController(model=self.model) #TODO: Add arguments
 
         while not rospy.is_shutdown():
-            AttitudeTarget = self.model.compute_desired_attitude()
+            AttitudeTarget = self.controller.compute_desired_attitude() #TODO: Move to PositionController
             self.pub_sp.publish(AttitudeTarget)
             self.rate.sleep()
         
@@ -51,7 +53,7 @@ class Robot():
         rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
 
     def _read_velocity(self,data):
-		self.velocity = data
+        self.velocity = data
 
     def _read_position(self,data):
         self.local_pose = data

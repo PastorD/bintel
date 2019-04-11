@@ -82,7 +82,6 @@ class QuadrotorModel(DynamicalModel):
 
         self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
-        
 
     def read_ROSBAG(self, rosbag_name, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -196,7 +195,12 @@ class QuadrotorModel(DynamicalModel):
         :return: transformed control inputs by standard mixing
         """
         B = np.array([[1, 1, 1, 1],[0, 1, 0, -1], [-1, 0, 1, 0],[-1, 1, -1, 1]])
-        return np.dot(np.square(raw_controls-min_pwm)/min_pwm**2,np.transpose(B))
+
+        # Mix and normalize every input to |u| <= 1
+        u =  np.dot(np.divide(np.square(raw_controls-min_pwm), np.array([4, 1, 1, 1])*min_pwm**2),np.transpose(B))
+        u[:, 0] /= 4.0
+        u[:, -1] /= 2.0
+        return u
 
     def predict_full_RHS(self, X, u):
 
@@ -208,11 +212,27 @@ class QuadrotorModel(DynamicalModel):
         Theta = self.normalize_theta(Theta, prediction=True)
         return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
 
-    def compute_desired_attitude(self):
-        pass
+    def get_dynamics_matrices(self, X, u):
+        if len(X.shape) == 1 or len(u.shape) == 1:
+            X = X.reshape((1,-1))
+            u = u.reshape((1,-1))
 
-    def compute_RHS(self):
-        pass
+        Theta = self.create_observables(X[:, 7:], u)
+        Theta = self.normalize_theta(Theta, prediction=True)
+        n_unactuated = int((Theta.shape[1])/5.0)
+
+        F_v = np.transpose(np.dot(Theta[:,:n_unactuated], self.estimator.coef_[:n_unactuated,:3]))
+        G_v = np.transpose(np.concatenate((np.dot(Theta[:, n_unactuated:2*n_unactuated], self.estimator.coef_[n_unactuated:2*n_unactuated, :3]),
+                                           np.dot(Theta[:, 2*n_unactuated:3*n_unactuated], self.estimator.coef_[2*n_unactuated:3*n_unactuated, :3]),
+                                           np.dot(Theta[:, 3*n_unactuated:4*n_unactuated], self.estimator.coef_[3*n_unactuated:4*n_unactuated, :3]),
+                                           np.dot(Theta[:, 4*n_unactuated:5*n_unactuated], self.estimator.coef_[4*n_unactuated:5*n_unactuated, :3])), axis=0))
+
+        F_omg = np.transpose(np.dot(Theta[:, :n_unactuated], self.estimator.coef_[:n_unactuated,3:]))
+        G_omg = np.transpose(np.concatenate((np.dot(Theta[:,n_unactuated:2*n_unactuated],self.estimator.coef_[n_unactuated:2*n_unactuated,3:]),
+                                             np.dot(Theta[:,2*n_unactuated:3*n_unactuated],self.estimator.coef_[2*n_unactuated:3*n_unactuated,3:]),
+                                             np.dot(Theta[:,3*n_unactuated:4*n_unactuated],self.estimator.coef_[3*n_unactuated:4*n_unactuated,3:]),
+                                             np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
+        return F_v, G_v, F_omg, G_omg
 
     def score(self, dataFilename, dataFormat, figure_path=""):
         import matplotlib.pyplot as plt
@@ -231,7 +251,7 @@ class QuadrotorModel(DynamicalModel):
             exit("Data format should be 'rosbag' or 'csv'")
 
         x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        u = self.mixControlInputs(rcout)
+        u = self.mix_control_inputs(rcout)
         dt = time[1]-time[0]
 
         k = int(np.round(0.1/dt)) #k-step ahead prediction
