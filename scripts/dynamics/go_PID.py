@@ -1,25 +1,21 @@
 #!/usr/bin/env python
-import rospy
-from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
-from mavros_msgs.msg import AttitudeTarget
-from tf.transformations import quaternion_from_euler
-
-import roslib
-import rospy
-import tf
 import argparse
-
-from visualization_msgs.msg import Marker
-
 from yaml import load, dump
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
     from yaml import Loader, Dumper
 
-
-
+import rospy
+from std_msgs.msg import String
+from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
+from mavros_msgs.msg import AttitudeTarget
+from tf.transformations import quaternion_from_euler
+from visualization_msgs.msg import Marker
+import roslib
+import tf
+import mavros
+from mavros import command
 class PID():
     """
     Class for a generic PID controller
@@ -77,33 +73,42 @@ class QUAD_position_controller():
 
 class goThrust():
     def __init__(self):
+
+        # Arm the drone
+        mavros.set_namespace()
+        command.arming(True)
     
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         
         rospy.init_node('gotowaypoint', anonymous=True)
         rate = rospy.Rate(60) # 10hz
 
-        self.controller = QUAD_position_controller('offboard_ctrl/gainsStart.yaml')
-        
+        self.controller = QUAD_position_controller('scripts/gainsStart.yaml')
+        # Set parameters
+        self.kz = 0.05
+        self.hoverth = 0.565
+
+
         # Subscribe to local position
         self.local_pose = PoseStamped()
+        self.velocity = TwistStamped()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._send_command)
-        rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+        rospy.Subscriber('/mavros/local_position/velocity_local', TwistStamped, self._read_velocity)
 
 
         # Set Waypoint
         self.waypoint = PoseStamped()
         self.waypoint.pose.position.x = -1.4
         self.waypoint.pose.position.y = 0
-        self.waypoint.pose.position.z = 1.2
+        self.waypoint.pose.position.z = 8
+
+
         
         self.marker_pub = rospy.Publisher('/waypoint_marker', Marker, queue_size=10)
         self.waypoint_marker = Marker()
 
         self.publish_waypoint()
-        # Set parameters
-        self.kz = 0.05
-        self.hoverth = 0.65
+
 
         # Define Controller
         

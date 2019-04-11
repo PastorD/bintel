@@ -2,43 +2,41 @@
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
+from mavros_msgs.srv import SetMode
 import roslib
-import rospy
 import tf
-import argparse
+import mavros
+from mavros import command
 
 class gotooptitrack():
     def __init__(self):
-    
-        self.pub_sp = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
         
+        # Arm the drone
+        mavros.set_namespace()
+        command.arming(True)
+        
+        self.pub_sp = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        rospy.wait_for_service('mavros/set_mode')
+        change_mode = rospy.ServiceProxy('mavros/set_mode', SetMode)
+
         rospy.init_node('gotowaypoint', anonymous=True)
         rate = rospy.Rate(50) # 10hz
         
-        # subscriber,
-        self.local_pose = PoseStamped()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_cb)
         self.waypoint = PoseStamped()
-        self.waypoing.pose.position.x = 0
-        self.waypoing.pose.position.x = 0
-        self.waypoing.pose.position.x = 2
-        
+        self.waypoint.header.frame_id = 'map'
+        self.waypoint.pose.position.x = 0
+        self.waypoint.pose.position.y = 0
+        self.waypoint.pose.position.z = 5
+       
         while not rospy.is_shutdown():
-                user_input = raw_input('Press p got to waypoint...')
-                
-                if user_input=='p':
-                    self.pressed = 1
-                    rospy.loginfo('key pressed')
-                    self.local_pose_mod = self.local_pose
-                    rospy.loginfo(self.local_pose_mod)
-                    self.local_pose_mod.pose.position.x =  self.local_pose_mod.pose.position.x+1
-                    rospy.loginfo(self.local_pose_mod)
-                    
-                    self.pub_sp.publish(self.waypoint)
-                rate.sleep()
+            result_mode = change_mode(0,"OFFBOARD")
+            #self.waypoint.header.stamp = self.local_pose.header.stamp
+
+            self.pub_sp.publish(self.waypoint)
+            rate.sleep()
     
     def _local_pose_cb(self,data):
-        #rospy.loginfo(data)
         self.local_pose = data
         
 if __name__ == '__main__':
