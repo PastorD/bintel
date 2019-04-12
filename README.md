@@ -144,7 +144,14 @@ This will run px4 in your machine and it will open gazebo. Then, launch mavros a
 ```console
   $ roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
 ```
-See the tmux file 'tmux_sim_sitl.sh' for details.
+See the tmux file 'tmux_sim_sitl.sh' for details. To run the tmux files you need tmux and tmuxp:
+```console
+  $ sudo apt-get install tmux python-tmuxp
+```
+```console
+  $ tmuxp load bash/tmux_stil.yaml
+```
+The yaml file describes all commands to run a sitl session.
 
 
 
