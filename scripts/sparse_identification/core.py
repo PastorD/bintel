@@ -18,6 +18,15 @@ class sindy(BaseEstimator, RegressorMixin):
 
     def fit(self, A, b, eq=None, ineq=None):
 
+        # --> Set how many state dimensions to be fitted
+        if len(b.shape) > 1:
+            n_fits = b.shape[1]
+        else:
+            n_fits = 1
+
+        # --> Initialize coefficient matrix
+        coef = np.zeros((A.shape[1],n_fits))
+
         #--> Gets the user-defined constraints.
         if eq is not None:
             C = eq[0]
@@ -27,13 +36,17 @@ class sindy(BaseEstimator, RegressorMixin):
             d = None
 
         if self.solver == 'lstsq':
+            #TODO: Test and verify all functionality for lstsq
             #--> Compute the initial guess for the sparse regression.
             if self.l1 == 0:
-                coef = lstsq_solve(A, b, C=C, d=d, l2=self.l2)
+                for ii in range(n_fits):
+                    coef[:, ii] = lstsq_solve(A, b[:,ii], C=C, d=d, l2=self.l2)
             else:
-                coef = hard_threshold_lstsq_solve(A, b, C=C, d=d, l2=self.l2, l1=self.l1)
+                for ii in range(n_fits):
+                    coef[:, ii] = hard_threshold_lstsq_solve(A, b[:,ii], C=C, d=d, l2=self.l2, l1=self.l1)
         elif self.solver == 'lasso':
-            coef = lasso(A, b, C=C, d=d, l2=self.l2, l1=self.l1, tol=self.tol)
+            for ii in range(n_fits):
+                coef[:,ii] = lasso(A, b[:,ii], C=C, d=d, l2=self.l2, l1=self.l1, tol=self.tol)
         else:
             return ValueError('Desired solver has not been implemented yet.')
 

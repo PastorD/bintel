@@ -32,6 +32,7 @@ from scipy.linalg import block_diag
 #    that will be used in the sparse regression problem.
 from sklearn.preprocessing import PolynomialFeatures
 from sys import exit
+import os.path
 class DynamicalModel():
     """
     Class for a generic dynamical model of the form \dot{x} = f(x,u)
@@ -39,17 +40,17 @@ class DynamicalModel():
     def __init__(self):
         pass
 
-    def fitParameters(self,dataFilename,dataFormat,fitType):
+    def fit_parameters(self,data_filename,fit_type):
         """
          Use data to fit the model parameters
         """
 
-        self.dataOrigin = dataFilename
-        self.fitType = fitType
-
-        if (dataFormat=='rosbag'):
-            time, position, rcout = self.preProcessROSBAG(dataFilename)
-        elif (dataFormat=='csv'):
+        self.data_path = data_filename
+        self.fit_type = fit_type
+        data_format = os.path.splitext(data_filename)[1]
+        if (data_format=='.bag'):
+            time, position, rcout = self.read_ROSBAG(data_filename)
+        elif (data_format=='.csv'):
             pass
         else:
             exit("Data format should be 'rosbag' or 'csv'")
@@ -75,7 +76,7 @@ class DynamicalModel():
     
 
         
-    def preProcessROSBAG(self,rosbagName):
+    def read_ROSBAG(self,rosbagName):
         # Transform a ROSBAG into a timeseries signal
         bag = rosbag.Bag(rosbagName)
         
@@ -121,19 +122,14 @@ class DynamicalModel():
         return time, position_interp, rcout_interp
 
 
-    def saveModel(self,yaml_filename):
+    def save_to_file(self,yaml_filename):
         # save the model on a yaml file
         with open(yaml_filename, 'w') as outfile:
             dump(self, outfile, default_flow_style=False)
-        
 
-    def loadModel(self,yaml_filename):
-        # Load the model from the yaml file
-        with open(yaml_filename, 'r') as stream:
-            self = load(stream)
 
-    def computeDesiredAttitude(self):
-        pass
+    def compute_desired_attitude(self):
+        return AttitudeTarget()
 
-    def computeRHS(self):
+    def compute_RHS(self):
         pass
