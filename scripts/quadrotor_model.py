@@ -32,24 +32,32 @@ class QuadrotorModel(DynamicalModel):
     def __init__(self):
         pass
 
-    def get_kinematics(self, states):
+    def get_kinematics(self, X):
         """
         :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
         :return: current derivative of position and quaternian states (States where kinematics relationship is known
                     so no need for learning)
         """
-        dstates = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
-        dstates[0,:3] = np.transpose(np.dot(np.eye(3), states[7:10,0])) #\pos{pos}=velocity
-        q_w, q_x, q_y, q_z = states[3:7,0]
-        omg_w = 0.0
-        omg_x, omg_y, omg_z = states[10:,0]
-        dstates[0,3:7] = 0.5*np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
-                         omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
-                         -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
-                         omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z], dtype=np.float64) # \pos{quaternian}
-        dstates[0,3:7] = dstates[0,3:7]/np.linalg.norm(dstates[0,3:7]) # Normalize quaterniantmt
+        dX = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
+        dX[0,:3] = np.transpose(np.dot(np.eye(3), X[7:10,0])) #\pos{pos}=velocity
 
-        return dstates
+        omg = X[10:,0]
+        dX[0,3:7] = self.ang_vel_to_quat_deriv(X, omg)
+
+        return dX
+
+    def ang_vel_to_quat_deriv(self, X, omg):
+        q_w, q_x, q_y, q_z = X[3:7, 0]
+        omg_w = 0.0
+        omg_x, omg_y, omg_z = omg
+        dq = 0.5 * np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
+                                     omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
+                                     -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
+                                     omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z],
+                                    dtype=np.float64)
+        dq = dq / np.linalg.norm(dq)  # Normalize quaterniantmt
+
+        return dq
 
     def fit_parameters(self, data_filename, fit_type, dt=0.01):
         """
@@ -212,12 +220,11 @@ class QuadrotorModel(DynamicalModel):
         Theta = self.normalize_theta(Theta, prediction=True)
         return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
 
-    def get_dynamics_matrices(self, X, u):
-        if len(X.shape) == 1 or len(u.shape) == 1:
+    def get_dynamics_matrices(self, X):
+        if len(X.shape) == 1:
             X = X.reshape((1,-1))
-            u = u.reshape((1,-1))
 
-        Theta = self.create_observables(X[:, 7:], u)
+        Theta = self.create_observables(X[:, 7:], np.ones((1,4)))
         Theta = self.normalize_theta(Theta, prediction=True)
         n_unactuated = int((Theta.shape[1])/5.0)
 

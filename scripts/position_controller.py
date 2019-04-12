@@ -1,6 +1,8 @@
 #!/usr/bin/env/ python
 import rospy
 from collections import namedtuple
+import numpy as np
+import exceptions
 
 
 class PositionController():
@@ -9,27 +11,30 @@ class PositionController():
         self.K = [] #TODO: Decide how to store gain matrix
         self.dt = 0.05 #Timestep of controller #TODO: Make sure dt is consistent with actual update rate of controller
 
-    def compute_desired_attitude(self, X, u):
-        #TODO: Make sure X is 13x1 states and u is mixed control input
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, q_d, omg_d, domg_d):
 
-        #TODO: Define/compute trajectories and fetch desired position, velocity and accelerations based on current time
-        p_d = []
-        v_d = []
-        a_d = []
-        yaw_d = []
-        dyaw_d = []
-        ddyaw_d = []
+        X = np.concatenate((p, q, v, omg), axis=0)
 
-        F_v, G_v, F_omg, G_omg = self.model.get_dynamics_matrices(X, u)
-        u_FL = self.get_FL_control(F_v, G_v, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, X)
+        if len(X.shape) > 1 or not X.shape[0] == 13:
+            if len(X.shape) == 2 and X.shape[1] > 1:
+                raise IndexError
+            else:
+                X = X.reshape(13,)
+
+        #TODO: How to specify trajectory in yaw based on quaternions?!!
+
+        F_v, G_v, F_omg, G_omg = self.model.get_dynamics_matrices(X)
+        u_FL = self.get_FL_control(F_v=F_v, G_v=G_v, F_omg=F_omg, G_omg= G_omg, p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d,
+                                   dyaw_d=dyaw_d, ddyaw_d=ddyaw_d, X=X)
+
         q_d = namedtuple("q_d", "w x y z")
-        T_d, q_d.w, q_d.x, q_d.y, q_d.z = self.transform_input_to_attitude(u_FL, F_omg, G_omg, X, u_FL)
-        T_d, q_d = self.post_process_input(T_d, q_d)
-        attitude_target = self.create_attitude_msg(T_d, q_d)
+        omg_d = namedtuple("omg_d, x y z")
+        T_d, q_d.w, q_d.x, q_d.y, q_d.z, omg_d.x, omg_d.y, omg_d.z = self.ctrl_to_attitude(u_FL=u_FL, F_omg=F_omg, G_omg=G_omg, X=X)
+        T_d, q_d, omg_d = self.post_process_input(T=T_d, q=q_d, omg=omg_d)
 
-        return attitude_target
+        return T_d, q_d, omg_d
 
-    def get_FL_control(self, F_v, G_v, F_omg, G_omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, X):
+    def get_FL_control(self, F_v, G_v, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, X):
         p = X[:3]
         v = X[7:10]
         yaw = 0.0 #TODO: quaternian - yaw relationship (How to specify trajectory?)
@@ -43,62 +48,21 @@ class PositionController():
 
         return u_FL
 
-    def transform_input_to_attitude(self, u_FL, F_omg, G_omg, X, u_FL):
-        th = self.quaternian_to_euler(X[3:7])
-        omg = X[11:]
+    def ctrl_to_attitude(self, u_FL, F_omg, G_omg, X):
+        q = X[3:7] #Current pose
+        omg = X[11:] #Current angular vel
 
         domg_d = F_omg + np.dot(G_omg, u_FL)
         omg_d = omg + domg_d*self.dt
-        th_d = th + omg_d*dt
-        w, x, y, z = self.euler_to_quaternian(th_d)
+        dq_d = self.model.ang_vel_to_quad_deriv(X, omg_d)
+        q_d = q + dq_d*self.dt
+
         T = u_FL[0]
+        qw, qx, qy, qz = q_d/np.linalg.norm(q_d)
 
-        return T, w, x, y, z
+        return T, qw, qx, qy, qz, omg_d[0], omg_d[1], omg_d[2]
 
-    def quaternian_to_euler(self, q):
-        pass #TODO: Implement
-
-    def euler_to_quaternian(self, th):
-        pass #TODO: Implement
-
-    def post_process_input(self, T, w, x, y, z):
-        #TODO: Make sure that the input found is reasonable
-        return T, w, x, y, z
-
-    def create_attitude_msg(self, T, q):
-        pass #TODO: Implement
-
-
-
-def load_model(model_file_name): #TODO: Remove after testing
-    with open(model_file_name, 'r') as stream:
-        model = load(stream)
-    return model
-
-if __name__ == '__main__':
-    # !/usr/bin/env python
-
-    # Python Common
-    import argparse
-    from yaml import load, dump
-    import position_controller
-
-    # ROS
-    import rospy
-    import roslib
-    from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
-    from mavros_msgs.msg import AttitudeTarget
-    from visualization_msgs.msg import Marker
-
-    # Project
-    from dynamical_model import DynamicalModel
-
-    model_file_name = 'model_test.yaml'
-    model = load_model(model_file_name)
-    controller = position_controller.PositionController(model=model)  # TODO: Add arguments
-
-    AttitudeTarget = controller.compute_desired_attitude()  # TODO: Move to PositionController
-
-
-
-
+    def post_process_input(self, T, q, omg):
+        #TODO: Make sure that the input found is reasonable (define ranges for T and q and make sure that command
+        # found are within these ranges)
+        return T, q, omg
