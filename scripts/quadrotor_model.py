@@ -46,8 +46,8 @@ class QuadrotorModel(DynamicalModel):
 
         return dX
 
-    def ang_vel_to_quat_deriv(self, X, omg):
-        q_w, q_x, q_y, q_z = X[3:7, 0]
+    def ang_vel_to_quat_deriv(self, q, omg):
+        q_w, q_x, q_y, q_z = q
         omg_w = 0.0
         omg_x, omg_y, omg_z = omg
         dq = 0.5 * np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,

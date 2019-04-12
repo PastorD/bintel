@@ -3,13 +3,13 @@ import rospy
 from collections import namedtuple
 import numpy as np
 import math
-import exceptions
+import scipy.io as sio
 
 
 class PositionController():
     def __init__(self, model):
         self.model = model
-        self.K = [] #TODO: Decide how to store gain matrix
+        self.K = sio.loadmat("lqr_gains.mat")["K"]
         self.dt = 0.05 #Timestep of controller #TODO: Make sure dt is consistent with actual update rate of controller
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
@@ -27,8 +27,9 @@ class PositionController():
                                    p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d, ddyaw_d=ddyaw_d)
 
         q_d = namedtuple("q_d", "w x y z")
-        omg_d = namedtuple("omg_d, x y z")
-        T_d, q_d.w, q_d.x, q_d.y, q_d.z, omg_d.x, omg_d.y, omg_d.z = self.ctrl_to_attitude(u_FL=u_FL, F_omg=F_omg, G_omg=G_omg, X=X)
+        omg_d = namedtuple("omg_d", "x y z")
+        T_d, q_d.w, q_d.x, q_d.y, q_d.z, omg_d.x, omg_d.y, omg_d.z = self.ctrl_to_attitude(u_FL=u_FL, F_omg=F_omg,
+                                                                                           G_omg=G_omg, q=q, omg=omg)
         T_d, q_d, omg_d = self.post_process_input(T=T_d, q=q_d, omg=omg_d)
 
         return T_d, q_d, omg_d
@@ -40,22 +41,21 @@ class PositionController():
         yaw = math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y**2+q.z**2))
         dyaw = omg.z
 
-        eta = np.concatenate((e_p, e_v, [yaw-yaw_d], [dyaw-dyaw_d]))
+        eta = np.concatenate((e_p, e_v, [yaw-yaw_d], [dyaw-dyaw_d])).reshape(-1,1)
 
         L_f = np.concatenate(((F_v-a_d), [F_omg[2]-ddyaw_d]))
-
         A = np.concatenate((G_v, [G_omg[2,:]]), axis=0)
-        u_FL = np.linalg.inv(A)*(-L_f + np.dot(self.K, eta))
+        u_FL = np.dot(np.linalg.inv(A), (-L_f + np.dot(self.K, eta).flatten()))
 
         return u_FL
 
-    def ctrl_to_attitude(self, u_FL, F_omg, G_omg, X):
-        q = X[3:7] #Current pose
-        omg = X[11:] #Current angular vel
+    def ctrl_to_attitude(self, u_FL, F_omg, G_omg, q, omg):
+        q = np.array([q.w, q.x, q.y, q.z])
+        omg = np.array([omg.x, omg.y, omg.z])
 
         domg_d = F_omg + np.dot(G_omg, u_FL)
         omg_d = omg + domg_d*self.dt
-        dq_d = self.model.ang_vel_to_quad_deriv(X, omg_d)
+        dq_d = self.model.ang_vel_to_quat_deriv(q, omg_d)
         q_d = q + dq_d*self.dt
 
         T = u_FL[0]
