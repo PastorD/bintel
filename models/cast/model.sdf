@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="cast">
+    <static>true</static>
+    <link name="walls">
+      <collision name="collision">
+        <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+        <geometry>
+          <mesh>
+            <uri>model://cast/meshes/cast_simple_2.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <origin rpy="0.0 0 -3.1415" xyz="4.075 5.135 0"/>
+        <geometry>
+          <mesh>
+            <uri>model://cast/meshes/cast_simple_2.dae</uri>
+          </mesh>
+        </geometry>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+    </link>
+  </model>
+</sdf>
