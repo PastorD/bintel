@@ -239,7 +239,7 @@ class QuadrotorModel(DynamicalModel):
                                              np.dot(Theta[:,2*n_unactuated:3*n_unactuated],self.estimator.coef_[2*n_unactuated:3*n_unactuated,3:]),
                                              np.dot(Theta[:,3*n_unactuated:4*n_unactuated],self.estimator.coef_[3*n_unactuated:4*n_unactuated,3:]),
                                              np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
-        return F_v, G_v, F_omg, G_omg
+        return F_v.flatten(), G_v, F_omg.flatten(), G_omg
 
     def score(self, dataFilename, dataFormat, figure_path=""):
         import matplotlib.pyplot as plt
