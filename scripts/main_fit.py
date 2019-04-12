@@ -7,11 +7,12 @@ import roslib
 from  quadrotor_model import QuadrotorModel
 
 def fit_main():
-
-    #os.chdir(os.path.dirname(__file__))
-    #os.chdir("..")
-    bagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_freeFlight.bag'
-    testbagfilename = '/home/carlfolkestad/catkin_ws/src/bintel/Experimental Data/111118b/111118_ground.bag'
+  
+    os.chdir(os.path.dirname(__file__))
+    os.chdir("..")
+    #sys.path.append(os.path.split(os.path.split(os.path.dirname(__file__))[0])[0])
+    bagfilename = 'Experimental Data/111118b/111118_freeFlight.bag'
+    testbagfilename = 'Experimental Data/111118b/111118_ground.bag'
     #bagfilename = 'Experimental Data/071818/2018-07-18-16-55-35.bag'
     figure_path = 'figures/'
     

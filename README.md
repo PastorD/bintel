@@ -125,6 +125,36 @@ For extra convenience, create an alias, for example bintelconnect:
 ```
 The bash file add_to_bashrc.sh copies useful commands to your bash file.
 
+## Setting Up Software In The Loop (SITL)
+SITL is used to run a simulation using the same software stack used on the real vehicle. In this case, it uses the same px4 code, the same mavros node and the same higher level controller code. The real physics are replaced by a Gazebo instance. 
+
+To configure your machine, follow the instructions [here](https://dev.px4.io/en/setup/dev_env_linux.html#jmavsimgazebo-simulation):
+- Run the two bash files
+```console
+  $ source ubuntu_sim.sh
+  $ source ubuntu_sim_ros_gazebo.sh
+```
+
+To run the px4 run 
+```console
+  $ cd ~/src/Firmware
+  $ make px4_sitl_default gazebo
+```
+This will run px4 in your machine and it will open gazebo. Then, launch mavros as usual but using a udp port
+```console
+  $ roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+```
+See the tmux file 'tmux_sim_sitl.sh' for details. To run the tmux files you need tmux and tmuxp:
+```console
+  $ sudo apt-get install tmux python-tmuxp
+```
+```console
+  $ tmuxp load bash/tmux_stil.yaml
+```
+The yaml file describes all commands to run a sitl session.
+
+
+
 ## Setting Up Optitrack for Positioning
 To use Optitrack for positioning using ecf-EKF, first remap the vrpn topic publishing pose to /mavros/vision_pose/pose. This is done when running the launch file mavros_optitrack.launch (which then runs vrpn_optitrack_positioning.launch which remaps the topic). Then, set the following parameters in QGroundControl:
 - EKF2_AID_MASK: Check vision position fusion, vision yaw fusion (uncheck everything else)

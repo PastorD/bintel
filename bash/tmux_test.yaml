@@ -1,0 +1,11 @@
+session_name: bintel_sitl_session
+suppress_history: false
+windows:
+  - window_name: bintel_sitl
+    layout: tiled
+    shell_command_before:
+    - roscd bintel_ros
+    panes:
+      - shell_command:
+        - roscore
+      - rostopic list \

@@ -14,7 +14,7 @@ import math
 import rospy
 import roslib
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
-from mavros_msgs.msg import AttitudeTarget
+from mavros_msgs.msg import AttitudeTarget, RCOut
 from visualization_msgs.msg import Marker
 
 # Project
@@ -75,15 +75,19 @@ class Robot():
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
             
         rospy.init_node('controller_bintel', anonymous=True)
-        self.rate = rospy.Rate(60) 
+        self.main_loop_rate = 60
+        self.rate = rospy.Rate(self.main_loop_rate) 
           
         # - Subscribe to local position
         self.local_pose = PoseStamped()
+        self.velocity = TwistStamped()
+        self.rc_out = RCOut()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
         if self.is_simulation:
             rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, self._read_velocity)
         else:
             rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+        rospy.Subscriber('/mavros/rc/out', RCOut, self._read_rc_out)
 
     def _read_position(self,data):
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.y
@@ -174,6 +178,9 @@ class Robot():
         """Return 3D vector derivative of 3D exponential trajectory"""
         return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
                 self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
+
+    def _read_rc_out(self,data):
+        self.rc_out = data
 
 
 if __name__ == '__main__':
