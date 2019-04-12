@@ -28,10 +28,14 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
     def __init__(self):
+        self.is_simulation = True
 
-        self.model_file_name = 'model_test.yaml'
+        if self.is_simulation:
+            self.model_file_name = 'model_test.yaml'
+        else:
+            self.model_file_name = 'model_test.yaml'
 
-        self.init_ROS()        
+        self.init_ROS()
         self.model = self.load_model(self.model_file_name)
         self.controller = position_controller.PositionController(model=self.model) #TODO: Add arguments
 
@@ -67,7 +71,7 @@ class Robot():
             model = load(stream)
         return model
 
-    def init_ROS(self,):
+    def init_ROS(self, ):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
             
         rospy.init_node('controller_bintel', anonymous=True)
@@ -76,7 +80,10 @@ class Robot():
         # - Subscribe to local position
         self.local_pose = PoseStamped()
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
-        rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+        if self.is_simulation:
+            rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, self._read_velocity)
+        else:
+            rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
 
     def _read_position(self,data):
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.y
