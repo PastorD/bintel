@@ -32,24 +32,32 @@ class QuadrotorModel(DynamicalModel):
     def __init__(self):
         pass
 
-    def get_kinematics(self, states):
+    def get_kinematics(self, X):
         """
         :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
         :return: current derivative of position and quaternian states (States where kinematics relationship is known
                     so no need for learning)
         """
-        dstates = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
-        dstates[0,:3] = np.transpose(np.dot(np.eye(3), states[7:10,0])) #\pos{pos}=velocity
-        q_w, q_x, q_y, q_z = states[3:7,0]
-        omg_w = 0.0
-        omg_x, omg_y, omg_z = states[10:,0]
-        dstates[0,3:7] = 0.5*np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
-                         omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
-                         -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
-                         omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z], dtype=np.float64) # \pos{quaternian}
-        dstates[0,3:7] = dstates[0,3:7]/np.linalg.norm(dstates[0,3:7]) # Normalize quaterniantmt
+        dX = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
+        dX[0,:3] = np.transpose(np.dot(np.eye(3), X[7:10,0])) #\pos{pos}=velocity
 
-        return dstates
+        omg = X[10:,0]
+        dX[0,3:7] = self.ang_vel_to_quat_deriv(X, omg)
+
+        return dX
+
+    def ang_vel_to_quat_deriv(self, q, omg):
+        q_w, q_x, q_y, q_z = q
+        omg_w = 0.0
+        omg_x, omg_y, omg_z = omg
+        dq = 0.5 * np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
+                                     omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
+                                     -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
+                                     omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z],
+                                    dtype=np.float64)
+        dq = dq / np.linalg.norm(dq)  # Normalize quaterniantmt
+
+        return dq
 
     def fit_parameters(self, data_filename, fit_type, dt=0.01):
         """
@@ -82,7 +90,6 @@ class QuadrotorModel(DynamicalModel):
 
         self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
-        
 
     def read_ROSBAG(self, rosbag_name, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -196,7 +203,12 @@ class QuadrotorModel(DynamicalModel):
         :return: transformed control inputs by standard mixing
         """
         B = np.array([[1, 1, 1, 1],[0, 1, 0, -1], [-1, 0, 1, 0],[-1, 1, -1, 1]])
-        return np.dot(np.square(raw_controls-min_pwm)/min_pwm**2,np.transpose(B))
+
+        # Mix and normalize every input to |u| <= 1
+        u =  np.dot(np.divide(np.square(raw_controls-min_pwm), np.array([4, 1, 1, 1])*min_pwm**2),np.transpose(B))
+        u[:, 0] /= 4.0
+        u[:, -1] /= 2.0
+        return u
 
     def predict_full_RHS(self, X, u):
 
@@ -208,11 +220,26 @@ class QuadrotorModel(DynamicalModel):
         Theta = self.normalize_theta(Theta, prediction=True)
         return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
 
-    def compute_desired_attitude(self):
-        pass
+    def get_dynamics_matrices(self, X):
+        if len(X.shape) == 1:
+            X = X.reshape((1,-1))
 
-    def compute_RHS(self):
-        pass
+        Theta = self.create_observables(X[:, 7:], np.ones((1,4)))
+        Theta = self.normalize_theta(Theta, prediction=True)
+        n_unactuated = int((Theta.shape[1])/5.0)
+
+        F_v = np.transpose(np.dot(Theta[:,:n_unactuated], self.estimator.coef_[:n_unactuated,:3]))
+        G_v = np.transpose(np.concatenate((np.dot(Theta[:, n_unactuated:2*n_unactuated], self.estimator.coef_[n_unactuated:2*n_unactuated, :3]),
+                                           np.dot(Theta[:, 2*n_unactuated:3*n_unactuated], self.estimator.coef_[2*n_unactuated:3*n_unactuated, :3]),
+                                           np.dot(Theta[:, 3*n_unactuated:4*n_unactuated], self.estimator.coef_[3*n_unactuated:4*n_unactuated, :3]),
+                                           np.dot(Theta[:, 4*n_unactuated:5*n_unactuated], self.estimator.coef_[4*n_unactuated:5*n_unactuated, :3])), axis=0))
+
+        F_omg = np.transpose(np.dot(Theta[:, :n_unactuated], self.estimator.coef_[:n_unactuated,3:]))
+        G_omg = np.transpose(np.concatenate((np.dot(Theta[:,n_unactuated:2*n_unactuated],self.estimator.coef_[n_unactuated:2*n_unactuated,3:]),
+                                             np.dot(Theta[:,2*n_unactuated:3*n_unactuated],self.estimator.coef_[2*n_unactuated:3*n_unactuated,3:]),
+                                             np.dot(Theta[:,3*n_unactuated:4*n_unactuated],self.estimator.coef_[3*n_unactuated:4*n_unactuated,3:]),
+                                             np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
+        return F_v.flatten(), G_v, F_omg.flatten(), G_omg
 
     def score(self, dataFilename, dataFormat, figure_path=""):
         import matplotlib.pyplot as plt
