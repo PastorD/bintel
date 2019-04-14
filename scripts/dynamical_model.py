@@ -21,7 +21,7 @@ class DynamicalModel():
     def __init__(self):
         pass
 
-    def fit_parameters(self,data_filename,fit_type):
+    def fit_parameters(self,data_filename,fit_type, is_simulation):
         """
          Use data to fit the model parameters
         """

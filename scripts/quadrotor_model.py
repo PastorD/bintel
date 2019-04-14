@@ -39,10 +39,12 @@ class QuadrotorModel(DynamicalModel):
                     so no need for learning)
         """
         dX = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
-        dX[0,:3] = np.transpose(np.dot(np.eye(3), X[7:10,0])) #\pos{pos}=velocity
+        dX[0,:3] = X[7:10,0] #\pos{pos}=velocity
 
-        omg = X[10:,0]
-        dX[0,3:7] = self.ang_vel_to_quat_deriv(X, omg)
+        q = X[3:7, 0]
+        omg = X[10:, 0]
+
+        dX[0, 3:7] = self.ang_vel_to_quat_deriv(q, omg)
 
         return dX
 
@@ -59,7 +61,7 @@ class QuadrotorModel(DynamicalModel):
 
         return dq
 
-    def fit_parameters(self, data_filename, fit_type, dt=0.01):
+    def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
         """
          Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
@@ -69,7 +71,8 @@ class QuadrotorModel(DynamicalModel):
         self.fit_type = fit_type
         data_format = os.path.splitext(data_filename)[1]
         if (data_format=='.bag'):
-            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(data_filename, dt=dt)
+            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(data_filename, dt=dt,
+                                                                                  is_simulation=is_simulation)
         elif (data_format=='.csv'):
             pass
         else:
@@ -91,7 +94,7 @@ class QuadrotorModel(DynamicalModel):
         self.estimator = sp.sindy(l1=0.75, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
 
-    def read_ROSBAG(self, rosbag_name, dt = 0.01):
+    def read_ROSBAG(self, rosbag_name, is_simulation, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
         bag = rosbag.Bag(rosbag_name)
 
@@ -100,6 +103,11 @@ class QuadrotorModel(DynamicalModel):
         types = []
         for i in range(0, len(bag.get_type_and_topic_info()[1].values())):
             types.append(bag.get_type_and_topic_info()[1].values()[i][0])
+
+        if is_simulation:
+            velocity_topic = "/mavros/local_position/velocity_local"
+        else:
+            velocity_topic = "/mavros/local_position/velocity"
 
         npos = 3
         position_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/local_position/pose"]), npos])
@@ -120,14 +128,14 @@ class QuadrotorModel(DynamicalModel):
             k = k + 1
 
         nlinvel = 3
-        linvel_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/local_position/velocity"]), nlinvel])
+        linvel_raw = np.empty([bag.get_message_count(topic_filters=[velocity_topic]), nlinvel])
         time_linvel = []
         nangvel = 3
-        angvel_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/local_position/velocity"]), nangvel])
+        angvel_raw = np.empty([bag.get_message_count(topic_filters=[velocity_topic]), nangvel])
         time_angvel = []
 
         k = 0
-        for topic, msg, t in bag.read_messages(topics=['/mavros/local_position/velocity']):
+        for topic, msg, t in bag.read_messages(topics=[velocity_topic]):
             linvel_raw[k, :] = [msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]
             time_linvel.append(t.to_time())
 
@@ -241,7 +249,7 @@ class QuadrotorModel(DynamicalModel):
                                              np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
         return F_v.flatten(), G_v, F_omg.flatten(), G_omg
 
-    def score(self, dataFilename, dataFormat, figure_path=""):
+    def score(self, dataFilename, dataFormat, is_simulation, figure_path=""):
         import matplotlib.pyplot as plt
         import string
         from datetime import datetime
@@ -251,7 +259,7 @@ class QuadrotorModel(DynamicalModel):
         self.dataOrigin = dataFilename
 
         if (dataFormat == 'rosbag'):
-            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(dataFilename)
+            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(dataFilename, is_simulation=is_simulation)
         elif (dataFormat == 'csv'):
             pass
         else:
@@ -270,13 +278,13 @@ class QuadrotorModel(DynamicalModel):
             if ii+k >= len(time):
                 break
             x_temp = x_all[ii,:]
-
+            print(x_temp)
             #TODO: make better integration scheme work
             #x_ode = odeint(self.ode_sim_model, x_temp, time[ii:ii+k], args=(u[ii:ii+k,:],))
             # x_sim[ii+k,:] = x_ode[-1,:]
 
             for jj in range(k):
-                x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt
+                x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt #TODO: Find reason for nan in q (happens in predict_full_RHS
             x_sim[ii + k, :] = x_temp
 
 

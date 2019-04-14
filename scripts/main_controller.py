@@ -17,6 +17,9 @@ from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
 from visualization_msgs.msg import Marker
 
+#Initialize trajeftory
+from dynamics import goto_optitrack
+
 # Project
 from  dynamical_model import DynamicalModel
 
@@ -35,10 +38,6 @@ class Robot():
         else:
             self.model_file_name = 'model_test.yaml'
 
-        self.init_ROS()
-        self.model = self.load_model(self.model_file_name)
-        self.controller = position_controller.PositionController(model=self.model) #TODO: Add arguments
-
         self.p = namedtuple("p", "x y z")
         self.q = namedtuple("q", "w x y z")
         self.v = namedtuple("v", "x y z")
@@ -50,14 +49,17 @@ class Robot():
         self.q_d = namedtuple("q_d", "w x y z")
         self.omg_d = namedtuple("omg_d", "x y z")
 
-        #Trajectory:
-        self.p_init = np.array([0.0, 0.0, 1.0])
-        self.p_final = np.array([1.0, 2.0, 1.5])
-        self.t_init = rospy.Time.now()
-        self.t_final = rospy.Time.now() #rospy.Time(secs=(self.t_init + rospy.Duration(2.0)).to_sec())
-        self.t_last_msg = self.t_init
-
+        self.init_ROS()
+        self.model = self.load_model(self.model_file_name)
+        self.controller = position_controller.PositionController(model=self.model)  # TODO: Add arguments
         self.msg = AttitudeTarget()
+
+        #Trajectory:
+        self.p_init = np.array([0.0, 0.0, 5.0])
+        self.p_final = np.array([1.0, 2.0, 6.5])
+        self.t_init = rospy.Time.now()
+        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(2.0)).to_sec())
+        self.t_last_msg = self.t_init
 
         while not rospy.is_shutdown():
             self.update_ctrl()
@@ -89,11 +91,11 @@ class Robot():
             rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
         rospy.Subscriber('/mavros/rc/out', RCOut, self._read_rc_out)
 
-    def _read_position(self,data):
+    def _read_position(self, data):
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.y
         self.q.w, self.q.x, self.q.y, self.q.z = data.pose.orientation.w, data.pose.orientation.x, \
                                                  data.pose.orientation.y, data.pose.orientation.z
-        self.t_last_msg = data.float(data.header.stamp.secs) + data.header.stamp.nsecs*1e-9
+        self.t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
 
     def _read_velocity(self,data):
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
