@@ -1,0 +1,10 @@
+# Define the publishing rate, must be positive.
+publish_rate: 10
+
+# Define the frames we care about. Each frame is associated with a pose topic
+# (mandatory), and optionally a parent frame (default=world) and
+# initial_position (default=None).
+frames:
+    bintel:
+        pose_topic: /mavros/local_position/pose
+        parent_frame: map

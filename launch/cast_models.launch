@@ -4,7 +4,7 @@
   <arg name="cast_urdf" default="$(find bintel_ros)/urdf/cast.urdf"/>
   
   <arg name="gui" default="false" />
-  <arg name="rvizconfig" default="$(find bintel_ros)/urdf/cast_urdf.rviz" />
+  <arg name="rvizconfig" default="$(find bintel_ros)/rviz/cast_urdf.rviz" />
 
 
   
