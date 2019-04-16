@@ -34,7 +34,7 @@ class pose2path():
 
     def processFeedback_init(self,feedback):
         p = feedback.pose.position
-        #print feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z)
+
 
     def poseCallback(self, data):
         self.path.header = data.header

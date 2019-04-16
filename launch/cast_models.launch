@@ -6,8 +6,27 @@
   <arg name="gui" default="false" />
   <arg name="rvizconfig" default="$(find bintel_ros)/rviz/cast_urdf.rviz" />
 
+  <node
+		pkg="bintel_ros"
+		name="pose_to_tf_rebroadcaster"
+		type="pose_to_tf_rebroadcaster.py"
+		args="--config_file $(find bintel_ros)/localPosition_bintel_tf.yaml"
+    output="screen"/>
 
-  
+  <node
+		pkg="bintel_ros"
+		name="pose2path"
+		type="pose2path.py"
+		args="--reference '/mavros/local_position/pose'"
+    output="screen"/>
+
+  <node
+		pkg="bintel_ros"
+		name="seeBoundaryCorners"
+		type="seeBoundaryCorners.py"
+		args="--boundary $(find bintel_ros)/scripts/boundary.yaml"
+    output="screen"/>  
+
   <param name="cast_description" command="$(find xacro)/xacro --inorder '$(arg cast_urdf)'" />
   <param name="robot_description" command="$(find xacro)/xacro --inorder '$(arg robot_urdf)'" />
 
@@ -16,5 +35,4 @@
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="false" />
-
 </launch>
