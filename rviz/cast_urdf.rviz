@@ -14,6 +14,7 @@ Panels:
         - /MarkerArray1
         - /Path1
         - /Marker1
+        - /MarkerArray2
       Splitter Ratio: 0.5
     Tree Height: 767
   - Class: rviz/Selection
@@ -181,7 +182,11 @@ Visualization Manager:
       Tree:
         map:
           bintel:
+            base_link:
+              {}
             camera_link:
+              camera_depth_optical_frame:
+                {}
               camera_rgb_optical_frame:
                 {}
             engineLL:
@@ -208,7 +213,7 @@ Visualization Manager:
       Marker Topic: /boundary_box_array
       Name: MarkerArray
       Namespaces:
-        {}
+        "": true
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -239,6 +244,14 @@ Visualization Manager:
       Marker Topic: /waypoint_marker
       Name: Marker
       Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: waypoint_box_array
+      Name: MarkerArray
+      Namespaces:
         {}
       Queue Size: 100
       Value: true
@@ -267,25 +280,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.01490974
+      Distance: 18.5417442
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -2.71376061
-        Y: 1.06363618
-        Z: 5.47712708
+        X: 1.47164011
+        Y: -0.262369245
+        Z: -0.0577494502
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.00479699392
+      Pitch: 0.299796879
       Target Frame: bintel
       Value: Orbit (rviz)
-      Yaw: 1.46911168
+      Yaw: 1.74414635
     Saved: ~
 Window Geometry:
   Displays:

@@ -124,8 +124,8 @@ class goThrust():
         # Set Waypoint
         self.waypoint = PoseStamped()
         self.waypoint.pose.position.x = -1.4
-        self.waypoint.pose.position.y = 0
-        self.waypoint.pose.position.z = 8
+        self.waypoint.pose.position.y = -5
+        self.waypoint.pose.position.z = 3
 
 
         
