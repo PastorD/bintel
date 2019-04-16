@@ -8,11 +8,11 @@ Panels:
         - /Status1
         - /RobotModel1
         - /RobotModel2
-        - /RobotModel2/Status1
         - /TF1/Frames1
         - /TF1/Tree1
         - /Axes1
         - /MarkerArray1
+        - /Path1
         - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 767
@@ -161,7 +161,17 @@ Visualization Manager:
           Value: true
         engineUR:
           Value: true
+        fcu:
+          Value: true
+        fcu_frd:
+          Value: true
         laser:
+          Value: true
+        local_origin:
+          Value: true
+        local_origin_ned:
+          Value: true
+        map:
           Value: true
       Marker Scale: 0.200000003
       Name: TF
@@ -169,7 +179,21 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          bintel:
+            camera_link:
+              camera_rgb_optical_frame:
+                {}
+            engineLL:
+              {}
+            engineLR:
+              {}
+            engineUL:
+              {}
+            engineUR:
+              {}
+            laser:
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz/Axes
@@ -243,25 +267,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 11.3828812
+      Distance: 7.01490974
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.408423275
-        Y: 1.56538773
-        Z: 1.35906971
+        X: -2.71376061
+        Y: 1.06363618
+        Z: 5.47712708
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.474796802
+      Pitch: 0.00479699392
       Target Frame: bintel
       Value: Orbit (rviz)
-      Yaw: 1.57721388
+      Yaw: 1.46911168
     Saved: ~
 Window Geometry:
   Displays:

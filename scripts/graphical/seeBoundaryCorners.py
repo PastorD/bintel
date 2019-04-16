@@ -8,10 +8,11 @@ import sys
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 import tf
+"""
+Usage: use this node to publish the boundary
+Example: python seeBoundaryCorners.py --boundary boundary.yaml
 
-# Usage: use this node to publish a marker topic from a pose. 
-# For example: python pose2marker --reference '/vrpn_client_node/bintel/pose'
-
+"""
 class seeBoundaryCorners():
     def __init__(self,argsv):
         
