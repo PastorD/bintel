@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-from yaml import load, dump
+import yaml
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
@@ -16,6 +16,8 @@ import roslib
 import tf
 import mavros
 from mavros import command
+from mavros_msgs.srv import SetMode
+
 class PID():
     """
     Class for a generic PID controller
@@ -38,25 +40,26 @@ class QUAD_position_controller():
     """
     Class for a PID controller for quadrotors
     """
-    def __init__(self,gainsPath):
+    def __init__(self,gainsData):
 
-        data = load(file(gainsPath, 'r'), Loader=Loader)
+       
+        #data = load(file(gainsPath, 'r'), Loader=Loader)
 
-        self.pitchPID = PID(data['controller']['pitchPID']['kp'], \
-                       data['controller']['pitchPID']['kd'], \
-                       data['controller']['pitchPID']['ki'])
+        self.pitchPID = PID(gainsData['controller']['pitchPID']['kp'], \
+                       gainsData['controller']['pitchPID']['kd'], \
+                       gainsData['controller']['pitchPID']['ki'])
 
-        self.rollPID = PID(data['controller']['rollPID']['kp'], \
-                      data['controller']['rollPID']['kd'], \
-                      data['controller']['rollPID']['ki'])
+        self.rollPID = PID(gainsData['controller']['rollPID']['kp'], \
+                      gainsData['controller']['rollPID']['kd'], \
+                      gainsData['controller']['rollPID']['ki'])
 
-        self.yawPID = PID(data['controller']['yawPID']['kp'], \
-                     data['controller']['yawPID']['kd'], \
-                     data['controller']['yawPID']['ki'])
+        self.yawPID = PID(gainsData['controller']['yawPID']['kp'], \
+                     gainsData['controller']['yawPID']['kd'], \
+                     gainsData['controller']['yawPID']['ki'])
 
-        self.heightPID =  PID(data['controller']['heightPID']['kp'], \
-                         data['controller']['heightPID']['kd'], \
-                         data['controller']['heightPID']['ki'])
+        self.heightPID =  PID(gainsData['controller']['heightPID']['kp'], \
+                         gainsData['controller']['heightPID']['kd'], \
+                         gainsData['controller']['heightPID']['ki'])
 
     def genQUADcontrol(self,currentPose,waypointPose,velocity):
 
@@ -71,6 +74,16 @@ class QUAD_position_controller():
         uheight = -self.heightPID.genControl(errorz,velocity.twist.linear.z)
         return [uptich,uroll,uyaw,uheight]
 
+
+class Boundary():
+    def __init__(self,data):
+        self.xmin = data['boundary']['xmin']
+        self.xmax = data['boundary']['xmax']
+        self.ymin = data['boundary']['ymin']
+        self.ymax = data['boundary']['ymax']
+        self.zmin = data['boundary']['zmin']
+        self.zmax = data['boundary']['zmax']
+
 class goThrust():
     def __init__(self):
 
@@ -83,7 +96,19 @@ class goThrust():
         rospy.init_node('gotowaypoint', anonymous=True)
         rate = rospy.Rate(60) # 10hz
 
-        self.controller = QUAD_position_controller('scripts/gainsStart.yaml')
+        # Parse input
+        #parser = argparse.ArgumentParser()
+        #parser.add_argument("--boundary", help="filepath to the control boundary")
+        #args = parser.parse_args(rospy.myargv(argsv))
+
+        #self.pub_sp = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        rospy.wait_for_service('mavros/set_mode')
+        self.change_mode = rospy.ServiceProxy('mavros/set_mode', SetMode)
+
+        data = self.load_config('scripts/boundary.yaml')
+        self.boundary = Boundary(data)
+
+        self.controller = QUAD_position_controller(self.load_config('scripts/gainsStart.yaml'))
         # Set parameters
         self.kz = 0.05
         self.hoverth = 0.565
@@ -110,10 +135,14 @@ class goThrust():
         self.publish_waypoint()
 
 
-        # Define Controller
-        
-
+        # Define Controller  
         rospy.spin()
+
+    def load_config(self,config_file):
+        with open(config_file, 'r') as f:
+            config = yaml.load(f)
+
+        return config
 
     def publish_waypoint(self):
         # Set parameters and publish the waypoint as a Rviz marker
@@ -158,7 +187,28 @@ class goThrust():
         self.AttitudeTarget.orientation = Quaternion(*quaternion_from_euler(self.croll,self.cpitch,self.cyaw))
         self.AttitudeTarget.thrust = self.cheight + self.hoverth
 
-        self.pub_sp.publish(self.AttitudeTarget)
+        if inside_boundary(self.local_pose.pose,self.boundary):
+            result_mode = self.change_mode(0,"OFFBOARD")
+            self.pub_sp.publish(self.AttitudeTarget)
+        else:
+            result_mode = self.change_mode(0,"POSCTL")
+
+
+
+
+def inside_boundary(pos,boundary):
+    if    ( pos.position.x < boundary.xmin or 
+            pos.position.y < boundary.ymin or 
+            pos.position.z < boundary.zmin or 
+            pos.position.x > boundary.xmax or 
+            pos.position.y > boundary.ymax or 
+            pos.position.z > boundary.zmax ):
+        return False
+    else:
+        return True
+
+
+
         
 if __name__ == '__main__':
     try:

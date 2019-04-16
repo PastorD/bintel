@@ -7,7 +7,7 @@ controller:
   rollPID:
     kp: 0.1
     kd: 0.02
-    ki: 0.00	
+    ki: 0.00
 
   yawPID:
     kp: 0.1
