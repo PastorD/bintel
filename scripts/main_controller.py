@@ -34,7 +34,7 @@ class Robot():
         self.is_simulation = True
 
         if self.is_simulation:
-            self.model_file_name = 'model_test.yaml'
+            self.model_file_name = 'sim_model.yaml'
         else:
             self.model_file_name = 'model_test.yaml'
 
@@ -54,9 +54,11 @@ class Robot():
         self.controller = position_controller.PositionController(model=self.model)  # TODO: Add arguments
         self.msg = AttitudeTarget()
 
+        #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
+
         #Trajectory:
         self.p_init = np.array([0.0, 0.0, 5.0])
-        self.p_final = np.array([1.0, 2.0, 6.5])
+        self.p_final = np.array([0.0, 0.0, 6.0])
         self.t_init = rospy.Time.now()
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(2.0)).to_sec())
         self.t_last_msg = self.t_init

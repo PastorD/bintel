@@ -29,8 +29,8 @@ class QuadrotorModel(DynamicalModel):
     Class for a control-affine quadrotor dynamical model of the form \dot{x} = f(x) + g(x)u with known kinematics
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, is_simulation=False):
+        self.is_simulation=is_simulation
 
     def get_kinematics(self, X):
         """
@@ -43,21 +43,22 @@ class QuadrotorModel(DynamicalModel):
 
         q = X[3:7, 0]
         omg = X[10:, 0]
-
+        #print(X)
         dX[0, 3:7] = self.ang_vel_to_quat_deriv(q, omg)
-
+        #print(dX)
         return dX
 
     def ang_vel_to_quat_deriv(self, q, omg):
         q_w, q_x, q_y, q_z = q
-        omg_w = 0.0
-        omg_x, omg_y, omg_z = omg
-        dq = 0.5 * np.array([-omg_x * q_x - omg_y * q_y - omg_z * q_z + omg_w * q_w,
-                                     omg_x * q_w + omg_y * q_z - omg_z * q_y + omg_w * q_x,
-                                     -omg_x * q_z + omg_y * q_w + omg_z * q_x + omg_w * q_y,
-                                     omg_x * q_y - omg_y * q_x + omg_z * q_w + omg_w * q_z],
-                                    dtype=np.float64)
-        dq = dq / np.linalg.norm(dq)  # Normalize quaterniantmt
+        o_w = 0.0
+        o_x, o_y, o_z = omg
+
+        dq = 0.5 * np.array([o_w*q_w - q_x*o_x - q_y*o_y - q_z*o_z,
+                             q_x*o_w + q_w*o_x + q_y*o_z - q_z*o_y,
+                             q_y*o_w + q_w*o_y + q_z*o_x - q_x*o_z,
+                             q_z*o_w + q_w*o_z + q_x*o_y - q_y*o_x
+                             ],
+                            dtype=np.float64)
 
         return dq
 
@@ -78,7 +79,6 @@ class QuadrotorModel(DynamicalModel):
         else:
             exit("Data format should be 'rosbag' or 'csv'")
 
-        x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
         x_learn = np.concatenate((linvel, angvel), axis=1)
         u = self.mix_control_inputs(rcout)
 
@@ -91,8 +91,9 @@ class QuadrotorModel(DynamicalModel):
         Theta = self.create_observables(X, u)
         Theta = self.normalize_theta(Theta, prediction=False)
 
-        self.estimator = sp.sindy(l1=0.75, solver='lasso')
+        self.estimator = sp.sindy(l1=0.0, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
+        print(self.estimator.coef_)
 
     def read_ROSBAG(self, rosbag_name, is_simulation, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -219,7 +220,6 @@ class QuadrotorModel(DynamicalModel):
         return u
 
     def predict_full_RHS(self, X, u):
-
         if len(X.shape) == 1 or len(u.shape) == 1:
             X = X.reshape((1,-1))
             u = u.reshape((1,-1))
@@ -278,14 +278,16 @@ class QuadrotorModel(DynamicalModel):
             if ii+k >= len(time):
                 break
             x_temp = x_all[ii,:]
-            print(x_temp)
+
             #TODO: make better integration scheme work
             #x_ode = odeint(self.ode_sim_model, x_temp, time[ii:ii+k], args=(u[ii:ii+k,:],))
             # x_sim[ii+k,:] = x_ode[-1,:]
 
             for jj in range(k):
-                x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt #TODO: Find reason for nan in q (happens in predict_full_RHS
+                x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt
+                x_temp[3:7] = x_temp[3:7] / np.linalg.norm(x_temp[3:7])  # Normalize quaternion
             x_sim[ii + k, :] = x_temp
+            #print(x_temp)
 
 
 

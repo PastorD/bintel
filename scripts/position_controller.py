@@ -45,6 +45,8 @@ class PositionController():
 
         L_f = np.concatenate(((F_v-a_d), [F_omg[2]-ddyaw_d]))
         A = np.concatenate((G_v, [G_omg[2,:]]), axis=0)
+
+        print(A)
         u_FL = np.dot(np.linalg.inv(A), (-L_f + np.dot(self.K, eta).flatten()))
 
         return u_FL

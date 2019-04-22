@@ -8,7 +8,7 @@ from  quadrotor_model import QuadrotorModel
 
 def fit_main():
   
-    os.chdir(os.path.dirname(__file__))
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     os.chdir('..')
     #sys.path.append(os.path.split(os.path.split(os.path.dirname(__file__))[0])[0])
 
@@ -23,10 +23,10 @@ def fit_main():
 
     figure_path = 'figures/'
     
-    model_filename = 'sim_model.yaml'
+    model_filename = 'scripts/sim_model.yaml'
 
-    model = QuadrotorModel()
-    model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.1)
+    model = QuadrotorModel(is_simulation=is_simulation)
+    model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.01)
     model.score(testbagfilename,  dataFormat='rosbag', figure_path=figure_path, is_simulation=is_simulation)
     model.save_to_file(model_filename)
     
