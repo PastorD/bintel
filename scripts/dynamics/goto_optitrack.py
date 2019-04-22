@@ -38,7 +38,7 @@ class gotooptitrack():
     
     def _local_pose_cb(self,data):
         self.local_pose = data
-        
+
 if __name__ == '__main__':
     try:
         gotoop = gotooptitrack()
