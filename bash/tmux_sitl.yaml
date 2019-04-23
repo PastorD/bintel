@@ -11,9 +11,11 @@ windows:
         - make px4_sitl_default gazebo
       - roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
       - shell_command:
+        - sleep 5
         - source bash/increase_rates.sh
-        - sleep 5; rostopic echo /mavros/state
+        - rostopic echo /mavros/state
       - sleep 5; rostopic echo /mavros/local_position/pose 
+      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
       - python scripts/dynamics/goto_optitrack.py \
       - ~/Downloads/QGroundControl.AppImage 
       - rosbag record -o sitl_test_ /mavros/imu/data /mavros/rc/out /mavros/local_position/pose /mavros/local_position/velocity_local /tf \

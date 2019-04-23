@@ -1,44 +1,46 @@
 #!/usr/bin/env python
-import rospy
 
-from nav_msgs.msg import Path
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseStamped
-import tf
+"""
+Usage: use this node to publish a path topic from a pose. 
+example: python pose2path.py --reference '/vrpn_client_node/bintel/pose'
+
+Author: Daniel Pastor
+
+"""
 import argparse
+import sys
+import copy
 
-# Usage: use this node to publish a path topic from a pose. 
-# For example: python pose2path --reference '/vrpn_client_node/bintel/pose'
+import rospy
+from nav_msgs.msg import Path, Odometry
+from geometry_msgs.msg import PoseStamped
+
+
 
 class pose2path():
-    def __init__(self):
+    def __init__(self,argsv):
         # Parse Input
         parser = argparse.ArgumentParser()
-        parser.add_argument("reference", help="name of the optitrack frame used for reference")
-        parser.add_argument("length",    help='length in seconds of the published path')
-                
-        args = parser.parse_args()
-        self.reference = args.reference
-        self.length = args.length
-        
+        parser.add_argument("--reference", required=True, help="name of the optitrack frame used for reference")
+        #parser.add_argument("--length",    help='length in seconds of the published path')
+            
+        args = parser.parse_args(rospy.myargv(argsv))
         # Init Node
         rospy.init_node('path_node')
-        rospy.Subscriber(self.reference, PoseStamped, self.poseCallback)
+        rospy.Subscriber(args.reference, PoseStamped, self.poseCallback)
         self.path_pub = rospy.Publisher('/path', Path, queue_size=10)
         self.path = Path()
         rospy.spin()
 
-
     def poseCallback(self, data):
-	    self.path.header = data.header
-	    pose = PoseStamped()
-	    pose.header = data.header
-	    pose.pose = data.pose
-	    self.path.poses.append(pose)
-	    self.path_pub.publish(self.path)
+        if not self.path.poses==0:
+            self.path.header = data.header
+
+        self.path.poses.append(data)
+        self.path_pub.publish(self.path)
 
 if __name__ == '__main__':
     try:
-        opR = pose2path()
+        opR = pose2path(sys.argv[1:])
     except rospy.ROSInterruptException:
         pass

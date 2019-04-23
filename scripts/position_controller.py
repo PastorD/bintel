@@ -7,10 +7,10 @@ import scipy.io as sio
 
 
 class PositionController():
-    def __init__(self, model):
+    def __init__(self, model, rate):
         self.model = model
         self.K = sio.loadmat("lqr_gains.mat")["K"]
-        self.dt = 0.05 #Timestep of controller #TODO: Make sure dt is consistent with actual update rate of controller
+        self.dt = 1.0/rate #Timestep of controller
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
 

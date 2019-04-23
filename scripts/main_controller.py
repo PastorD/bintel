@@ -49,9 +49,10 @@ class Robot():
         self.q_d = namedtuple("q_d", "w x y z")
         self.omg_d = namedtuple("omg_d", "x y z")
 
+        self.main_loop_rate = 30  # TODO: Test what rates are achievable (Need this to be achievable as it is used for control calculations)
         self.init_ROS()
         self.model = self.load_model(self.model_file_name)
-        self.controller = position_controller.PositionController(model=self.model)  # TODO: Add arguments
+        self.controller = position_controller.PositionController(model=self.model, dt=self.main_loop_rate)  # TODO: Add arguments
         self.msg = AttitudeTarget()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
@@ -75,12 +76,11 @@ class Robot():
             model = load(stream)
         return model
 
-    def init_ROS(self, ):
+    def init_ROS(self):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
             
         rospy.init_node('controller_bintel', anonymous=True)
-        self.main_loop_rate = 60
-        self.rate = rospy.Rate(self.main_loop_rate) 
+        self.rate = rospy.Rate(self.main_loop_rate)
           
         # - Subscribe to local position
         self.local_pose = PoseStamped()

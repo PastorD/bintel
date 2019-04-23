@@ -1,36 +1,40 @@
 #!/usr/bin/env python
-import rospy
 
-from visualization_msgs.msg import Marker, MarkerArray
-import tf
 import argparse
 import copy
-from yaml import load, dump
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
+import yaml
+import sys
 
-# Usage: use this node to publish a marker topic from a pose. 
-# For example: python pose2marker --reference '/vrpn_client_node/bintel/pose'
+import rospy
+from visualization_msgs.msg import Marker, MarkerArray
+import tf
+"""
+Usage: use this node to publish the boundary
+Example: python seeBoundaryCorners.py --boundary boundary.yaml
 
+"""
 class seeBoundaryCorners():
-    def __init__(self):
-    
-        # Init Node
-        rospy.init_node('marker_node_boundary_array')
-        self.marker_pub = rospy.Publisher('/boundary_box_array', MarkerArray, queue_size=10)
-        boxArray = MarkerArray()
+    def __init__(self,argsv):
+        
+        # Parse input
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--boundary", help="filepath to the control boundary")
+        args = parser.parse_args(rospy.myargv(argsv))
 
-        path = 'scripts/boundary.yaml'
-        data = load(file(path, 'r'), Loader=Loader)
-
+        data = self.load_config(args.boundary)
+        rospy.sleep(2.)
         self.xmin = data['boundary']['xmin']
         self.xmax = data['boundary']['xmax']
         self.ymin = data['boundary']['ymin']
         self.ymax = data['boundary']['ymax']
         self.zmin = data['boundary']['zmin']
         self.zmax = data['boundary']['zmax']
+
+        print(self.zmax)
+        # Init Node
+        rospy.init_node('marker_node_boundary_array')
+        self.marker_pub = rospy.Publisher('/boundary_box_array', MarkerArray, queue_size=10)
+        boxArray = MarkerArray()
 
         self.box_marker = Marker()
         self.box_marker.type = Marker.CUBE
@@ -72,12 +76,20 @@ class seeBoundaryCorners():
                     cornervector.append(corner)
                     boxArray.markers.append(cornervector[-1])
 
-        rospy.sleep(2.)
-        self.marker_pub.publish(boxArray)        
+        for i in range(5):
+            rospy.sleep(1.) 
+            self.marker_pub.publish(boxArray)   
         
+    def load_config(self,config_file):
+        with open(config_file, 'r') as f:
+            config = yaml.load(f)
+
+        return config
+
+
 
 if __name__ == '__main__':
     try:
-        opR = seeBoundaryCorners()
+        opR = seeBoundaryCorners(sys.argv[1:])
     except rospy.ROSInterruptException:
         pass

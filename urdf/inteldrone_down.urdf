@@ -3,7 +3,7 @@
 
   <link name="bintel">
     <visual>
-      <origin rpy="0.0 0 1.5707" xyz="0 0 0.008"/>
+      <origin rpy="0.0 0 -1.5707" xyz="0 0 0.008"/>
       <geometry>
         <mesh filename="package://bintel_ros/meshes/inteldrone_frame.stl" scale="0.001 0.001 0.001"/>
       </geometry>

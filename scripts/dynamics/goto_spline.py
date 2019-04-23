@@ -1,16 +1,22 @@
 #!/usr/bin/env python
 
+import numpy as np
+import copy
+
 import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
 from mavros_msgs.srv import SetMode
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 import roslib
 import tf
 import mavros
 from mavros import command
 
-class gotooptitrack():
+from scipy.interpolate import UnivariateSpline, splev, splrep
+
+
+class gotospline():
     def __init__(self):
         
         # Arm the drone
@@ -22,7 +28,7 @@ class gotooptitrack():
         change_mode = rospy.ServiceProxy('mavros/set_mode', SetMode)
 
         rospy.init_node('gotowaypoint', anonymous=True)
-        rate = rospy.Rate(50) # 10hz
+        rate = rospy.Rate(50) 
         
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_cb)
         self.waypoint = PoseStamped()
@@ -34,8 +40,12 @@ class gotooptitrack():
         
         self.marker_pub = rospy.Publisher('/waypoint_marker', Marker, queue_size=10)
         self.waypoint_marker = Marker()
+        self.waypoints = np.array([[0,0,0],
+                                   [0,1,1],
+                                   [0,3,3]])
         self.publish_waypoint()
 
+        
        
         while not rospy.is_shutdown():
             result_mode = change_mode(0,"OFFBOARD")
@@ -58,12 +68,40 @@ class gotooptitrack():
         self.waypoint_marker.color.a = 1
         self.waypoint_marker.pose = self.waypoint.pose
 
-        for i in range(3):
-            rospy.sleep(2)
-            self.marker_pub.publish(self.waypoint_marker)
+
+    
+        self.marker_pub = rospy.Publisher('/waypoint_box_array', MarkerArray, queue_size=10)
+        boxArray = MarkerArray()
+        cornerMarker = Marker()
+        cornerMarker.type = Marker.CUBE
+        cornerMarker.header.frame_id = 'map'
+        cornerMarker.scale.x = 0.2
+        cornerMarker.scale.y = 0.2
+        cornerMarker.scale.z = 0.2
+        cornerMarker.color.r = 0.6
+        cornerMarker.color.g = 0.4
+        cornerMarker.color.b = 0.2
+        cornerMarker.color.a = 1
+        cornervector = []
+        #counter = 0
+        for way in self.waypoints:
+            cornerMarker.pose.position.x = way[0]
+            cornerMarker.pose.position.y = way[1]
+            cornerMarker.pose.position.z = way[2]
+
+            cornerMarker.id += 1
+            corner = copy.deepcopy(cornerMarker)
+            cornervector.append(corner)
+            boxArray.markers.append(cornervector[-1])
+
+
+        for i in range(4):
+            rospy.sleep(1)
+            #self.marker_pub.publish(self.waypoint_marker)
+            self.marker_pub.publish(boxArray)   
 
 if __name__ == '__main__':
     try:
-        gotoop = gotooptitrack()
+        gotoop = gotospline()
     except rospy.ROSInterruptException:
         pass

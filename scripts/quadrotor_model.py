@@ -30,7 +30,7 @@ class QuadrotorModel(DynamicalModel):
     """
 
     def __init__(self, is_simulation=False):
-        self.is_simulation=is_simulation
+        self.is_simulation = is_simulation
 
     def get_kinematics(self, X):
         """
@@ -85,14 +85,17 @@ class QuadrotorModel(DynamicalModel):
         from sparse_identification.utils import derivative
         dt = time[1] - time[0]
         xdot_learn = derivative(x_learn,dt)
-        X = x_learn
+        X = self.normalize_x(x_learn)
 
         self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
         Theta = self.create_observables(X, u)
         Theta = self.normalize_theta(Theta, prediction=False)
 
-        self.estimator = sp.sindy(l1=0.0, solver='lasso')
+
+        self.estimator = sp.sindy(l1=0.1, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
+        print(self.estimator.coef_)
+        self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
         print(self.estimator.coef_)
 
     def read_ROSBAG(self, rosbag_name, is_simulation, dt = 0.01):
@@ -180,7 +183,14 @@ class QuadrotorModel(DynamicalModel):
             rcout_interp[:, k] = np.interp(time, time_rcout, rcout_raw[:, k])
 
         bag.close()
+
         return time, position_interp, orientation_interp, linvel_interp, angvel_interp, rcout_interp
+
+    def normalize_x(self, X):
+        self.x_var = np.var(X, axis=0)
+        print(self.x_var)
+        X = np.divide(X, self.x_var)
+        return X
 
     def create_observables(self, X, u):
         obsX = self.poly_lib.fit_transform(X)

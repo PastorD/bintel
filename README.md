@@ -1,11 +1,14 @@
 # Description
+
 This repository contains the code to use the Burdick Lab Intel Drone. Please don't include data in this repository and use the dedicated repository instead.
 
 All possible set of commands are listed in the scripts folder. Use it as a reference or execute a file using bash.
 
 # Setup
+
 - Turn on the radio (if you forget to turn on the radio first, you have to press the turn it on while holding the bind button. A mayor tone indicates success while a minor tone (sad tone) indicates failure. Try again if it fails)
 - Turn on the drone
+- 
 - ssh into the drone
 ```console
   $ ssh bgroupintel@192.168.1.61
@@ -26,6 +29,7 @@ All possible set of commands are listed in the scripts folder. Use it as a refer
 
 
 If you cannot see the topics from one machine to another make sure that the connectivy works:
+
 - Set up ROST_HOSTNAME and ROS_MASTER_URI
 ```console
   export ROS_MASTER_URI=http://192.168.1.61:11311 # this assumes the drone is master
@@ -35,21 +39,21 @@ If you cannot see the topics from one machine to another make sure that the conn
 - ping between the two machines
 
 To visualize the drone within CAST you have to run their urdf models. Run the launch file and check that the movement matches reality (for example, get close to a column in real life and it should do the same in RVIZ).
+
 ```console
-  (host) $ roslaunch urdf/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+  (host) $ roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
 ```
-![](urdf/urdf_screen.png)
 
+![urdf_screen](urdf/urdf_screen.png)
 
-It will define the frames for the bintel, CAST and it will define the static tf between them. In addition, it will launch a rviz instance with the right configuration. 
+It will define the frames for the bintel, CAST and it will define the static tf between them. In addition, it will launch a rviz instance with the right configuration.
 **NOTE:** if the CAD models or the frames are red it means optitrack is not publishing the correct pose. Check that the node is working.
-
 
 # Operation
 
 ## Manual Control
 
-+ To arm push the left stick to the bottom right. 
+- To arm push the left stick to the bottom right.
 
 ## Position Control
 
@@ -62,6 +66,7 @@ Be ready to take manual control of the drone at any time
 ## Off-board mode
 
 OPTION 1
+
 + Arm the drone in position mode. 
 + Start a script publishing to command the drone, either /mavros/setpoint_position/pose or /mavros/setpoint_attitude. Make sure to publish at a high rate (>~20HZ??)
 + Change to off-board mode in the radio. If you change to off-board mode before publishing it would reject the mode
