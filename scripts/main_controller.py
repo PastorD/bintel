@@ -49,19 +49,19 @@ class Robot():
         self.q_d = namedtuple("q_d", "w x y z")
         self.omg_d = namedtuple("omg_d", "x y z")
 
-        self.main_loop_rate = 30  # TODO: Test what rates are achievable (Need this to be achievable as it is used for control calculations)
+        self.main_loop_rate = 60  # TODO: Test what rates are achievable (Need this to be achievable as it is used for control calculations)
         self.init_ROS()
         self.model = self.load_model(self.model_file_name)
-        self.controller = position_controller.PositionController(model=self.model, dt=self.main_loop_rate)  # TODO: Add arguments
+        self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate)  # TODO: Add arguments
         self.msg = AttitudeTarget()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
         #Trajectory:
         self.p_init = np.array([0.0, 0.0, 5.0])
-        self.p_final = np.array([0.0, 0.0, 6.0])
+        self.p_final = np.array([0.0, 0.0, 5.0])
         self.t_init = rospy.Time.now()
-        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(2.0)).to_sec())
+        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(5.0)).to_sec())
         self.t_last_msg = self.t_init
 
         while not rospy.is_shutdown():
@@ -94,7 +94,7 @@ class Robot():
         rospy.Subscriber('/mavros/rc/out', RCOut, self._read_rc_out)
 
     def _read_position(self, data):
-        self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.y
+        self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.z
         self.q.w, self.q.x, self.q.y, self.q.z = data.pose.orientation.w, data.pose.orientation.x, \
                                                  data.pose.orientation.y, data.pose.orientation.z
         self.t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)

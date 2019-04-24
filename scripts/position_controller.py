@@ -45,10 +45,8 @@ class PositionController():
 
         L_f = np.concatenate(((F_v-a_d), [F_omg[2]-ddyaw_d]))
         A = np.concatenate((G_v, [G_omg[2,:]]), axis=0)
-
-        print(A)
         u_FL = np.dot(np.linalg.inv(A), (-L_f + np.dot(self.K, eta).flatten()))
-
+        print(u_FL)
         return u_FL
 
     def ctrl_to_attitude(self, u_FL, F_omg, G_omg, q, omg):
@@ -68,4 +66,23 @@ class PositionController():
     def post_process_input(self, T, q, omg):
         #TODO: Make sure that the input found is reasonable (define ranges for T and q and make sure that command
         # found are within these ranges)
+        T += (1562.-1000.)/1000. #Hover throttle added #TODO: Investigate why necessary
+
+        #Post-process T:
+        if T < 0.3:
+            T = 0.3
+        elif T > 1:
+            T = 1
+
+        #Post-Process omg:
+        omg_lim = 2. #TODO: Test effect of omg_lim
+        omg.x, omg.y, omg.z = np.abs(omg.x), np.abs(omg.y), np.abs(omg.z)
+        if omg.x > omg_lim:
+            omg.x = omg_lim
+        if omg.y > omg_lim:
+            omg.y = omg_lim
+        if omg.z > omg_lim:
+            omg.z = omg_lim
+
+
         return T, q, omg

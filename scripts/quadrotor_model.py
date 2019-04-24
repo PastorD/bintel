@@ -92,11 +92,10 @@ class QuadrotorModel(DynamicalModel):
         Theta = self.normalize_theta(Theta, prediction=False)
 
 
-        self.estimator = sp.sindy(l1=0.1, solver='lasso')
+        self.estimator = sp.sindy(l1=1.0, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
-        print(self.estimator.coef_)
+
         self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
-        print(self.estimator.coef_)
 
     def read_ROSBAG(self, rosbag_name, is_simulation, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -109,7 +108,7 @@ class QuadrotorModel(DynamicalModel):
             types.append(bag.get_type_and_topic_info()[1].values()[i][0])
 
         if is_simulation:
-            velocity_topic = "/mavros/local_position/velocity_local"
+            velocity_topic = "/mavros/local_position/velocity_body"
         else:
             velocity_topic = "/mavros/local_position/velocity"
 
@@ -224,9 +223,9 @@ class QuadrotorModel(DynamicalModel):
         B = np.array([[1, 1, 1, 1],[0, 1, 0, -1], [-1, 0, 1, 0],[-1, 1, -1, 1]])
 
         # Mix and normalize every input to |u| <= 1
-        u =  np.dot(np.divide(np.square(raw_controls-min_pwm), np.array([4, 1, 1, 1])*min_pwm**2),np.transpose(B))
-        u[:, 0] /= 4.0
-        u[:, -1] /= 2.0
+        u =  np.dot(np.divide(np.square(raw_controls-min_pwm), np.array([1, 1, 1, 1])*min_pwm**2),np.transpose(B))
+        u[:, 0] /= 4.0 #Normalize to get total thrust between 0 and 1
+        #u[:, -1] /= 2.0
         return u
 
     def predict_full_RHS(self, X, u):

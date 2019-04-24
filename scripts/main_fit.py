@@ -15,8 +15,8 @@ def fit_main():
     is_simulation = True
 
     if is_simulation:
-        bagfilename = "Experimental Data/sitl_12april19/sitl_test_siaggresive_2019-04-12-16-56-32.bag"
-        testbagfilename = "Experimental Data/sitl_12april19/sitl_test_init_2019-04-12-16-50-02.bag"
+        bagfilename = "Experimental Data/sitl_23april19/sitl_test__aggressive_sim.bag"
+        testbagfilename = "Experimental Data/sitl_23april19/sitl_test__short_test.bag"
     else:
         bagfilename = 'Experimental Data/111118b/111118_freeFlight.bag'
         testbagfilename = 'Experimental Data/111118b/111118_ground.bag'
