@@ -2,9 +2,9 @@
 import os
 
 import rospy
-import roslib
 
-from  quadrotor_model import QuadrotorModel
+from learn_full_model import learnFullModel
+from learn_nominal_model import learnNominalModel
 
 def fit_main():
   
@@ -13,6 +13,7 @@ def fit_main():
     #sys.path.append(os.path.split(os.path.split(os.path.dirname(__file__))[0])[0])
 
     is_simulation = True
+    fit_nominal = True
 
     if is_simulation:
         bagfilename = "Experimental Data/sitl_23april19/sitl_test__aggressive_sim.bag"
@@ -22,16 +23,19 @@ def fit_main():
         testbagfilename = 'Experimental Data/111118b/111118_ground.bag'
 
     figure_path = 'scripts/figures/'
-    
-    model_filename = 'scripts/sim_model.yaml'
 
-    model = QuadrotorModel(is_simulation=is_simulation)
-    model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.1)
+    if fit_nominal:
+        model_filename = 'scripts/sim_nom_model.yaml'
+        model = learnNominalModel(is_simulation=is_simulation)
+        model.fit_parameters(bagfilename, fit_type='lstsq', is_simulation=is_simulation, dt=0.1)
+    else:
+        model_filename = 'scripts/sim_model.yaml'
+        model = learnFullModel(is_simulation=is_simulation)
+        model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.01)
+
     model.score(testbagfilename,  dataFormat='rosbag', figure_path=figure_path, is_simulation=is_simulation)
     model.save_to_file(model_filename)
-    
 
-    
 if __name__ == '__main__':
     try:
         fit_main()

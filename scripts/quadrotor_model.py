@@ -1,101 +1,44 @@
 #!/usr/bin/env python
 
-
+# Python
 import numpy as np
 import argparse
 from sys import exit
 import os.path
 from yaml import load, dump
+from mavros_msgs.msg import AttitudeTarget
 
+# ROS
 import rospy
 import roslib
 import tf
 import rosbag
-from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
-from mavros_msgs.msg import AttitudeTarget
-from tf.transformations import quaternion_from_euler
 
-import sparse_identification as sp
-from scipy.integrate import odeint
-from scipy.linalg import block_diag
-from sklearn.preprocessing import PolynomialFeatures
-
-from dynamical_model import DynamicalModel
-
-
-class QuadrotorModel(DynamicalModel):
+class QuadrotorModel():
     """
-    Class for a control-affine quadrotor dynamical model of the form \dot{x} = f(x) + g(x)u with known kinematics
+    Class for a generic dynamical model of the form \dot{x} = f(x,u)
     """
+    def __init__(self):
+        pass
 
-    def __init__(self, is_simulation=False):
-        self.is_simulation = is_simulation
+    #=======Functions overloaded by methods=======
+    def fit_parameters(self,data_filename,fit_type, is_simulation):
+        pass
 
-    def get_kinematics(self, X):
-        """
-        :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
-        :return: current derivative of position and quaternian states (States where kinematics relationship is known
-                    so no need for learning)
-        """
-        dX = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
-        dX[0,:3] = X[7:10,0] #\pos{pos}=velocity
+    def predict_full_RHS(self):
+        pass
 
-        q = X[3:7, 0]
-        omg = X[10:, 0]
-        #print(X)
-        dX[0, 3:7] = self.ang_vel_to_quat_deriv(q, omg)
-        #print(dX)
-        return dX
+    def get_dynamics_matrices(self, X):
+        pass
+    #===========================================
+    
+    def save_to_file(self,yaml_filename):
+        # save the model on a yaml file
+        with open(yaml_filename, 'w') as outfile:
+            dump(self, outfile, default_flow_style=False)
 
-    def ang_vel_to_quat_deriv(self, q, omg):
-        q_w, q_x, q_y, q_z = q
-        o_w = 0.0
-        o_x, o_y, o_z = omg
-
-        dq = 0.5 * np.array([o_w*q_w - q_x*o_x - q_y*o_y - q_z*o_z,
-                             q_x*o_w + q_w*o_x + q_y*o_z - q_z*o_y,
-                             q_y*o_w + q_w*o_y + q_z*o_x - q_x*o_z,
-                             q_z*o_w + q_w*o_z + q_x*o_y - q_y*o_x
-                             ],
-                            dtype=np.float64)
-
-        return dq
-
-    def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
-        """
-         Use data to fit the model parameters of the velocity states (linvel, angvel)
-        """
-
-        # Load data
-        self.data_path = data_filename
-        self.fit_type = fit_type
-        data_format = os.path.splitext(data_filename)[1]
-        if (data_format=='.bag'):
-            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(data_filename, dt=dt,
-                                                                                  is_simulation=is_simulation)
-        elif (data_format=='.csv'):
-            pass
-        else:
-            exit("Data format should be 'rosbag' or 'csv'")
-
-        x_learn = np.concatenate((linvel, angvel), axis=1)
-        u = self.mix_control_inputs(rcout)
-
-        from sparse_identification.utils import derivative
-        dt = time[1] - time[0]
-        xdot_learn = derivative(x_learn,dt)
-        X = self.normalize_x(x_learn)
-
-        self.poly_lib = PolynomialFeatures(degree=2, include_bias=True)
-        Theta = self.create_observables(X, u)
-        Theta = self.normalize_theta(Theta, prediction=False)
-
-
-        self.estimator = sp.sindy(l1=1.0, solver='lasso')
-        self.estimator.fit(Theta, xdot_learn)
-
-        self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
+    def compute_desired_attitude(self):
+        return AttitudeTarget()
 
     def read_ROSBAG(self, rosbag_name, is_simulation, dt = 0.01):
         # Transform a ROSBAG into a timeseries signal
@@ -228,35 +171,35 @@ class QuadrotorModel(DynamicalModel):
         #u[:, -1] /= 2.0
         return u
 
-    def predict_full_RHS(self, X, u):
-        if len(X.shape) == 1 or len(u.shape) == 1:
-            X = X.reshape((1,-1))
-            u = u.reshape((1,-1))
+    def get_kinematics(self, X):
+        """
+        :param states: current system state vector (13x1) [pos (3x1), quat(4x1), linvel(3x1), angvel(3x1)}
+        :return: current derivative of position and quaternian states (States where kinematics relationship is known
+                    so no need for learning)
+        """
+        dX = np.zeros((1,7)) #Known kinematics of model (no model learning for (pos, orientation) states)
+        dX[0,:3] = X[7:10,0] #\pos{pos}=velocity
 
-        Theta = self.create_observables(X[:, 7:], u)
-        Theta = self.normalize_theta(Theta, prediction=True)
-        return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
+        q = X[3:7, 0]
+        omg = X[10:, 0]
+        #print(X)
+        dX[0, 3:7] = self.ang_vel_to_quat_deriv(q, omg)
+        #print(dX)
+        return dX
 
-    def get_dynamics_matrices(self, X):
-        if len(X.shape) == 1:
-            X = X.reshape((1,-1))
+    def ang_vel_to_quat_deriv(self, q, omg):
+        q_w, q_x, q_y, q_z = q
+        o_w = 0.0
+        o_x, o_y, o_z = omg
 
-        Theta = self.create_observables(X[:, 7:], np.ones((1,4)))
-        Theta = self.normalize_theta(Theta, prediction=True)
-        n_unactuated = int((Theta.shape[1])/5.0)
+        dq = 0.5 * np.array([o_w*q_w - q_x*o_x - q_y*o_y - q_z*o_z,
+                             q_x*o_w + q_w*o_x + q_y*o_z - q_z*o_y,
+                             q_y*o_w + q_w*o_y + q_z*o_x - q_x*o_z,
+                             q_z*o_w + q_w*o_z + q_x*o_y - q_y*o_x
+                             ],
+                            dtype=np.float64)
 
-        F_v = np.transpose(np.dot(Theta[:,:n_unactuated], self.estimator.coef_[:n_unactuated,:3]))
-        G_v = np.transpose(np.concatenate((np.dot(Theta[:, n_unactuated:2*n_unactuated], self.estimator.coef_[n_unactuated:2*n_unactuated, :3]),
-                                           np.dot(Theta[:, 2*n_unactuated:3*n_unactuated], self.estimator.coef_[2*n_unactuated:3*n_unactuated, :3]),
-                                           np.dot(Theta[:, 3*n_unactuated:4*n_unactuated], self.estimator.coef_[3*n_unactuated:4*n_unactuated, :3]),
-                                           np.dot(Theta[:, 4*n_unactuated:5*n_unactuated], self.estimator.coef_[4*n_unactuated:5*n_unactuated, :3])), axis=0))
-
-        F_omg = np.transpose(np.dot(Theta[:, :n_unactuated], self.estimator.coef_[:n_unactuated,3:]))
-        G_omg = np.transpose(np.concatenate((np.dot(Theta[:,n_unactuated:2*n_unactuated],self.estimator.coef_[n_unactuated:2*n_unactuated,3:]),
-                                             np.dot(Theta[:,2*n_unactuated:3*n_unactuated],self.estimator.coef_[2*n_unactuated:3*n_unactuated,3:]),
-                                             np.dot(Theta[:,3*n_unactuated:4*n_unactuated],self.estimator.coef_[3*n_unactuated:4*n_unactuated,3:]),
-                                             np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
-        return F_v.flatten(), G_v, F_omg.flatten(), G_omg
+        return dq
 
     def score(self, dataFilename, dataFormat, is_simulation, figure_path=""):
         import matplotlib.pyplot as plt
@@ -287,10 +230,6 @@ class QuadrotorModel(DynamicalModel):
             if ii+k >= len(time):
                 break
             x_temp = x_all[ii,:]
-
-            #TODO: make better integration scheme work
-            #x_ode = odeint(self.ode_sim_model, x_temp, time[ii:ii+k], args=(u[ii:ii+k,:],))
-            # x_sim[ii+k,:] = x_ode[-1,:]
 
             for jj in range(k):
                 x_temp = x_temp + self.predict_full_RHS(x_temp,u[ii+jj,:])*dt
@@ -355,10 +294,3 @@ class QuadrotorModel(DynamicalModel):
         print("MSE qx: ", qx_err)
         print("MSE qy: ", qy_err)
         print("MSE qz: ", qz_err)
-
-    def ode_sim_model(self, X, t, u):
-        """Function to be used for ode-simulation only"""
-        dxdt = self.predict_full_RHS(X,u)
-        return dxdt.flatten()
-
-

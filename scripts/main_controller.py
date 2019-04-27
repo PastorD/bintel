@@ -21,7 +21,8 @@ from visualization_msgs.msg import Marker
 from dynamics import goto_optitrack
 
 # Project
-from  dynamical_model import DynamicalModel
+from learn_full_model import learnFullModel
+from learn_nominal_model import learnNominalModel
 
 
 class Robot():
@@ -34,7 +35,7 @@ class Robot():
         self.is_simulation = True
 
         if self.is_simulation:
-            self.model_file_name = 'sim_model.yaml'
+            self.model_file_name = 'sim_nom_model.yaml'
         else:
             self.model_file_name = 'model_test.yaml'
 
@@ -49,10 +50,10 @@ class Robot():
         self.q_d = namedtuple("q_d", "w x y z")
         self.omg_d = namedtuple("omg_d", "x y z")
 
-        self.main_loop_rate = 60  # TODO: Test what rates are achievable (Need this to be achievable as it is used for control calculations)
+        self.main_loop_rate = 60
         self.init_ROS()
         self.model = self.load_model(self.model_file_name)
-        self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate)  # TODO: Add arguments
+        self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate)
         self.msg = AttitudeTarget()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
