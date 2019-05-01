@@ -13,7 +13,7 @@ def fit_main():
     #sys.path.append(os.path.split(os.path.split(os.path.dirname(__file__))[0])[0])
 
     is_simulation = True
-    fit_nominal = True
+    fit_nominal = False
 
     if is_simulation:
         bagfilename = "Experimental Data/sitl_23april19/sitl_test__aggressive_sim.bag"
@@ -29,9 +29,10 @@ def fit_main():
         model = learnNominalModel(is_simulation=is_simulation)
         model.fit_parameters(bagfilename, fit_type='lstsq', is_simulation=is_simulation, dt=0.1)
     else:
+        nom_model_filename = 'scripts/sim_nom_model.yaml'
         model_filename = 'scripts/sim_model.yaml'
-        model = learnFullModel(is_simulation=is_simulation)
-        model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.01)
+        model = learnFullModel(is_simulation=is_simulation, nom_model_name=nom_model_filename)
+        model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.1)
 
     model.score(testbagfilename,  dataFormat='rosbag', figure_path=figure_path, is_simulation=is_simulation)
     model.save_to_file(model_filename)

@@ -17,6 +17,7 @@ class learnNominalModel(QuadrotorModel):
         self.is_simulation = is_simulation
 
         self.g = 9.81
+        self.hover_throttle = 0.56
 
     def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
         """
@@ -44,12 +45,12 @@ class learnNominalModel(QuadrotorModel):
 
         theta_xdt, theta_ydt, theta_zdt, theta_omg_x, theta_omg_y, theta_omg_z = self.create_observables(x_full, u)
 
-        self.estimator_xdt = sp.sindy(l2=0.0, solver='lstsq')
-        self.estimator_xdt.fit(theta_xdt.reshape(x_learn.shape[0],1), xdot_learn[:,0].reshape(x_learn.shape[0],1))
-        self.estimator_ydt = sp.sindy(l2=0.0, solver='lstsq')
-        self.estimator_ydt.fit(theta_ydt.reshape(x_learn.shape[0], 1), xdot_learn[:, 1].reshape(x_learn.shape[0], 1))
-        self.estimator_zdt = sp.sindy(l2=0.0, solver='lstsq')
-        self.estimator_zdt.fit(theta_zdt.reshape(x_learn.shape[0], 1), (xdot_learn[:, 2]-self.g).reshape(x_learn.shape[0], 1))
+        #Concatenate theta and xdot for position states to learn single coefficient for pos states
+        theta_p = np.concatenate((theta_xdt, theta_ydt, theta_zdt), axis=0).reshape(-1,1)
+        pdot = np.concatenate((xdot_learn[:,0], xdot_learn[:,1], xdot_learn[:,2]), axis=0).reshape(-1,1)
+
+        self.estimator_pdt = sp.sindy(l2=0.0, solver='lstsq')
+        self.estimator_pdt.fit(theta_p, pdot)
         self.estimator_omg_x = sp.sindy(l2=0.0, solver='lstsq')
         self.estimator_omg_x.fit(theta_omg_x, xdot_learn[:, 3].reshape(x_learn.shape[0], 1))
         self.estimator_omg_y = sp.sindy(l2=0.0, solver='lstsq')
@@ -76,9 +77,9 @@ class learnNominalModel(QuadrotorModel):
 
         theta_xdt, theta_ydt, theta_zdt, theta_omg_x, theta_omg_y, theta_omg_z = self.create_observables(X, u)
 
-        xdot = np.concatenate((self.estimator_xdt.predict(theta_xdt),
-                                self.estimator_ydt.predict(theta_ydt),
-                                self.estimator_zdt.predict(theta_zdt),
+        xdot = np.concatenate((self.estimator_pdt.predict(theta_xdt),
+                                self.estimator_pdt.predict(theta_ydt),
+                                self.estimator_pdt.predict(theta_zdt),
                                 self.estimator_omg_x.predict(theta_omg_x).flatten(),
                                 self.estimator_omg_y.predict(theta_omg_y).flatten(),
                                 self.estimator_omg_z.predict(theta_omg_z).flatten()), axis=0)
@@ -89,7 +90,6 @@ class learnNominalModel(QuadrotorModel):
         if len(X.shape) == 1:
             X = X.reshape((1,-1))
 
-        #TODO: Fix for control
         theta_xdt, theta_ydt, theta_zdt, theta_omg_x, theta_omg_y, theta_omg_z = self.create_observables(X, np.ones((1,4)))
 
         F_v = np.zeros(3)
@@ -108,7 +108,6 @@ class learnNominalModel(QuadrotorModel):
         G_omg[1, 2] = np.dot(theta_omg_y[0, 1], self.estimator_omg_y.coef_[1, 0])
         G_omg[2, 3] = np.dot(theta_omg_z[0, 1], self.estimator_omg_z.coef_[1, 0])
 
-        print(G_v, G_omg)
         return F_v, G_v, F_omg, G_omg
 
 

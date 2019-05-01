@@ -35,7 +35,7 @@ class Robot():
         self.is_simulation = True
 
         if self.is_simulation:
-            self.model_file_name = 'sim_nom_model.yaml'
+            self.model_file_name = 'sim_model.yaml'
         else:
             self.model_file_name = 'model_test.yaml'
 
@@ -59,8 +59,8 @@ class Robot():
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
         #Trajectory:
-        self.p_init = np.array([0.0, 0.0, 5.0])
-        self.p_final = np.array([0.0, 0.0, 5.0])
+        self.p_init = np.array([0.0, 0.0, 1.0])
+        self.p_final = np.array([0.0, 0.0, 0.0])
         self.t_init = rospy.Time.now()
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(5.0)).to_sec())
         self.t_last_msg = self.t_init
@@ -115,9 +115,12 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
 
-        self.T_d, self.q_d, self.omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
+        T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d,
                                                                   ddyaw_d=ddyaw_d)
+        self.T_d = T_d
+        self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
+        self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d
 
     def create_attitude_msg(self, stamp):
         ## Set the header

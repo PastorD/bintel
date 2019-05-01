@@ -7,14 +7,25 @@ import sparse_identification as sp
 from sklearn.preprocessing import PolynomialFeatures
 from quadrotor_model import QuadrotorModel
 from sparse_identification.utils import derivative
+from yaml import load, dump
 
 class learnFullModel(QuadrotorModel):
     """
     Class for a control-affine quadrotor dynamical model of the form \dot{x} = f(x) + g(x)u with known kinematics
     """
 
-    def __init__(self, is_simulation=False):
+    def __init__(self, is_simulation=False, nom_model_name=None):
         self.is_simulation = is_simulation
+
+        try:
+            self.nom_model = self.load_model(nom_model_name)
+        except OSError:
+            pass
+
+    def load_model(self,model_file_name):
+        with open(model_file_name, 'r') as stream:
+            model = load(stream)
+        return model
 
     def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
         """
@@ -33,9 +44,10 @@ class learnFullModel(QuadrotorModel):
         else:
             exit("Data format should be 'rosbag' or 'csv'")
 
-        x_full = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        x_learn = np.concatenate((linvel, angvel), axis=1)
         u = self.mix_control_inputs(rcout)
+        x_full = np.concatenate((position, orientation, linvel, angvel), axis=1)
+        x_full = self.subtract_nom_model(x_full, u)
+        x_learn = x_full[:,6:]
 
         dt = time[1] - time[0]
         xdot_learn = self.normalize_x(derivative(x_learn,dt))
@@ -44,10 +56,15 @@ class learnFullModel(QuadrotorModel):
         Theta = self.create_observables(x_full, u)
         Theta = self.normalize_theta(Theta, prediction=False)
 
-        self.estimator = sp.sindy(l1=1.0, solver='lasso')
+        self.estimator = sp.sindy(l1=0.5, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
 
         self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
+        print(self.estimator.coef_)
+
+    def subtract_nom_model(self, x, u):
+        subtracted_vels = np.array([state[6:]-self.nom_model.predict_full_RHS(state, ctrl)[:,6:] for state, ctrl in zip(x,u)]).squeeze()
+        return np.concatenate((x[:,:6], subtracted_vels), axis=1)
 
     def predict_full_RHS(self, X, u):
         if len(X.shape) == 1 or len(u.shape) == 1:
@@ -56,7 +73,17 @@ class learnFullModel(QuadrotorModel):
 
         Theta = self.create_observables(X, u)
         Theta = self.normalize_theta(Theta, prediction=True)
-        return np.concatenate((self.get_kinematics(np.transpose(X)), self.estimator.predict(Theta)),axis=1)
+
+        nom_rhs = self.nom_model.predict_full_RHS(X, u)
+        nom_rhs[:,6:] += self.estimator.predict(Theta)
+        return nom_rhs
+
+    def get_f_a(self, x, u):
+        Theta = self.create_observables(X, u)
+        Theta = self.normalize_theta(Theta, prediction=True)
+        print(self.estimator.predict(Theta)[:, :3])
+
+        return self.estimator.predict(Theta)[:, :3]
 
     def get_dynamics_matrices(self, X):
         if len(X.shape) == 1:
