@@ -1,0 +1,13 @@
+drone: 'Burdick Intel Drone'
+trajectory: 
+  type: 'Waypoints'
+  iterations: 3
+  duration: 5.0
+  points: 
+    - [0., 0., 2.]
+    - [1., 2., 3.]
+save_csv_file: True
+boundary: 
+  usage: True
+  type: 'Cube'
+  file_name: 'scripts/boundary.yaml'
