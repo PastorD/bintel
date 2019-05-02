@@ -9,9 +9,10 @@ import roslib
 import tf
 import mavros
 from mavros import command
+import numpy as np
 
 class gotooptitrack():
-    def __init__(self):
+    def __init__(self, p_desired):
         
         # Arm the drone
         mavros.set_namespace()
@@ -27,9 +28,9 @@ class gotooptitrack():
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_cb)
         self.waypoint = PoseStamped()
         self.waypoint.header.frame_id = 'map'
-        self.waypoint.pose.position.x = 0
-        self.waypoint.pose.position.y = 0
-        self.waypoint.pose.position.z = 5
+        self.waypoint.pose.position.x = p_desired[0]
+        self.waypoint.pose.position.y = p_desired[1]
+        self.waypoint.pose.position.z = p_desired[2]
 
         
         self.marker_pub = rospy.Publisher('/waypoint_marker', Marker, queue_size=10)
@@ -37,7 +38,10 @@ class gotooptitrack():
         self.publish_waypoint()
 
        
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and np.linalg.norm(
+            np.array([self.waypoint.pose.position.x-self.local_pose.pose.position.x,
+                          self.waypoint.pose.position.y-self.local_pose.pose.position.y,
+                          self.waypoint.pose.position.z-self.local_pose.pose.position.z])) > 0.1:
             result_mode = change_mode(0,"OFFBOARD")
             self.pub_sp.publish(self.waypoint)
             rate.sleep()
@@ -64,6 +68,6 @@ class gotooptitrack():
 
 if __name__ == '__main__':
     try:
-        gotoop = gotooptitrack()
+        gotoop = gotooptitrack([0., 0., 5.])
     except rospy.ROSInterruptException:
         pass

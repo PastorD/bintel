@@ -31,7 +31,7 @@ class Robot():
 
     It contains a model, a controller and its ROS auxiliar data.
     """
-    def __init__(self):
+    def __init__(self, p_init, p_final, t):
         self.is_simulation = True
         self.use_learned_model = True
 
@@ -53,25 +53,29 @@ class Robot():
         self.omg_d = namedtuple("omg_d", "x y z")
 
         self.main_loop_rate = 60
-        self.init_ROS()
         self.model = self.load_model(self.model_file_name)
+        self.init_ROS()
         self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate,
                                                                  use_learned_model=self.use_learned_model)
         self.msg = AttitudeTarget()
+        self.traj_msg = PoseStamped()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
         #Trajectory:
-        self.p_init = np.array([0.0, 0.0, 0.0])
-        self.p_final = np.array([0.0, 2.0, 5.0])
+        self.p_init = p_init
+        self.p_final = p_final
         self.t_init = rospy.Time.now()
-        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(5.0)).to_sec())
+        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(t)).to_sec())
         self.t_last_msg = self.t_init
+        self.p_d = namedtuple("p_d", "x y z") # For publishing desired pos
 
-        while not rospy.is_shutdown():
+
+        while not rospy.is_shutdown() and np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.2:
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
+            self.pub_traj.publish(self.traj_msg)
             self.rate.sleep()
 
     def load_model(self,model_file_name):
@@ -81,8 +85,11 @@ class Robot():
 
     def init_ROS(self):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
-            
-        rospy.init_node('controller_bintel', anonymous=True)
+        self.pub_traj = rospy.Publisher('/mavros/setpoint_raw/trajectory', PoseStamped, queue_size=10)
+
+        if rospy.is_shutdown():
+            rospy.init_node('controller_bintel', anonymous=True)
+
         self.rate = rospy.Rate(self.main_loop_rate)
           
         # - Subscribe to local position
@@ -116,6 +123,7 @@ class Robot():
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
+        self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d,
@@ -133,6 +141,15 @@ class Robot():
         self.msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
         self.msg.body_rate = Vector3(x=self.omg_d.x, y=self.omg_d.y, z=self.omg_d.z)
         self.msg.thrust = self.T_d
+
+    def create_trajectory_msg(self, x, y, z, stamp):
+        ## Set the header
+        self.traj_msg.header.stamp = stamp
+        self.traj_msg.header.frame_id = '/world'
+
+        ## Set message content
+        self.traj_msg.pose.position = Vector3(x=x, y=y, z=z)
+        self.traj_msg.pose.orientation = Quaternion(x=0., y=0., z=0., w=1.)
 
     def exp_traj(self, t, t0, tf, x0, xf):
         """ Exponential trajectory generator. See Giri Subramanian's thesis for details.
@@ -195,6 +212,8 @@ class Robot():
 
 if __name__ == '__main__':
     try:
-        drone = Robot()
+        p_init = np.array([0.0, 0.0, 0.0])
+        p_final = np.array([0.0, 2.0, 5.0])
+        drone = Robot(p_init=p_init, p_final=p_final, t=5.)
     except rospy.ROSInterruptException:
         pass
