@@ -36,7 +36,7 @@ class Robot():
         self.use_learned_model = True
 
         if self.is_simulation:
-            self.model_file_name = 'sim_model.yaml'
+            self.model_file_name = 'scripts/sim_model.yaml'
         else:
             self.model_file_name = 'model_test.yaml'
 
@@ -53,8 +53,9 @@ class Robot():
         self.omg_d = namedtuple("omg_d", "x y z")
 
         self.main_loop_rate = 60
-        self.init_ROS()
+
         self.model = self.load_model(self.model_file_name)
+        self.init_ROS()
         self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate,
                                                                  use_learned_model=self.use_learned_model)
         self.msg = AttitudeTarget()

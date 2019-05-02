@@ -6,33 +6,37 @@ import math
 import scipy.io as sio
 import exceptions
 import tf
+import control
 
 
 class PositionController():
     def __init__(self, model, rate, use_learned_model):
         self.model = model
-        #self.K = sio.loadmat("lqr_gains.mat")["K"]
+
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3
         self.use_learned_model = use_learned_model
 
-        #TODO: Remove and do LQR on linearized system:
-        lam = math.sqrt(1.2/3*9.81/.7)
-        lam_xy = math.sqrt(0.6/3*9.81/.7)
-        K_p_xy = 1*(lam_xy**2)
-        K_p_z  = 1*(lam**2)
-        K_d_xy = 2*lam_xy # 2math.sqrt(lam)*2*9.81/.7
-        K_d_z  = 2*lam # 2math.sqrt(lam)*2*9.81/.7 #
-        K_i_xy = 0.0 * (lam_xy**3)
-        K_i_z  = 0.0 * (lam**3)
+        use_lqr_gains = True
+        if (use_lqr_gains):
+            self.K = sio.loadmat("scripts/lqr_gains_nominal.mat")["K"]
+        else:
+            lam = math.sqrt(1.2/3*9.81/.7)
+            lam_xy = math.sqrt(0.6/3*9.81/.7)
+            K_p_xy = 1*(lam_xy**2)
+            K_p_z  = 1*(lam**2)
+            K_d_xy = 2*lam_xy # 2math.sqrt(lam)*2*9.81/.7
+            K_d_z  = 2*lam # 2math.sqrt(lam)*2*9.81/.7 #
+            K_i_xy = 0.0 * (lam_xy**3)
+            K_i_z  = 0.0 * (lam**3)
 
-        self.K = np.zeros((3,6))
-        self.K[0, 0] = K_p_xy
-        self.K[0, 3] = K_d_xy
-        self.K[1, 1] = K_p_xy
-        self.K[1, 4] = K_d_xy
-        self.K[2, 2] = K_p_z
-        self.K[2, 5] = K_d_z
+            self.K = np.zeros((3,6))
+            self.K[0, 0] = K_p_xy
+            self.K[0, 3] = K_d_xy
+            self.K[1, 1] = K_p_xy
+            self.K[1, 4] = K_d_xy
+            self.K[2, 2] = K_p_z
+            self.K[2, 5] = K_d_z
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
         f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
