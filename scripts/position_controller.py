@@ -61,7 +61,6 @@ class PositionController():
         if self.use_learned_model:
             x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
             f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
-            print(f_a)
             f_d.x -= f_a[0, 0]
             f_d.y -= f_a[0, 1]
             f_d.z -= f_a[0, 2]
