@@ -56,11 +56,11 @@ class learnFullModel(QuadrotorModel):
         Theta = self.create_observables(x_full, u)
         Theta = self.normalize_theta(Theta, prediction=False)
 
-        self.estimator = sp.sindy(l1=0.5, solver='lasso')
+        self.estimator = sp.sindy(l1=1.0, solver='lasso')
         self.estimator.fit(Theta, xdot_learn)
 
         self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
-        print(self.estimator.coef_)
+        print("Sparsity fraction: ", float(np.count_nonzero(self.estimator.coef_))/float(self.estimator.coef_.size))
 
     def subtract_nom_model(self, x, u):
         subtracted_vels = np.array([state[6:]-self.nom_model.predict_full_RHS(state, ctrl)[:,6:] for state, ctrl in zip(x,u)]).squeeze()
@@ -79,10 +79,8 @@ class learnFullModel(QuadrotorModel):
         return nom_rhs
 
     def get_f_a(self, x, u):
-        Theta = self.create_observables(X, u)
+        Theta = self.create_observables(x, u)
         Theta = self.normalize_theta(Theta, prediction=True)
-        print(self.estimator.predict(Theta)[:, :3])
-
         return self.estimator.predict(Theta)[:, :3]
 
     def get_dynamics_matrices(self, X):

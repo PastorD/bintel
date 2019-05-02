@@ -9,11 +9,12 @@ import tf
 
 
 class PositionController():
-    def __init__(self, model, rate):
+    def __init__(self, model, rate, use_learned_model):
         self.model = model
         #self.K = sio.loadmat("lqr_gains.mat")["K"]
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3
+        self.use_learned_model = use_learned_model
 
         #TODO: Remove and do LQR on linearized system:
         lam = math.sqrt(1.2/3*9.81/.7)
@@ -33,24 +34,15 @@ class PositionController():
         self.K[2, 2] = K_p_z
         self.K[2, 5] = K_d_z
 
-    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
-
-        X = np.array([p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z])
-
-        if len(X.shape) > 1 or not X.shape[0] == 13:
-            if len(X.shape) == 2 and X.shape[1] > 1:
-                raise IndexError
-            else:
-                X = X.reshape(13,)
-
-        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
+        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
         T_d = self.get_thrust(f_d)
         q_d = self.get_attitude(f_d, yaw_d)
         omg_d = 0., 0., 0.
 
         return T_d, q_d, omg_d
 
-    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
+    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
         a_d = np.array([a_d.x, a_d.y, a_d.z])
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
         e_v = np.array([v.x - v_d.x, v.y - v_d.y, v.z - v_d.z])
@@ -59,9 +51,16 @@ class PositionController():
         e = np.concatenate((e_p, e_v)).reshape(-1, 1)
 
         f_d = namedtuple("f_d", "x y z")
-        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e) + a_d.reshape((3,1))).flatten()*(self.model.hover_throttle/self.model.g)
+        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e) + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
+                                                                                   self.model.nom_model.g)
 
-
+        if self.use_learned_model:
+            x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
+            f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
+            print(f_a)
+            f_d.x -= f_a[0, 0]
+            f_d.y -= f_a[0, 1]
+            f_d.z -= f_a[0, 2]
 
         # Project f_d into space of achievable force
         try:
@@ -76,23 +75,23 @@ class PositionController():
             elif f_d.z / math.sqrt(f_d.x**2 + f_d.y**2) >= math.tan(self.max_pitch_roll):
                 s_oncone = float('inf')
             else:
-                s_oncone = self.model.hover_throttle/(math.tan(self.max_pitch_roll)*math.sqrt(f_d.x**2 + f_d.y**2)-f_d.z)
+                s_oncone = self.model.nom_model.hover_throttle/(math.tan(self.max_pitch_roll)*math.sqrt(f_d.x**2 + f_d.y**2)-f_d.z)
 
             a = f_d.x**2 + f_d.y**2 + f_d.z**2
-            b = 2 * self.model.hover_throttle * f_d.z
-            c = self.model.hover_throttle ** 2 - 1
+            b = 2 * self.model.nom_model.hover_throttle * f_d.z
+            c = self.model.nom_model.hover_throttle ** 2 - 1
             s_onsphere = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
 
             s = min(1, s_onsphere, s_oncone)
             f_d.x = f_d.x*s
             f_d.y = f_d.y*s
-            f_d.z = f_d.z*s + self.model.hover_throttle
+            f_d.z = f_d.z*s + self.model.nom_model.hover_throttle
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
             f_d.x = f_d.x
             f_d.y = f_d.y
-            f_d.z = f_d.z + self.model.hover_throttle
+            f_d.z = f_d.z + self.model.nom_model.hover_throttle
 
         return f_d
 

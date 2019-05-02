@@ -130,7 +130,6 @@ class QuadrotorModel():
 
     def normalize_x(self, X):
         self.x_var = np.var(X, axis=0)
-        print(self.x_var)
         X = np.divide(X, self.x_var)
         return X
 

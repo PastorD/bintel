@@ -33,6 +33,7 @@ class Robot():
     """
     def __init__(self):
         self.is_simulation = True
+        self.use_learned_model = True
 
         if self.is_simulation:
             self.model_file_name = 'sim_model.yaml'
@@ -45,6 +46,7 @@ class Robot():
         self.omg = namedtuple("omg", "x y z")
         self.p.x, self.p.y, self.p.z, self.q.w, self.q.x, self.q.y, self.q.z, self.v.x, self.v.y, self.v.z, self.omg.x,\
             self.omg.y, self.omg.z = 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0.
+        self.u_current = np.zeros((1,4))
 
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
@@ -53,14 +55,15 @@ class Robot():
         self.main_loop_rate = 60
         self.init_ROS()
         self.model = self.load_model(self.model_file_name)
-        self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate)
+        self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate,
+                                                                 use_learned_model=self.use_learned_model)
         self.msg = AttitudeTarget()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
         #Trajectory:
-        self.p_init = np.array([0.0, 0.0, 1.0])
-        self.p_final = np.array([0.0, 0.0, 0.0])
+        self.p_init = np.array([0.0, 0.0, 0.0])
+        self.p_final = np.array([0.0, 2.0, 5.0])
         self.t_init = rospy.Time.now()
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(5.0)).to_sec())
         self.t_last_msg = self.t_init
@@ -70,7 +73,6 @@ class Robot():
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.rate.sleep()
-        
 
     def load_model(self,model_file_name):
         with open(model_file_name, 'r') as stream:
@@ -117,7 +119,7 @@ class Robot():
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d,
-                                                                  ddyaw_d=ddyaw_d)
+                                                                  ddyaw_d=ddyaw_d, u=self.u_current)
         self.T_d = T_d
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
         self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d
@@ -187,8 +189,8 @@ class Robot():
         return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
                 self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
 
-    def _read_rc_out(self,data):
-        self.rc_out = data
+    def _read_rc_out(self, data):
+        self.u_current = self.model.mix_control_inputs(np.array([data.channels[:4]]))
 
 
 if __name__ == '__main__':

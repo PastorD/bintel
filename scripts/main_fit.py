@@ -16,8 +16,9 @@ def fit_main():
     fit_nominal = False
 
     if is_simulation:
-        bagfilename = "Experimental Data/sitl_23april19/sitl_test__aggressive_sim.bag"
-        testbagfilename = "Experimental Data/sitl_23april19/sitl_test__short_test.bag"
+        nom_bagfilename = "Experimental Data/sitl_1may19/2019-05-01-train_nom.bag"
+        bagfilename = "Experimental Data/sitl_1may19/2019-05-01-train_full.bag"
+        testbagfilename = "Experimental Data/sitl_1may19/2019-05-01-test.bag"
     else:
         bagfilename = 'Experimental Data/111118b/111118_freeFlight.bag'
         testbagfilename = 'Experimental Data/111118b/111118_ground.bag'
@@ -27,12 +28,12 @@ def fit_main():
     if fit_nominal:
         model_filename = 'scripts/sim_nom_model.yaml'
         model = learnNominalModel(is_simulation=is_simulation)
-        model.fit_parameters(bagfilename, fit_type='lstsq', is_simulation=is_simulation, dt=0.1)
+        model.fit_parameters(nom_bagfilename, fit_type='lstsq', is_simulation=is_simulation, dt=0.01)
     else:
         nom_model_filename = 'scripts/sim_nom_model.yaml'
         model_filename = 'scripts/sim_model.yaml'
         model = learnFullModel(is_simulation=is_simulation, nom_model_name=nom_model_filename)
-        model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.1)
+        model.fit_parameters(bagfilename, fit_type='SINDY', is_simulation=is_simulation, dt=0.01)
 
     model.score(testbagfilename,  dataFormat='rosbag', figure_path=figure_path, is_simulation=is_simulation)
     model.save_to_file(model_filename)
