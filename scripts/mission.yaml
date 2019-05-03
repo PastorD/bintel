@@ -1,7 +1,7 @@
 drone: 'Burdick Intel Drone'
 trajectory: 
   type: 'Waypoints'
-  iterations: 3
+  iterations: 1
   duration: 5.0
   points: 
     - [0., 0., 2.]

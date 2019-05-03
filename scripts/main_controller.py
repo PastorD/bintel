@@ -31,9 +31,10 @@ class Robot():
 
     It contains a model, a controller and its ROS auxiliar data.
     """
-    def __init__(self, p_init, p_final, t):
+    def __init__(self, p_init, p_final, t, file_csv):
         self.is_simulation = True
         self.use_learned_model = True
+        self.file = file_csv
 
         if self.is_simulation:
             self.model_file_name = 'scripts/sim_model.yaml'
@@ -71,18 +72,29 @@ class Robot():
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z") # For publishing desired pos
 
+        self.t0 = rospy.get_time()
 
         while not rospy.is_shutdown() and np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.2:
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
+            self.save_csv()
             self.rate.sleep()
 
     def load_model(self,model_file_name):
         with open(model_file_name, 'r') as stream:
             model = load(stream)
         return model
+    
+    def save_csv(self):
+        self.file.write("%5.5f, " % (rospy.get_time()-self.t0)  )
+        self.file.write(str(self.p.x)+"," \
+                       +str(self.p.y)+"," \
+                       +str(self.p.z)+"," \
+                       +str(self.p_d.x)+"," \
+                       +str(self.p_d.y)+"," \
+                       +str(self.p_d.z)+"\n")
 
     def init_ROS(self):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
@@ -124,6 +136,7 @@ class Robot():
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
+        self.p_d = p_d
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
@@ -146,7 +159,7 @@ class Robot():
     def create_trajectory_msg(self, x, y, z, stamp):
         ## Set the header
         self.traj_msg.header.stamp = stamp
-        self.traj_msg.header.frame_id = '/world'
+        self.traj_msg.header.frame_id = '/map'
 
         ## Set message content
         self.traj_msg.pose.position = Vector3(x=x, y=y, z=z)
