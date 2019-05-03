@@ -649,7 +649,7 @@ nom_model: !!python/object:learn_nominal_model.learnNominalModel
     tol: 0.001
   fit_type: lstsq
   g: 9.81
-  hover_throttle: 0.56
+  hover_throttle: 0.672
   is_simulation: false
 poly_lib: !!python/object:sklearn.preprocessing.data.PolynomialFeatures
   _sklearn_version: 0.20.3

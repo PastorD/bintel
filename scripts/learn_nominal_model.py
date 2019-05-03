@@ -18,7 +18,7 @@ class learnNominalModel(QuadrotorModel):
 
         #TODO: Add support for experimental values (can just be hard-coded for the intel drone)
         self.g = 9.81
-        self.hover_throttle = 0.56
+        self.hover_throttle = 0.672
 
     def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
         """

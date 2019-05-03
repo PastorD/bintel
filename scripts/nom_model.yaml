@@ -96,5 +96,5 @@ estimator_pdt: !!python/object:sparse_identification.core.sindy
   tol: 0.001
 fit_type: lstsq
 g: 9.81
-hover_throttle: 0.56
+hover_throttle: 0.672
 is_simulation: false
