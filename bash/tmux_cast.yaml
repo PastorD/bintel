@@ -1,15 +1,12 @@
-session_name: bintel_sitl_session
+session_name: bintel_cast_session
 suppress_history: false
 windows:
-  - window_name: bintel_sitl
+  - window_name: bintel_cast
     layout: tiled
     shell_command_before:
-    - roscd bintel_ros
+    - roscd bintel_ros; export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=http://192.168.1.123 
     panes:
-      - shell_command:
-        - cd ~/src/Firmware
-        - make px4_sitl_default gazebo
-      - roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+      - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack.launch
       - shell_command:
         - sleep 5
         - source bash/increase_rates.sh
