@@ -31,10 +31,10 @@ class Robot():
 
     It contains a model, a controller and its ROS auxiliar data.
     """
-    def __init__(self, p_init, p_final, t, file_csv):
+    def __init__(self):
         self.is_simulation = True
         self.use_learned_model = True
-        self.file = file_csv
+        
 
         if self.is_simulation:
             self.model_file_name = 'scripts/sim_model.yaml'
@@ -64,11 +64,16 @@ class Robot():
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
+    def gotopoint(self,p_init, p_final, tduration,file_csv):
+        """
+        Go to p_final
+        """
         #Trajectory:
+        self.file = file_csv
         self.p_init = p_init
         self.p_final = p_final
         self.t_init = rospy.Time.now()
-        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(t)).to_sec())
+        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z") # For publishing desired pos
 
@@ -100,8 +105,8 @@ class Robot():
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.pub_traj = rospy.Publisher('/mavros/setpoint_raw/trajectory', PoseStamped, queue_size=10)
 
-        if rospy.is_shutdown():
-            rospy.init_node('controller_bintel', anonymous=True)
+        
+        rospy.init_node('controller_bintel', anonymous=True)
 
         self.rate = rospy.Rate(self.main_loop_rate)
           

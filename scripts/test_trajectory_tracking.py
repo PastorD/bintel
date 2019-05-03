@@ -4,6 +4,8 @@ import yaml
 from collections import namedtuple
 import csv
 import matplotlib.pyplot as plt
+import os
+from datetime import datetime
 
 import rospy
 from geometry_msgs.msg import PoseStamped
@@ -18,23 +20,31 @@ from dynamics.goto_land import land
 class test_trajectory_tracking():
     def __init__(self):
 
+        # Read mission file
         config_file = 'scripts/mission.yaml'
         mission = self.read_mission(config_file)       
-
+        mission_folder = 'dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        os.mkdir(mission_folder)
 
         self.p_init = mission['trajectory']['points'][0]
         self.p_final = mission['trajectory']['points'][1]
         self.duration = mission['trajectory']['duration']
 
-        self.csv_file = 'csv_data.txt'
+        
+        # Initialize robot
+        bintel = Robot()
 
         for experiment in range(mission['trajectory']['iterations']):
             print("Moving to initial point...")
             gotooptitrack(self.p_init)
+
             if (mission['save_csv_file']):
-                self.file = open(self.csv_file ,'w')             
+                self.csv_file = mission_folder+'/csv_data_'+str(experiment)+'.csv'
+                self.file = open(self.csv_file ,'w') 
+
             print("Launching position controller...")
-            Robot(self.p_init, self.p_final, self.duration, self.file)
+            bintel.gotopoint(self.p_init, self.p_final, self.duration,self.file)
+
             if (mission['save_csv_file']):
                 self.file.close()
 

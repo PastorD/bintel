@@ -22,7 +22,8 @@ class gotooptitrack():
         rospy.wait_for_service('mavros/set_mode')
         change_mode = rospy.ServiceProxy('mavros/set_mode', SetMode)
 
-        rospy.init_node('gotowaypoint', anonymous=True)
+        if rospy.is_shutdown():
+            rospy.init_node('gotowaypoint', anonymous=True)
         rate = rospy.Rate(50) # 10hz
         
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_cb)
