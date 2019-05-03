@@ -137,6 +137,7 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
+        print(self.p.y-self.p_d.y)
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,

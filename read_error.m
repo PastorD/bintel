@@ -1,8 +1,8 @@
 filename = 'csv_data.txt';
 fileraw = csvread(filename,0,0); %initial reading of all values
 time = fileraw(:,1);
-pos = fileraw(:,1:3);
-pos_d = fileraw(:,4:6);
+pos = fileraw(:,2:4);
+pos_d = fileraw(:,5:7);
 error = pos - pos_d;
 
 afigure
@@ -20,7 +20,7 @@ ylabel('Position X (m)')
 legend('Estimated', 'Desired')
 
 subplot(3,1,2)
-plot(time,pos(:,2),time,pos_d(:,3))
+plot(time,pos(:,2),time,pos_d(:,2))
 xlabel('Time(s)')
 ylabel('Position Y (m)')
 legend('Estimated', 'Desired')
