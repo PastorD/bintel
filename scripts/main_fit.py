@@ -12,15 +12,15 @@ def fit_main():
     os.chdir('..')
     #sys.path.append(os.path.split(os.path.split(os.path.dirname(__file__))[0])[0])
 
-    is_simulation = True
-    fit_nominal = False
+    is_simulation = False
+    fit_nominal = True
 
     if is_simulation:
         nom_bagfilename = "Experimental Data/sitl_1may19/2019-05-01-train_nom.bag"
         bagfilename = "Experimental Data/sitl_1may19/2019-05-01-train_full.bag"
         testbagfilename = "Experimental Data/sitl_1may19/2019-05-01-test.bag"
     else:
-        bagfilename = 'Experimental Data/111118b/111118_freeFlight.bag'
+        bagfilename = 'Experimental Data/111118b/learn_nom_3may19'
         testbagfilename = 'Experimental Data/111118b/111118_ground.bag'
 
     figure_path = 'scripts/figures/'
