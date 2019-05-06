@@ -5,6 +5,10 @@ import argparse
 from collections import namedtuple
 import numpy as np
 
+# RL algorithm
+from replay_buffer import ReplayBuffer
+from learner import Learner
+
 # ROS
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
@@ -44,14 +48,26 @@ class RL_lander():
         self.z_ep = np.empty((self.n_ep, self.ep_length))
         self.zdot_ep = np.empty((self.n_ep, self.ep_length))
         self.T_ep = np.empty((self.n_ep, self.ep_length))
-
+        self.rl_buffer = ReplayBuffer(1000000)    # ((z1, zdot1), T, r, (z2, zdot2))
+        
         # Initialize ROS
         self.main_loop_rate = 60
         self.init_ROS()
         self.msg = AttitudeTarget()
 
+        # Initialize learner
+        sess = tf.Session()
+        state_dim, action_dim = 2, 1
+        action_bound = 10.
+        actor_lr, critic_lr = 0.0001, 0.001
+        gamma, tau = 0.99, 0.001
+        minibatch_size = 100
+        learner = Learner(sess, state_dim, action_dim, action_bound, actor_lr, critic_lr, tau, gamma, minibatch_size)
+        
+        
+        
     def train_rl(self):
-
+        
         for ep in range(self.n_ep):
             #Set T_RL using DDPG
             self.run_episode() # Run episode with safety filter, update z_ep, zdot_ep, T_ep
