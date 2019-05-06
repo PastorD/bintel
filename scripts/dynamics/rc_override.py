@@ -1,39 +1,42 @@
 #!/usr/bin/env python
-import argparse
-
 import rospy
-import roslib
-import tf
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
-from mavros_msgs.msg import ActuatorControl
 from mavros_msgs.srv import SetMode
+from mavros_msgs.msg import OverrideRCIn
+
+import roslib
+import rospy
+import tf
+import argparse
 
 # This Script is used to command individual motors using mavros
 
-class motorControl():
+class rcOverride():
     def __init__(self):
     
-        self.pub_sp = rospy.Publisher('/mavros/actuator_control', ActuatorControl, queue_size=10)
+        self.pub_sp = rospy.Publisher('/mavros/rc/override', OverrideRCIn, queue_size=10)
         
-        rospy.init_node('motorControl', anonymous=True)
+        rospy.init_node('rcOverride', anonymous=True)
         rate = rospy.Rate(60) # 10hz
+        act = OverrideRCIn()
+
         rospy.wait_for_service('mavros/set_mode')
         change_mode = rospy.ServiceProxy('mavros/set_mode', SetMode)
 
         result_mode = change_mode(0,"MANUAL")
-        act = ActuatorControl()
-        
-        while not rospy.is_shutdown():
-            
-            act.controls = [1800,1800,1800,1800,0,0,0,0]
-            rospy.loginfo(str(act.controls))
+
+        print("Sending PWM Override..")
+        while not rospy.is_shutdown():            
+            act.channels = [1800,1800,1800,1800,1500,1500,0,0]
+            #rospy.loginfo(str(act.controls))
             self.pub_sp.publish(act)
+            #result_mode = change_mode(0,"MANUAL")
             rate.sleep()
 
         
 if __name__ == '__main__':
     try:
-        gotoop = motorControl()
+        gotoop = rcOverride()
     except rospy.ROSInterruptException:
         pass
