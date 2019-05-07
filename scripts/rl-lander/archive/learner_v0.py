@@ -14,8 +14,8 @@ from scipy.io import savemat
 import datetime
 import random
 
-#from prior import BasePrior
-#from car_dat import allCars
+from prior import BasePrior
+from car_dat import allCars
 
 from replay_buffer import ReplayBuffer
 
@@ -285,6 +285,8 @@ class Learner(object):
         # Get dynamics and initialize prior controller  
         prior = BasePrior()
 
+        #self.sess.as_default()
+        
         # Needed to enable BatchNorm
         #tflearn.is_training(True)
 
@@ -313,12 +315,142 @@ class Learner(object):
         self.actor.update_target_network()
         self.critic.update_target_network()
         
+    
+    # Training loop within simulator
+    def train_rollout(self, args, reward_result):
+        # Set up summary Ops      
+        summary_ops, summary_vars = build_summaries()
+        
+        # Get dynamics and initialize prior controller
+        prior = BasePrior()
+        
+        # Initialize target network weights  
+        self.actor.update_target_network()
+        self.critic.update_target_network()
 
-def main(args):
+        # Initialize replay memory  
+        replay_buffer = ReplayBuffer(int(args['buffer_size']), int(args['random_seed']))
+        
+        # Needed to enable BatchNorm. 
+        tflearn.is_training(True)
+
+        paths = list()
+        
+        lambda_store = np.zeros((int(args['max_episode_len']),1))
+        
+        for i in range(int(args['max_episodes'])):
+
+            s = self.env.reset_inc()
+            
+            ep_reward = 0.
+            ep_ave_max_q = 0
+            
+            obs, action, act_prior, rewards, obs_ref, prior_ref, collisions = [], [], [], [], [], [], []
+
+            #Get reward using baseline controller
+            s0 = np.copy(s)
+            ep_reward_opt = 0.
+            for kk in range(int(args['max_episode_len'])):
+                a = self.env.getPrior()
+                prior_ref.append(np.array([a]))
+                s0, r, stop_c, act = self.env.step(a)
+                ep_reward_opt += r
+                obs_ref.append(s0)
+                if (stop_c):
+                    break
+
+            # Get reward using regRL algorithm       
+            s = self.env.reset()
+            
+            for j in range(int(args['max_episode_len'])):
+                
+                # Set control prior regularization weight 
+                lambda_mix = 15.
+                lambda_store[j] = lambda_mix
+
+                # Get control prior          
+                a_prior = self.env.getPrior()
+                
+                # Rl control with exploration noise 
+                ab = self.actor.predict(np.reshape(s, (1, self.actor.s_dim))) + self.actor_noise()
+                
+                # Mix the actions (RL controller + control prior)  
+                act = ab[0]/(1+lambda_mix) + (lambda_mix/(1+lambda_mix))*a_prior
+                
+                # Take action and observe next state/reward 
+                s2, r, terminal, act = self.env.step(act)
+                collisions.append(self.env.collision_flag)
+                act = np.array(act, ndmin=1)
+
+                # Add info from time step to the replay buffer   
+                replay_buffer.add(np.reshape(s, (self.actor.s_dim,)), np.reshape(ab, (self.actor.a_dim,)), r,
+                                  terminal, np.reshape(s2, (self.actor.s_dim,)))
+
+                # Keep adding experience to the memory until   
+                # there are at least minibatch size samples  
+                if replay_buffer.size() > int(args['minibatch_size']):
+
+                    #Sample a batch from the replay buffer  
+                    s_batch, a_batch, r_batch, t_batch, s2_batch = replay_buffer.sample_batch(int(args['minibatch_size']))
+
+                    # Calculate targets    
+                    target_q = self.critic.predict_target(
+                        s2_batch, self.actor.predict_target(s2_batch))
+                    y_i = []
+                    for k in range(int(args['minibatch_size'])):
+                        if t_batch[k]:
+                            y_i.append(r_batch[k])
+                        else:
+                            y_i.append(r_batch[k] + self.critic.gamma * target_q[k])
+
+                    # Update the critic given the targets 
+                    predicted_q_value, _ = self.critic.train(s_batch, a_batch, np.reshape(y_i, (int(args['minibatch_size']), 1)))
+                    ep_ave_max_q += np.amax(predicted_q_value)
+
+                    # Update the actor policy using the sampled gradient  
+                    a_outs = self.actor.predict(s_batch)
+                    grads = self.critic.action_gradients(s_batch, a_outs)
+                    self.actor.train(s_batch, grads[0])
+                    # Update target networks   
+                    self.actor.update_target_network()
+                    self.critic.update_target_network()
+
+                s = s2
+                ep_reward += r
+
+                obs.append(s)
+                rewards.append(r)
+                action.append(act)
+                act_prior.append(np.array([a_prior]))
+
+                # Collect results at end of episode 
+                if terminal:
+                    print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}'.format(int(ep_reward - ep_reward_opt), i, (ep_ave_max_q / float(j))))
+                    reward_result[0,i] = ep_reward
+                    reward_result[1,i] = ep_reward_opt
+                    reward_result[2,i] = np.mean(lambda_store)
+                    reward_result[3,i] = max(collisions)
+                    path = {"Observation":np.concatenate(obs).reshape((-1,6)),
+                            "Observation_ref":np.concatenate(obs_ref).reshape((-1,6)),
+                            "Action":np.concatenate(action),
+                            "Action_Prior":np.concatenate(act_prior),
+                            "Action_Prior_Ref":np.concatenate(prior_ref), 
+                            "Reward":np.asarray(rewards)}
+                    paths.append(path)
+
+                    break
+                
+        return [summary_ops, summary_vars, paths, reward_result]
+
+
+
+def main(args, reward_result):
 
     with tf.Session() as sess:
 
         # Initialize environment and seed
+        np.random.seed(int(args['random_seed']))
+        tf.set_random_seed(int(args['random_seed']))
         env = allCars()
         state_dim = 6
         action_dim = 1
@@ -326,19 +458,43 @@ def main(args):
 
         learner = Learner(sess, env, state_dim, action_dim, action_bound, float(args['actor_lr']), float(args['critic_lr']), float(args['tau']), float(args['gamma']), float(args['minibatch_size']))
 
-        #learner.train(replay_buffer, minibatch_size)
+        #[summary_ops, summary_vars, paths, reward_result] = learner.train(replay_buffer, minibatch_size)
+        [summary_ops, summary_vars, paths, reward_result] = learner.train_rollout(args, reward_result)
         
-        return learner
+        return [summary_ops, summary_vars, paths]
 
 if __name__ == '__main__':
-
+    # Set a random seed
+    rand_seed = random.randrange(1000000)
     parser = argparse.ArgumentParser(description='provide arguments for DDPG agent')
+
     # agent parameters
     parser.add_argument('--actor-lr', help='actor network learning rate', default=0.0001)
     parser.add_argument('--critic-lr', help='critic network learning rate', default=0.001)
     parser.add_argument('--gamma', help='discount factor for critic updates', default=0.99)
     parser.add_argument('--tau', help='soft target update parameter', default=0.001) 
+    parser.add_argument('--buffer-size', help='max size of the replay buffer', default=1000000)
     parser.add_argument('--minibatch-size', help='size of minibatch for minibatch-SGD', default=64)
+
+    # run parameters
+    parser.add_argument('--env', help='choose the gym env- tested on {Pendulum-v0}', default='Pendulum-v0')
+    parser.add_argument('--random-seed', help='random seed for repeatability', default=rand_seed) 
+    parser.add_argument('--max-episodes', help='max num of episodes to do while training', default=2600) 
+    parser.add_argument('--max-episode-len', help='max length of 1 episode', default=100) 
+    parser.add_argument('--render-env', help='render the gym env', action='store_false')
+    parser.add_argument('--use-gym-monitor', help='record gym results', action='store_false')
+    parser.add_argument('--monitor-dir', help='directory for storing gym results', default='./results/gym_ddpg')
+    parser.add_argument('--summary-dir', help='directory for storing tensorboard info', default='./results/tf_ddpg')
+
+    parser.set_defaults(render_env=False)
+    parser.set_defaults(use_gym_monitor=False)
+    
     args = vars(parser.parse_args())
     
-    learner = main(args)
+    pp.pprint(args)
+
+    reward_result = np.zeros((4,int(args['max_episodes'])))
+    [summary_ops, summary_vars, paths] = main(args, reward_result)
+
+    # Save learning results to a MATLAB data file
+    savemat('data_prior15_a_' + datetime.datetime.now().strftime("%y-%m-%d-%H-%M") + '.mat',dict(data=paths, reward=reward_result))
