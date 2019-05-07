@@ -13,6 +13,7 @@ from replay_buffer import ReplayBuffer
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
+from bintel_ros.msg import StateReward
 from mavros_msgs.srv import SetMode
 import mavros
 from mavros import command
@@ -52,7 +53,10 @@ class RL_lander():
         # Initialize RL-related variables
         self.n_ep = n_ep
         self.save_ep_reward = np.empty(n_ep)
-        self.T_RL = np.empty(ep_length)
+        self.T_RL = 0.
+        self.t_last_rl_msg = -1.0
+        self.cur_reward = 0.
+        self.land_threshold = 0.075
 
         # Initialize arrays to save episodic state and control values
         self.ep_length = ep_length
@@ -65,6 +69,7 @@ class RL_lander():
         self.main_loop_rate = 60
         self.init_ROS()
         self.msg = AttitudeTarget()
+        self.rl_train_msg = StateReward()
         self.rl_pos_controller = RLPosController(is_simulation=self.is_simulation, is_test_mode=self.is_test_mode)
 
         # Initialize learner
@@ -78,7 +83,9 @@ class RL_lander():
 
     def train_rl(self):
         for ep in range(self.n_ep):
+            print("Resetting position...")
             self.reset_position()
+            print("Running episode...")
             self.run_episode()
 
     def run_episode(self):
@@ -87,19 +94,24 @@ class RL_lander():
             self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
+            self.calc_reward()
+            self.create_rl_train_message(stamp=rospy.Time.now())
+            self.pub_rl.publish(self.rl_train_msg)
             self.rate.sleep()
 
             if self.p.z < 0.05:
                 break
 
     def pd_attitude_ctrl(self):
-        T_d, q_d = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
+        self.T_d, q_d = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                    p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL)
-        self.T_d = T_d
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
     def calc_reward(self):
-        pass
+        if self.p.z < self.land_threshold:
+            self.cur_reward = -self.p.z + 1.0*self.v.z # Penalize negative velocity
+        else:
+            self.cur_reward = -self.p.z
 
     def reset_position(self):
         # Arm the drone
@@ -126,7 +138,8 @@ class RL_lander():
 
     def init_ROS(self):
         self.pub_attmsg = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
-        self.pub_posmsg = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        self.pub_posmsg = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        self.pub_rl = rospy.Publisher('/rl/training', StateReward, queue_size=10)
 
         rospy.init_node('controller_bintel', anonymous=True)
 
@@ -142,11 +155,18 @@ class RL_lander():
         else:
             rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
 
+        # Subscribe to thrust commands from RL
+        rospy.Subscriber('/rl/commands', AttitudeTarget, self._read_rl_commands)
+
     def _read_position(self, data):
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.z
         self.q.w, self.q.x, self.q.y, self.q.z = data.pose.orientation.w, data.pose.orientation.x, \
                                                  data.pose.orientation.y, data.pose.orientation.z
         self.t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
+
+    def _read_rl_commands(self, data):
+        self.T_RL = data.thrust
+        self.t_last_rl_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
 
     def _read_velocity(self, data):
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
@@ -162,9 +182,21 @@ class RL_lander():
         self.msg.body_rate = Vector3(x=self.omg_d.x, y=self.omg_d.y, z=self.omg_d.z)
         self.msg.thrust = self.T_d
 
+    def create_rl_train_message(self, stamp):
+        ## Set the header
+        self.rl_train_msg.header.stamp = stamp
+        self.rl_train_msg.header.frame_id = '/world'
+
+        ## Set message content
+        self.rl_train_msg.pose.position.z = self.p.z
+        self.rl_train_msg.velocity.linear.z = self.v.z
+        self.rl_train_msg.reward.data = self.cur_reward
+        self.rl_train_msg.thrust.data = self.T_d
+
 if __name__ == '__main__':
     try:
         lander = RL_lander(n_ep=200, ep_length=2000) #TODO: Decide n_ep, ep_length
         lander.train_rl()
     except rospy.ROSInterruptException:
         pass
+
