@@ -171,3 +171,16 @@ The pose from the Optitrack system will now be fused with other sensors to estim
 For more details see: https://dev.px4.io/en/ros/external_position_estimation.html (The reference uses LPE instead of ecfEKF, both methods should work equally well, LPE requires firmware modifications to activate the correct modules). 
 
 When positioning through Optitrack is up and running, control can be offboarded as described in the PX4 documentation: https://dev.px4.io/en/ros/offboard_control.html. An example in C++ is also included in the documentation: https://dev.px4.io/en/ros/mavros_offboard.html
+
+## Adding Custom ROS-Messages
+Follow Section 2 of the following tutorial: http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_msg, then the terminal from where the code is run from must be sourced with 
+
+```console
+  $ source catkin_ws/devel/setup.bash
+```
+Custom messages can now be imported in python using
+
+```console
+  $ from bintel_ros.msg import custom_msg
+```
+
