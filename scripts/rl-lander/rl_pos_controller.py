@@ -4,6 +4,7 @@ from collections import namedtuple
 import numpy as np
 import math
 import scipy.io as sio
+import rospy
 import exceptions
 import tf
 

@@ -28,7 +28,7 @@ class RL_lander():
     def __init__(self, n_ep, ep_length):
         # Development environment variables
         self.is_simulation = True
-        self.is_test_mode = True  # Calculates all controls with PD (no RL)
+        self.is_test_mode = False  # Calculates all controls with PD (no RL)
 
         # Initialize current state variables
         self.p = namedtuple("p", "x y z")
@@ -50,27 +50,28 @@ class RL_lander():
         self.omg_d = namedtuple("omg_d", "x y z")
         self.omg_d.x, self.omg_d.y, self.omg_d.z = 0., 0., 0.
 
-        # Initialize RL-related variables
-        self.n_ep = n_ep
-        self.save_ep_reward = np.empty(n_ep)
-        self.T_RL = 0.
-        self.t_last_rl_msg = -1.0
-        self.cur_reward = 0.
-        self.land_threshold = 0.075
-
-        # Initialize arrays to save episodic state and control values
-        self.ep_length = ep_length
-        self.z_ep = np.empty((self.n_ep, self.ep_length))
-        self.zdot_ep = np.empty((self.n_ep, self.ep_length))
-        self.T_ep = np.empty((self.n_ep, self.ep_length))
-        self.rl_buffer = ReplayBuffer(1000000)    # ((z1, zdot1), T, r, (z2, zdot2))
-        
         # Initialize ROS
         self.main_loop_rate = 60
         self.init_ROS()
         self.msg = AttitudeTarget()
         self.rl_train_msg = StateReward()
         self.rl_pos_controller = RLPosController(is_simulation=self.is_simulation, is_test_mode=self.is_test_mode)
+
+        # Initialize RL-related variables
+        self.n_ep = n_ep
+        self.save_ep_reward = np.empty(n_ep)
+        self.T_RL = 0.
+        self.t_last_rl_msg = rospy.Time.now()
+        self.cur_reward = 0.
+        self.land_threshold = 0.075
+        self.end_of_ep = False
+
+        # Initialize arrays to save episodic state and control values
+        self.ep_length = ep_length
+        self.z_ep = np.empty((self.n_ep, self.ep_length))
+        self.zdot_ep = np.empty((self.n_ep, self.ep_length))
+        self.T_ep = np.empty((self.n_ep, self.ep_length))
+        self.rl_buffer = ReplayBuffer(1000000)  # ((z1, zdot1), T, r, (z2, zdot2))
 
         # Initialize learner
         #sess = tf.Session()
@@ -85,12 +86,15 @@ class RL_lander():
         for ep in range(self.n_ep):
             print("Resetting position...")
             self.reset_position()
-            print("Running episode...")
             self.run_episode()
 
     def run_episode(self):
-
+        self.end_of_ep = False
         for t in range(self.ep_length):
+            print("Waiting for RL commands...")
+            while rospy.Duration.from_sec(rospy.get_time()-self.t_last_rl_msg.to_sec()).to_sec() > 0.05:
+                pass
+            print("Running episode...")
             self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
@@ -101,6 +105,15 @@ class RL_lander():
 
             if self.p.z < 0.05:
                 break
+
+        # Publish final message with end_of_ep flag set to true
+        self.end_of_ep = True
+        self.pd_attitude_ctrl()
+        self.create_attitude_msg(stamp=rospy.Time.now())
+        self.pub_attmsg.publish(self.msg)
+        self.calc_reward()
+        self.create_rl_train_message(stamp=rospy.Time.now())
+        self.pub_rl.publish(self.rl_train_msg)
 
     def pd_attitude_ctrl(self):
         self.T_d, q_d = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
@@ -192,6 +205,7 @@ class RL_lander():
         self.rl_train_msg.velocity.linear.z = self.v.z
         self.rl_train_msg.reward.data = self.cur_reward
         self.rl_train_msg.thrust.data = self.T_d
+        self.rl_train_msg.end_of_ep.data = self.end_of_ep
 
 if __name__ == '__main__':
     try:
