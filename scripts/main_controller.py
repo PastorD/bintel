@@ -32,8 +32,8 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
     def __init__(self):
-        self.is_simulation = False
-        self.use_learned_model = False
+        self.is_simulation = True
+        self.use_learned_model = True
         
 
         if self.is_simulation:
@@ -142,7 +142,7 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
-        print(self.p.y-self.p_d.y)
+        print(self.p.z-self.p_d.z)
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
