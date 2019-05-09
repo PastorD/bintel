@@ -32,9 +32,8 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
     def __init__(self):
-        self.is_simulation = False
+        self.is_simulation = True
         self.use_learned_model = False
-        
 
         if self.is_simulation:
             self.model_file_name = 'scripts/sim_model.yaml'
@@ -93,7 +92,7 @@ class Robot():
         return model
     
     def save_csv(self):
-        self.file.write("%5.5f, " % (rospy.get_time()-self.t0)  )
+        self.file.write("%5.5f, " % (rospy.get_time()-self.t0) )
         self.file.write(str(self.p.x)+"," \
                        +str(self.p.y)+"," \
                        +str(self.p.z)+"," \
@@ -142,7 +141,6 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
-        print(self.p.y-self.p_d.y)
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,

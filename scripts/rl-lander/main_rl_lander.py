@@ -61,6 +61,7 @@ class RL_lander():
         self.n_ep = n_ep
         self.save_ep_reward = np.empty(n_ep)
         self.T_RL = 0.
+        self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
         self.cur_reward = 0.
         self.land_threshold = 0.075
@@ -89,6 +90,7 @@ class RL_lander():
             self.run_episode()
 
     def run_episode(self):
+        cum_reward = 0.
         self.end_of_ep = False
         for t in range(self.ep_length):
             print("Waiting for RL commands...")
@@ -103,6 +105,7 @@ class RL_lander():
             self.pub_rl.publish(self.rl_train_msg)
             self.rate.sleep()
 
+            cum_reward += self.cur_reward
             if self.p.z < 0.05:
                 break
 
@@ -115,8 +118,10 @@ class RL_lander():
         self.create_rl_train_message(stamp=rospy.Time.now())
         self.pub_rl.publish(self.rl_train_msg)
 
+        print("Cumulative episode reward: ", cum_reward)
+
     def pd_attitude_ctrl(self):
-        self.T_d, q_d = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
+        self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                    p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
@@ -205,6 +210,7 @@ class RL_lander():
         self.rl_train_msg.velocity.linear.z = self.v.z
         self.rl_train_msg.reward.data = self.cur_reward
         self.rl_train_msg.thrust.data = self.T_d
+        self.rl_train_msg.prior.data = self.prior
         self.rl_train_msg.end_of_ep.data = self.end_of_ep
 
 if __name__ == '__main__':

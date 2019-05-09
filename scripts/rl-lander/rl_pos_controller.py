@@ -44,11 +44,11 @@ class RLPosController:
             self.K[2, 5] = K_d_z
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, yaw_d=0., T_RL=0.):
-        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
+        f_d, prior = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
         T_d = self.get_thrust(f_d)
         q_d = self.get_attitude(f_d, yaw_d)
 
-        return T_d, q_d
+        return T_d, q_d, prior
 
     def get_desired_force(self, p, q, v, omg, p_d, v_d, T_RL):
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
@@ -57,6 +57,7 @@ class RLPosController:
 
         f_d = namedtuple("f_d", "x y z")
         f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)).flatten()*(self.hover_throttle/self.g)
+        prior = f_d.z
 
         if not self.is_test_mode:
             f_d.z = T_RL #TODO: Check units of T_RL
@@ -92,7 +93,7 @@ class RLPosController:
             f_d.y = f_d.y
             f_d.z = f_d.z + self.hover_throttle
 
-        return f_d
+        return f_d, prior
 
     def get_thrust(self, f_d):
         return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
