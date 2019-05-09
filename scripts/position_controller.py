@@ -55,7 +55,7 @@ class PositionController():
         e = np.concatenate((e_p, e_v)).reshape(-1, 1)
 
         f_d = namedtuple("f_d", "x y z")
-        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)*1.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
+        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)/12.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
                                                                                    self.model.nom_model.g)
 
         if self.use_learned_model:
@@ -93,7 +93,7 @@ class PositionController():
             s_onsphere = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
 
             s = min(1, s_onsphere, s_oncone)
-            print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
+            #print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
             f_d_ach.x = f_d.x*s
             f_d_ach.y = f_d.y*s
             f_d_ach.z = f_d.z*s 

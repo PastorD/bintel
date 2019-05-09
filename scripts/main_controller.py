@@ -138,11 +138,12 @@ class Robot():
         p_d.x, p_d.y, p_d.z = self.exp_traj3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
         v_d.x, v_d.y, v_d.z = self.exp_traj3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
         a_d.x, a_d.y, a_d.z = self.exp_traj3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.x,v_d.z,a_d.x,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
-        print(self.p.z-self.p_d.z)
+        print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
@@ -180,11 +181,12 @@ class Robot():
         :param x1: Final position
         :return: x at the current time
         """
+        tn = (t - t0) / (tf - t0)
         if t >= tf:
             y = xf
         else:
             try:
-                y = x0 + (xf - x0) * ((t - t0) / (tf - t0)) * math.exp(1 - ((t - t0) / (tf - t0)))
+                y = x0 + (xf - x0) * tn * math.exp(1 - tn)
             except exceptions.ZeroDivisionError:
                 y = xf
         return y
@@ -196,11 +198,13 @@ class Robot():
 
     def exp_traj_dt(self, t, t0, tf, x0, xf):
         """Derivative of exponential trajectory """
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
         if t >= tf:
             dydt = 0
         else:
             try:
-                dydt = -((xf - x0) / (tf - t0).to_nsec()**2) * math.exp(1 - ((t - t0) / (tf - t0))) * (tf - t).to_nsec()
+                dydt = (xf - x0) * tndot *( math.exp(1 - tn) - tn*math.exp(1 - tn) )
             except exceptions.ZeroDivisionError:
                 dydt = 0
         return dydt
@@ -212,11 +216,13 @@ class Robot():
 
     def exp_traj_ddt(self, t, t0, tf, x0, xf):
         """Derivative of exponential trajectory """
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
         if t >= tf:
             ddydt = 0
         else:
             try:
-                ddydt = -((xf - x0) / (tf - t0).to_nsec()**3) * math.exp(1 - ((t - t0) / (tf - t0))) * (2*tf.to_nsec() - t.to_nsec() - t0.to_nsec())
+                ddydt = (xf - x0) * tndot**2 *( tn*math.exp(1 - tn) - 2*math.exp(1 - tn)  )
             except exceptions.ZeroDivisionError:
                 ddydt = 0
         return ddydt
@@ -234,6 +240,7 @@ if __name__ == '__main__':
     try:
         p_init = np.array([0.0, 0.0, 0.0])
         p_final = np.array([0.0, 2.0, 5.0])
-        drone = Robot(p_init=p_init, p_final=p_final, t=5.)
+        drone = Robot()
+        drone.gotopoint(p_init=p_init, p_final=p_final, tduration=5.)
     except rospy.ROSInterruptException:
         pass

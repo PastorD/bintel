@@ -15,7 +15,7 @@ from geometry_msgs.msg import PoseStamped
 import rosbag
 
 from main_controller import Robot
-from dynamics.goto_optitrack import gotooptitrack
+from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 
 
@@ -38,10 +38,11 @@ class test_trajectory_tracking():
         
         # Initialize robot
         bintel = Robot()
+        go_waypoint = MavrosGOTOWaypoint()
 
         for experiment in range(mission['trajectory']['iterations']):
             print("Moving to initial point...")
-            gotooptitrack(self.p_init)
+            go_waypoint.gopoint(self.p_init)
 
             if (mission['save_csv_file']):
                 self.csv_file = mission_folder+'/csv_data_'+str(experiment)+'.csv'
@@ -54,7 +55,7 @@ class test_trajectory_tracking():
                 self.file.close()
 
         print("Experiments finalized, moving to initial point...")
-        gotooptitrack(self.p_init)
+        go_waypoint.gopoint(self.p_init)
         print("Landing")
         land()
 
