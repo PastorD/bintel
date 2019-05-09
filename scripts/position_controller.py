@@ -66,6 +66,13 @@ class PositionController():
             f_d.z -= f_a[0, 2]
 
         # Project f_d into space of achievable force
+        f_d_achievable = self.project_force_achievable (f_d)
+        f_d_achievable.z = f_d_achievable.z + self.model.nom_model.hover_throttle
+
+        return f_d_achievable
+    
+    def project_force_achievable (self, f_d):
+        f_d_ach = namedtuple("f_d_ach", "x y z")
         try:
             if math.isnan(self.max_pitch_roll):
                 s_oncone = float('inf')
@@ -87,17 +94,17 @@ class PositionController():
 
             s = min(1, s_onsphere, s_oncone)
             print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
-            f_d.x = f_d.x*s
-            f_d.y = f_d.y*s
-            f_d.z = f_d.z*s + self.model.nom_model.hover_throttle
+            f_d_ach.x = f_d.x*s
+            f_d_ach.y = f_d.y*s
+            f_d_ach.z = f_d.z*s 
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
-            f_d.x = f_d.x
-            f_d.y = f_d.y
-            f_d.z = f_d.z + self.model.nom_model.hover_throttle
+            f_d_ach.x = f_d.x
+            f_d_ach.y = f_d.y
+            f_d_ach.z = f_d.z
 
-        return f_d
+        return f_d_ach
 
     def get_thrust(self, f_d):
         return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
