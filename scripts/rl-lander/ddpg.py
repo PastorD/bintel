@@ -8,6 +8,7 @@ import numpy as np
 # RL algorithm
 from replay_buffer import ReplayBuffer
 from learner import Learner
+from cbf import Barrier
 import tensorflow as tf
 
 # ROS
@@ -40,13 +41,16 @@ class RL_Controller():
         minibatch_size = 100
         self.learner = Learner(sess, 0., state_dim, action_dim, action_bound, actor_lr, critic_lr, tau, gamma, minibatch_size)
 
+        #Initialize safety filter (barrier function)
+        a_max = 1.
+        a_min = 0.
+        self.cbf = Barrier(state_dim, action_dim, a_max, a_min)
+
         # Initialize variables storing current data from environment
         self.z = 0.
         self.zdot = 0.
         self.prev_thrust = 0.
         self.a_prior = 0.
-        #self.cur_reward = 0.
-        #self.dep_thrust = 0.
 
         # Initialize experiment variables
         self.n_ep = 1000
@@ -67,7 +71,15 @@ class RL_Controller():
         l_mix = 5.
         a = self.learner.actor.predict(s) + self.learner.actor_noise()
         return a/(1+l_mix) + l_mix*a_prior/(1+l_mix)
-    
+
+    def safety_filter(self, s, a):
+        x = s
+        f = np.zeros(2)
+        g = np.zeros(2)
+        #[f, g, x] = get_dynamics(s) #TODO: get dynamics
+        u_bar = self.cbf.control_barrier(a, f, g, x) 
+        return a + u_bar
+        
     def train_rl(self):
         # Train based on replay buffer
         minibatch_size = 64
@@ -120,14 +132,18 @@ class RL_Controller():
 
         ## Set message content
         s = np.array([[self.z, self.zdot]])
-        self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
+        a_rl = self.output_command(s, self.a_prior)
+        ## Use cbf to filter output
+        self.rl_command_msg.thrust = self.safety_filter(s, a_rl)
+        #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
 
 
 if __name__ == '__main__':
     try:
+        # Initialize RL controller and communicatino
         lander = RL_Controller()
-        #lander.train_rl()
         while True:
+            # Run landing experiments and conduct training
             lander.run_experiment()
         rospy.spin()
     except rospy.ROSInterruptException:
