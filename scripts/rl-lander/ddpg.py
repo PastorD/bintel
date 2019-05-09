@@ -34,7 +34,7 @@ class RL_Controller():
         # Initialize learner
         sess = tf.Session()
         state_dim, action_dim = 2, 1
-        action_bound = 10.
+        action_bound = 2.
         actor_lr, critic_lr = 0.0001, 0.001
         gamma, tau = 0.99, 0.001
         minibatch_size = 100
@@ -44,6 +44,7 @@ class RL_Controller():
         self.z = 0.
         self.zdot = 0.
         self.prev_thrust = 0.
+        self.a_prior = 0.
         #self.cur_reward = 0.
         #self.dep_thrust = 0.
 
@@ -52,7 +53,7 @@ class RL_Controller():
 
     def run_experiment(self):
         last_ep = 0
-        training_interval = 10
+        training_interval = 60
         for ep in range(self.n_ep): #TODO: Define number of iterations
             self.create_rl_command_msg(stamp=rospy.Time.now())
             self.pub.publish(self.rl_command_msg)
@@ -62,13 +63,15 @@ class RL_Controller():
 
             self.rate.sleep()
 
-    def output_command(self, s):
-        return self.learner.actor.predict(s)
-        
+    def output_command(self, s, a_prior):
+        l_mix = 5.
+        a = self.learner.actor.predict(s) + self.learner.actor_noise()
+        return a/(1+l_mix) + l_mix*a_prior/(1+l_mix)
+    
     def train_rl(self):
         # Train based on replay buffer
         minibatch_size = 64
-        if self.rl_buffer.count > minibatch_size:
+        if self.rl_buffer.count > 5*minibatch_size:
             self.learner.train(self.rl_buffer, minibatch_size) #Train
 
     """
@@ -95,12 +98,15 @@ class RL_Controller():
         t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
         t = data.end_of_ep.data
 
-        self.a_prior = self.data.prior.data
+        self.a_prior = data.prior.data
         
         # Add to replay buffer
         s = np.array([self.z, self.zdot])  # TODO: Set s to be state at one timestep back
+        a = self.learner.actor.predict(s[np.newaxis,:])
+
         s2 = np.array([z, zdot])
-        self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
+        #self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
+        self.rl_buffer.add(s, a, cur_reward, t, s2)
         #self.create_rl_command_msg(rospy.Time.now()) #TODO: Test if creating messages here allows "parallelization"
         #self.pub.publish(self.rl_command_msg)
         self.z = z
@@ -114,7 +120,7 @@ class RL_Controller():
 
         ## Set message content
         s = np.array([[self.z, self.zdot]])
-        self.rl_command_msg.thrust = self.output_command(s, a_prior)
+        self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
 
 
 if __name__ == '__main__':
