@@ -17,7 +17,7 @@ class PositionController():
         self.max_pitch_roll = math.pi/3
         self.use_learned_model = use_learned_model
 
-        use_lqr_gains = True
+        use_lqr_gains = False
         if (use_lqr_gains):
             self.K = sio.loadmat("scripts/lqr_gains_nominal.mat")["K"]
         else:
@@ -38,6 +38,8 @@ class PositionController():
             self.K[2, 2] = K_p_z
             self.K[2, 5] = K_d_z
 
+            self.K *= 2.
+
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
         f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
         T_d = self.get_thrust(f_d)
@@ -57,7 +59,6 @@ class PositionController():
         f_d = namedtuple("f_d", "x y z")
         f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e) + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
                                                                                    self.model.nom_model.g)
-
         if self.use_learned_model:
             x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
             f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
@@ -84,11 +85,12 @@ class PositionController():
             b = 2 * self.model.nom_model.hover_throttle * f_d.z
             c = self.model.nom_model.hover_throttle ** 2 - 1
             s_onsphere = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+            s = min(1., s_onsphere, s_oncone)
 
-            s = min(1, s_onsphere, s_oncone)
             f_d.x = f_d.x*s
             f_d.y = f_d.y*s
             f_d.z = f_d.z*s + self.model.nom_model.hover_throttle
+
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
