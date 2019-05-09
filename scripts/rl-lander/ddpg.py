@@ -43,6 +43,7 @@ class RL_Controller():
         # Initialize variables storing current data from environment
         self.z = 0.
         self.zdot = 0.
+        self.prev_thrust = 0.
         #self.cur_reward = 0.
         #self.dep_thrust = 0.
 
@@ -67,7 +68,8 @@ class RL_Controller():
     def train_rl(self):
         # Train based on replay buffer
         minibatch_size = 64
-        self.learner.train(self.rl_buffer, minibatch_size) #Train
+        if self.rl_buffer.count > minibatch_size:
+            self.learner.train(self.rl_buffer, minibatch_size) #Train
 
     """
     Define ROS Interface
@@ -93,14 +95,17 @@ class RL_Controller():
         t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
         t = data.end_of_ep.data
 
+        self.a_prior = self.data.prior.data
+        
         # Add to replay buffer
         s = np.array([self.z, self.zdot])  # TODO: Set s to be state at one timestep back
         s2 = np.array([z, zdot])
-        self.rl_buffer.add(s, dep_thrust, cur_reward, t, s2)
+        self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
         #self.create_rl_command_msg(rospy.Time.now()) #TODO: Test if creating messages here allows "parallelization"
         #self.pub.publish(self.rl_command_msg)
         self.z = z
         self.zdot = zdot
+        self.prev_thrust = dep_thrust
 
     def create_rl_command_msg(self, stamp):
         ## Set the header
@@ -108,15 +113,16 @@ class RL_Controller():
         self.rl_command_msg.header.frame_id = '/world'
 
         ## Set message content
-        s = np.array([self.z, self.zdot])
-        self.rl_command_msg.thrust = self.output_command(s)
+        s = np.array([[self.z, self.zdot]])
+        self.rl_command_msg.thrust = self.output_command(s, a_prior)
 
 
 if __name__ == '__main__':
     try:
         lander = RL_Controller()
         #lander.train_rl()
-        lander.run_experiment()
+        while True:
+            lander.run_experiment()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

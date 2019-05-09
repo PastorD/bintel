@@ -282,16 +282,14 @@ class Learner(object):
         
     # Training based on collected data
     def train(self, replay_buffer, minibatch_size):
-        # Get dynamics and initialize prior controller  
-        prior = BasePrior()
-
+        
         # Needed to enable BatchNorm
         #tflearn.is_training(True)
 
-        #Sample a batch from the replay buffer                                                                                         
+        #Sample a batch from the replay buffer            
         s_batch, a_batch, r_batch, t_batch, s2_batch = replay_buffer.sample_batch(minibatch_size)
         
-        # Calculate targets                                                                                                            
+        # Calculate targets                                                                             
         target_q = self.critic.predict_target(s2_batch, self.actor.predict_target(s2_batch))
         y_i = []
         for k in range(minibatch_size):
@@ -300,16 +298,16 @@ class Learner(object):
             else:
                 y_i.append(r_batch[k] + self.critic.gamma * target_q[k])
 
-        # Update the critic given the targets                                                                                          
-        predicted_q_value, _ = self.critic.train(s_batch, a_batch, np.reshape(y_i, (minibatch_size, 1)))
-        ep_ave_max_q += np.amax(predicted_q_value)
+        # Update the critic given the targets       
+        predicted_q_value, _ = self.critic.train(s_batch, np.squeeze(a_batch)[:,np.newaxis], np.reshape(y_i, (minibatch_size, 1)))
+        #ep_ave_max_q += np.amax(predicted_q_value)
         
-        # Update the actor policy using the sampled gradient                                                                           
+        # Update the actor policy using the sampled gradient  
         a_outs = self.actor.predict(s_batch)
         grads = self.critic.action_gradients(s_batch, a_outs)
         self.actor.train(s_batch, grads[0])
         
-        # Update target networks                                                                                                       
+        # Update target networks                          
         self.actor.update_target_network()
         self.critic.update_target_network()
         

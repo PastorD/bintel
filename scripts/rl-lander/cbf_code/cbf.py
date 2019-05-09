@@ -13,9 +13,9 @@ import dynamics_gp
 
 #Build barrier function model
 def build_barrier(self):
-    N = 1  # action dimension
+    N = 1  #action_dim
     #self.P = matrix(np.eye(N), tc='d')
-    self.P = matrix(np.diag([1., 1e20]), tc='d')
+    self.P = matrix(np.diag([1., 1e24]), tc='d')
     self.q = matrix(np.zeros(N+1))
     self.H1 = np.array([1, 0.05])
     self.H2 = np.array([1, -0.05])
