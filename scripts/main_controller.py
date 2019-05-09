@@ -34,6 +34,7 @@ class Robot():
     def __init__(self):
         self.is_simulation = True
         self.use_learned_model = False
+
         
 
         if self.is_simulation:

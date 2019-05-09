@@ -4,8 +4,11 @@ import yaml
 from collections import namedtuple
 import csv
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 from datetime import datetime
+import shutil
+
 
 import rospy
 from geometry_msgs.msg import PoseStamped
@@ -14,7 +17,7 @@ import rosbag
 from main_controller import Robot
 from dynamics.goto_optitrack import gotooptitrack
 from dynamics.goto_land import land
-import numpy as np
+
 
 
 
@@ -26,6 +29,7 @@ class test_trajectory_tracking():
         mission = self.read_mission(config_file)       
         mission_folder = 'dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         os.mkdir(mission_folder)
+        shutil.copy(config_file,mission_folder)
 
         self.p_init = mission['trajectory']['points'][0]
         self.p_final = mission['trajectory']['points'][1]
