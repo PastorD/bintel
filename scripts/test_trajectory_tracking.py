@@ -38,25 +38,24 @@ class test_trajectory_tracking():
         
         # Initialize robot
         bintel = Robot()
+        bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
         go_waypoint = MavrosGOTOWaypoint()
+        print("Moving to initial point...")
+        go_waypoint.gopoint(self.p_init)
+        
 
         for experiment in range(mission['trajectory']['iterations']):
-            print("Moving to initial point...")
-            go_waypoint.gopoint(self.p_init)
-
-            if (mission['save_csv_file']):
-                self.csv_file = mission_folder+'/csv_data_'+str(experiment)+'.csv'
-                self.file = open(self.csv_file ,'w') 
+            
+            self.csv_file = mission_folder+'/csv_data_'+str(experiment)+'.csv'
+            self.file = open(self.csv_file ,'w') 
 
             print("Launching position controller...")
             bintel.gotopoint(self.p_init, self.p_final, self.duration, self.file)
+            self.file.close()
 
-            if (mission['save_csv_file']):
-                self.file.close()
+            go_waypoint.gopoint(self.p_init)
 
-        print("Experiments finalized, moving to initial point...")
-        go_waypoint.gopoint(self.p_init)
-        print("Landing")
+        print("Experiments finalized, landing")        
         land()
 
         plot_error(mission_folder, self.duration)

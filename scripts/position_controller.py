@@ -94,18 +94,12 @@ class PositionController():
             s_onsphere = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
             s = min(1., s_onsphere, s_oncone)
 
-<<<<<<< HEAD
             s = min(1, s_onsphere, s_oncone)
             #print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
             f_d_ach.x = f_d.x*s
             f_d_ach.y = f_d.y*s
             f_d_ach.z = f_d.z*s 
-=======
-            f_d.x = f_d.x*s
-            f_d.y = f_d.y*s
-            f_d.z = f_d.z*s + self.model.nom_model.hover_throttle
-
->>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
+            
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
