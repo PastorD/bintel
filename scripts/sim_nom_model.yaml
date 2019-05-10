@@ -1,0 +1,100 @@
+!!python/object:learn_nominal_model.learnNominalModel
+dataOrigin: Experimental Data/111118b/111118_ground.bag
+data_path: Experimental Data/learn_nom_3may19.bag
+estimator_omg_x: !!python/object:sparse_identification.core.sindy
+  coef_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - &id001 !!python/name:numpy.ndarray ''
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+      - 1
+    - &id002 !!python/object/apply:numpy.dtype
+      args:
+      - f8
+      - 0
+      - 1
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - false
+    - !!binary |
+      /3QsRxU49D/MTFVquOb8Pw==
+  l1: 0
+  l2: 0.0
+  solver: lstsq
+  tol: 0.001
+estimator_omg_y: !!python/object:sparse_identification.core.sindy
+  coef_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+      - 1
+    - *id002
+    - false
+    - !!binary |
+      cd8A1wwd87/aOONsQrDgvw==
+  l1: 0
+  l2: 0.0
+  solver: lstsq
+  tol: 0.001
+estimator_omg_z: !!python/object:sparse_identification.core.sindy
+  coef_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+      - 1
+    - *id002
+    - false
+    - !!binary |
+      wCCVuIBRvT+pdwoFJ93Dvw==
+  l1: 0
+  l2: 0.0
+  solver: lstsq
+  tol: 0.001
+estimator_pdt: !!python/object:sparse_identification.core.sindy
+  coef_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 1
+      - 1
+    - *id002
+    - false
+    - !!binary |
+      q5BypjHhqj8=
+  l1: 0
+  l2: 0.0
+  solver: lstsq
+  tol: 0.001
+fit_type: lstsq
+g: 9.81
+hover_throttle: 0.56
+is_simulation: false

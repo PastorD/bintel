@@ -4,85 +4,130 @@ from collections import namedtuple
 import numpy as np
 import math
 import scipy.io as sio
+import exceptions
+import tf
+import control
 
 
 class PositionController():
-    def __init__(self, model, rate):
+    def __init__(self, model, rate, use_learned_model):
         self.model = model
-        self.K = sio.loadmat("lqr_gains.mat")["K"]
+
         self.dt = 1.0/rate #Timestep of controller
+        self.max_pitch_roll = math.pi/3
+        self.use_learned_model = use_learned_model
 
-    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
+        use_lqr_gains = False
+        if (use_lqr_gains):
+            self.K = sio.loadmat("scripts/lqr_gains_nominal.mat")["K"]
+        else:
+            lam = math.sqrt(1.2/3*9.81/.7)
+            lam_xy = math.sqrt(0.6/3*9.81/.7)
+            K_p_xy = 1*(lam_xy**2)
+            K_p_z  = 1*(lam**2)
+            K_d_xy = 2*lam_xy # 2math.sqrt(lam)*2*9.81/.7
+            K_d_z  = 2*lam # 2math.sqrt(lam)*2*9.81/.7 #
+            K_i_xy = 0.0 * (lam_xy**3)
+            K_i_z  = 0.0 * (lam**3)
 
-        X = np.array([p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z])
+            self.K = np.zeros((3,6))
+            self.K[0, 0] = K_p_xy
+            self.K[0, 3] = K_d_xy
+            self.K[1, 1] = K_p_xy
+            self.K[1, 4] = K_d_xy
+            self.K[2, 2] = K_p_z
+            self.K[2, 5] = K_d_z
 
-        if len(X.shape) > 1 or not X.shape[0] == 13:
-            if len(X.shape) == 2 and X.shape[1] > 1:
-                raise IndexError
-            else:
-                X = X.reshape(13,)
+            self.K *= 2.
 
-        F_v, G_v, F_omg, G_omg = self.model.get_dynamics_matrices(X)
-        u_FL = self.get_FL_control(F_v=F_v, G_v=G_v, F_omg=F_omg, G_omg= G_omg, p=p, q=q, v=v, omg=omg,
-                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d, ddyaw_d=ddyaw_d)
-
-        q_d = namedtuple("q_d", "w x y z")
-        omg_d = namedtuple("omg_d", "x y z")
-        T_d, q_d.w, q_d.x, q_d.y, q_d.z, omg_d.x, omg_d.y, omg_d.z = self.ctrl_to_attitude(u_FL=u_FL, F_omg=F_omg,
-                                                                                           G_omg=G_omg, q=q, omg=omg)
-        T_d, q_d, omg_d = self.post_process_input(T=T_d, q=q_d, omg=omg_d)
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
+        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
+        T_d = self.get_thrust(f_d)
+        q_d = self.get_attitude(f_d, yaw_d)
+        omg_d = 0., 0., 0.
 
         return T_d, q_d, omg_d
 
-    def get_FL_control(self, F_v, G_v, F_omg, G_omg, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
+    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
         a_d = np.array([a_d.x, a_d.y, a_d.z])
-        e_p = np.array([p.x-p_d.x, p.y-p_d.y, p.z-p_d.z])
-        e_v = np.array([v.x-v_d.x, v.y-v_d.y, v.z-v_d.z])
-        yaw = math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y**2+q.z**2))
+        e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
+        e_v = np.array([v.x - v_d.x, v.y - v_d.y, v.z - v_d.z])
+        yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
         dyaw = omg.z
+        e = np.concatenate((e_p, e_v)).reshape(-1, 1)
 
-        eta = np.concatenate((e_p, e_v, [yaw-yaw_d], [dyaw-dyaw_d])).reshape(-1,1)
+        f_d = namedtuple("f_d", "x y z")
+        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)/5.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
+                                                                                   self.model.nom_model.g)
+        if self.use_learned_model:
+            x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
+            f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
+            f_d.x -= f_a[0, 0]
+            f_d.y -= f_a[0, 1]
+            f_d.z -= f_a[0, 2]
 
-        L_f = np.concatenate(((F_v-a_d), [F_omg[2]-ddyaw_d]))
-        A = np.concatenate((G_v, [G_omg[2,:]]), axis=0)
-        u_FL = np.dot(np.linalg.inv(A), (-L_f + np.dot(self.K, eta).flatten()))
-        print(u_FL)
-        return u_FL
+        # Project f_d into space of achievable force
+        f_d_achievable = self.project_force_achievable (f_d)
+        f_d_achievable.z = f_d_achievable.z + self.model.nom_model.hover_throttle
 
-    def ctrl_to_attitude(self, u_FL, F_omg, G_omg, q, omg):
-        q = np.array([q.w, q.x, q.y, q.z])
-        omg = np.array([omg.x, omg.y, omg.z])
+        return f_d_achievable
+    
+    def project_force_achievable (self, f_d):
+        f_d_ach = namedtuple("f_d_ach", "x y z")
+        try:
+            if math.isnan(self.max_pitch_roll):
+                s_oncone = float('inf')
+            elif self.max_pitch_roll <= 1e-2:
+                f_d.x = 0
+                f_d.y = 0
+                s_oncone = float('inf')
+            elif self.max_pitch_roll >= math.pi - 1e-2:
+                s_oncone = float('inf')
+            elif f_d.z / math.sqrt(f_d.x**2 + f_d.y**2) >= math.tan(self.max_pitch_roll):
+                s_oncone = float('inf')
+            else:
+                s_oncone = self.model.nom_model.hover_throttle/(math.tan(self.max_pitch_roll)*math.sqrt(f_d.x**2 + f_d.y**2)-f_d.z)
 
-        domg_d = F_omg + np.dot(G_omg, u_FL)
-        omg_d = omg + domg_d*self.dt
-        dq_d = self.model.ang_vel_to_quat_deriv(q, omg_d)
-        q_d = q + dq_d*self.dt
+            a = f_d.x**2 + f_d.y**2 + f_d.z**2
+            b = 2 * self.model.nom_model.hover_throttle * f_d.z
+            c = self.model.nom_model.hover_throttle ** 2 - 1
+            s_onsphere = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+            s = min(1., s_onsphere, s_oncone)
 
-        T = u_FL[0]
-        qw, qx, qy, qz = q_d/np.linalg.norm(q_d)
+<<<<<<< HEAD
+            s = min(1, s_onsphere, s_oncone)
+            #print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
+            f_d_ach.x = f_d.x*s
+            f_d_ach.y = f_d.y*s
+            f_d_ach.z = f_d.z*s 
+=======
+            f_d.x = f_d.x*s
+            f_d.y = f_d.y*s
+            f_d.z = f_d.z*s + self.model.nom_model.hover_throttle
 
-        return T, qw, qx, qy, qz, omg_d[0], omg_d[1], omg_d[2]
+>>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
+        except exceptions.ZeroDivisionError:
+            if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
+                warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
+            f_d_ach.x = f_d.x
+            f_d_ach.y = f_d.y
+            f_d_ach.z = f_d.z
 
-    def post_process_input(self, T, q, omg):
-        #TODO: Make sure that the input found is reasonable (define ranges for T and q and make sure that command
-        # found are within these ranges)
-        T += (1562.-1000.)/1000. #Hover throttle added #TODO: Investigate why necessary
+        return f_d_ach
 
-        #Post-process T:
-        if T < 0.3:
-            T = 0.3
-        elif T > 1:
-            T = 1
+    def get_thrust(self, f_d):
+        return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
 
-        #Post-Process omg:
-        omg_lim = 2. #TODO: Test effect of omg_lim
-        omg.x, omg.y, omg.z = np.abs(omg.x), np.abs(omg.y), np.abs(omg.z)
-        if omg.x > omg_lim:
-            omg.x = omg_lim
-        if omg.y > omg_lim:
-            omg.y = omg_lim
-        if omg.z > omg_lim:
-            omg.z = omg_lim
+    def get_attitude(self, f_d, yaw_d):
+        q_worldToYawed = tf.transformations.quaternion_from_euler(0,0,yaw_d, axes='rxyz')
+        rotation_axis = tuple(np.cross((0,0,1), np.array([f_d.x, f_d.y, f_d.z])))
+        if np.allclose(rotation_axis, (0.0, 0.0, 0.0)):
+            unit_rotation_axis = rotation_axis
+        else:
+            unit_rotation_axis = tf.transformations.unit_vector(rotation_axis)
+        rotation_angle = math.asin(np.linalg.norm(rotation_axis))
+        q_yawedToBody = tf.transformations.quaternion_about_axis(rotation_angle, unit_rotation_axis)
 
+        q_d = tf.transformations.quaternion_multiply(q_worldToYawed, q_yawedToBody)
 
-        return T, q, omg
+        return q_d
