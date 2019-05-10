@@ -33,7 +33,7 @@ class Robot():
     """
     def __init__(self):
         self.is_simulation = True
-        self.use_learned_model = True
+        self.use_learned_model = False
         
 
         if self.is_simulation:
@@ -135,10 +135,10 @@ class Robot():
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
         a_d = namedtuple("a_d", "x y z")
-        p_d.x, p_d.y, p_d.z = self.exp_traj3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        v_d.x, v_d.y, v_d.z = self.exp_traj3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        a_d.x, a_d.y, a_d.z = self.exp_traj3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.x,v_d.z,a_d.x,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
+        p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
@@ -211,8 +211,8 @@ class Robot():
 
     def exp_traj3_dt(self, t, t0, tf, x0, x1):
         """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_dt(t, t, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_dt(t, t, tf, x0[2], x1[2]))
+        return (self.exp_traj_dt(t, t0, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
+                self.exp_traj_dt(t, t0, tf, x0[2], x1[2]))
 
     def exp_traj_ddt(self, t, t0, tf, x0, xf):
         """Derivative of exponential trajectory """
@@ -231,6 +231,53 @@ class Robot():
         """Return 3D vector derivative of 3D exponential trajectory"""
         return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
                 self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
+
+
+    def smooth_setp(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        
+        if t >= tf:
+            y = xf
+        else:
+            y = x0 + (xf - x0) * ( 6*tn**5 - 15*tn**4 + 10*tn**3)
+        return y
+
+    def smooth_setp_dt(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
+        if t >= tf:
+            dydt = 0
+        else:
+            dydt = (xf - x0)*tndot*( 6*5*tn**4 - 15*4*tn**3 + 10*3*tn**2)
+        return dydt
+
+    def smooth_setp_ddt(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
+        if t >= tf:
+            ddydt2 = 0
+        else:
+            ddydt2 = (xf - x0)*tndot**2*( 6*5*4*tn**3 - 15*4*3*tn**2 + 10*3*2*tn)
+        return ddydt2
+
+    def smooth_setp3(self, t, t0, tf, x0, x1):
+        
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp(t, t0, tf, x0[0], x1[0]), self.smooth_setp(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp(t, t0, tf, x0[2], x1[2]))
+
+    def smooth_setp3_dt(self, t, t0, tf, x0, x1):
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp_dt(t, t0, tf, x0[0], x1[0]), self.smooth_setp_dt(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp_dt(t, t0, tf, x0[2], x1[2]))
+
+    def smooth_setp3_ddt(self, t, t0, tf, x0, x1):
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp_ddt(t, t0, tf, x0[0], x1[0]), self.smooth_setp_ddt(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp_ddt(t, t0, tf, x0[2], x1[2]))
+    
+
+
 
     def _read_rc_out(self, data):
         self.u_current = self.model.mix_control_inputs(np.array([data.channels[:4]]))

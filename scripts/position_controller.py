@@ -55,7 +55,7 @@ class PositionController():
         e = np.concatenate((e_p, e_v)).reshape(-1, 1)
 
         f_d = namedtuple("f_d", "x y z")
-        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)/12.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
+        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)/5.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
                                                                                    self.model.nom_model.g)
 
         if self.use_learned_model:
