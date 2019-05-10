@@ -34,6 +34,10 @@ class Robot():
     def __init__(self):
         self.is_simulation = True
         self.use_learned_model = False
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
         
 
         if self.is_simulation:
@@ -143,7 +147,10 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
+<<<<<<< HEAD
         print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
+=======
+>>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
