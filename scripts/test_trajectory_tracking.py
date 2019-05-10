@@ -18,9 +18,6 @@ from main_controller import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 
-
-
-
 class test_trajectory_tracking():
     def __init__(self):
 

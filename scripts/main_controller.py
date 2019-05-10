@@ -36,7 +36,6 @@ class Robot():
     def __init__(self):
         self.is_simulation = True
         self.use_learned_model = False
-        
 
         if self.is_simulation:
             self.model_file_name = 'scripts/sim_model.yaml'
@@ -163,12 +162,14 @@ class Robot():
         p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
         v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
         a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
+        #print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
+
         print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
+
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
@@ -300,9 +301,6 @@ class Robot():
         """Return 3D vector derivative of 3D exponential trajectory"""
         return (self.smooth_setp_ddt(t, t0, tf, x0[0], x1[0]), self.smooth_setp_ddt(t, t0, tf, x0[1], x1[1]),
                 self.smooth_setp_ddt(t, t0, tf, x0[2], x1[2]))
-    
-
-
 
     def _read_rc_out(self, data):
         self.u_current = self.model.mix_control_inputs(np.array([data.channels[:4]]))

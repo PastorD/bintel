@@ -18,7 +18,7 @@ class learnNominalModel(QuadrotorModel):
 
         self.g = 9.81
         if self.is_simulation:
-            self.hover_throttle = 0.562
+            self.hover_throttle = 0.564
         else:
             self.hover_throttle = 0.672
 
