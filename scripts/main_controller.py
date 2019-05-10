@@ -16,6 +16,8 @@ import roslib
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
 from visualization_msgs.msg import Marker
+from nav_msgs.msg import Path
+from std_msgs.msg import Header
 
 #Initialize trajeftory
 from dynamics import goto_optitrack
@@ -83,6 +85,7 @@ class Robot():
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
+            self.desired_path_pub.publish(self.desired_path)
             self.save_csv()
             self.rate.sleep()
 
@@ -103,6 +106,9 @@ class Robot():
     def init_ROS(self):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.pub_traj = rospy.Publisher('/mavros/setpoint_raw/trajectory', PoseStamped, queue_size=10)
+
+        self.desired_path_pub = rospy.Publisher('/desired_path', Path, queue_size=10)
+        
 
         
         rospy.init_node('controller_bintel', anonymous=True)
@@ -130,6 +136,25 @@ class Robot():
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
         self.omg.x, self.omg.y, self.omg.z = data.twist.angular.x, data.twist.angular.y, data.twist.angular.z
 
+    def plot_desired_traj(self,p_init, p_final, tduration):
+        self.get_desired_traj(p_init, p_final, tduration)
+        self.desired_path_pub.publish(self.desired_path)
+
+    def get_desired_traj(self,p_init, p_final, tduration):
+        self.desired_path = Path()
+        
+        t_init = rospy.Time.now()
+        t_final = rospy.Time(secs=(t_init + rospy.Duration(tduration)).to_sec())
+        self.desired_path.header = Header(stamp=t_init, frame_id='map',seq=0)
+        tvector = np.linspace(0., tduration, num=100)
+        for (num, tp) in enumerate(tvector):
+            ti = rospy.Time(secs=(t_init + rospy.Duration(tp)).to_sec())
+            pd = PoseStamped()
+            pd.header = Header(stamp=t_init, frame_id='map',seq=num)
+            pd.pose.orientation = Quaternion(x=0., y=0., z=0., w=1.)
+            pd.pose.position.x, pd.pose.position.y, pd.pose.position.z = self.smooth_setp3(ti, t_init, t_final, p_init, p_final)
+            self.desired_path.poses.append(pd)
+
     def update_ctrl(self):
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
@@ -142,6 +167,9 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
+
+        print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
+
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
