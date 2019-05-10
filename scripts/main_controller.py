@@ -32,8 +32,12 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
     def __init__(self):
-        self.is_simulation = False
+        self.is_simulation = True
         self.use_learned_model = False
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
         
 
         if self.is_simulation:
@@ -135,14 +139,18 @@ class Robot():
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
         a_d = namedtuple("a_d", "x y z")
-        p_d.x, p_d.y, p_d.z = self.exp_traj3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        v_d.x, v_d.y, v_d.z = self.exp_traj3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        a_d.x, a_d.y, a_d.z = self.exp_traj3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
-        print(self.p.y-self.p_d.y)
+<<<<<<< HEAD
+        print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
+=======
+>>>>>>> 8efe2b2ad5c5d474734fc2a9ec09acfbe8b7dec9
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
@@ -180,11 +188,12 @@ class Robot():
         :param x1: Final position
         :return: x at the current time
         """
+        tn = (t - t0) / (tf - t0)
         if t >= tf:
             y = xf
         else:
             try:
-                y = x0 + (xf - x0) * ((t - t0) / (tf - t0)) * math.exp(1 - ((t - t0) / (tf - t0)))
+                y = x0 + (xf - x0) * tn * math.exp(1 - tn)
             except exceptions.ZeroDivisionError:
                 y = xf
         return y
@@ -196,27 +205,31 @@ class Robot():
 
     def exp_traj_dt(self, t, t0, tf, x0, xf):
         """Derivative of exponential trajectory """
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
         if t >= tf:
             dydt = 0
         else:
             try:
-                dydt = -((xf - x0) / (tf - t0).to_nsec()**2) * math.exp(1 - ((t - t0) / (tf - t0))) * (tf - t).to_nsec()
+                dydt = (xf - x0) * tndot *( math.exp(1 - tn) - tn*math.exp(1 - tn) )
             except exceptions.ZeroDivisionError:
                 dydt = 0
         return dydt
 
     def exp_traj3_dt(self, t, t0, tf, x0, x1):
         """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_dt(t, t, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_dt(t, t, tf, x0[2], x1[2]))
+        return (self.exp_traj_dt(t, t0, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
+                self.exp_traj_dt(t, t0, tf, x0[2], x1[2]))
 
     def exp_traj_ddt(self, t, t0, tf, x0, xf):
         """Derivative of exponential trajectory """
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
         if t >= tf:
             ddydt = 0
         else:
             try:
-                ddydt = -((xf - x0) / (tf - t0).to_nsec()**3) * math.exp(1 - ((t - t0) / (tf - t0))) * (2*tf.to_nsec() - t.to_nsec() - t0.to_nsec())
+                ddydt = (xf - x0) * tndot**2 *( tn*math.exp(1 - tn) - 2*math.exp(1 - tn)  )
             except exceptions.ZeroDivisionError:
                 ddydt = 0
         return ddydt
@@ -226,6 +239,53 @@ class Robot():
         return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
                 self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
 
+
+    def smooth_setp(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        
+        if t >= tf:
+            y = xf
+        else:
+            y = x0 + (xf - x0) * ( 6*tn**5 - 15*tn**4 + 10*tn**3)
+        return y
+
+    def smooth_setp_dt(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
+        if t >= tf:
+            dydt = 0
+        else:
+            dydt = (xf - x0)*tndot*( 6*5*tn**4 - 15*4*tn**3 + 10*3*tn**2)
+        return dydt
+
+    def smooth_setp_ddt(self, t, t0, tf, x0, xf):
+        tn = (t - t0) / (tf - t0)
+        tndot = 1/ (tf - t0).to_sec()
+        if t >= tf:
+            ddydt2 = 0
+        else:
+            ddydt2 = (xf - x0)*tndot**2*( 6*5*4*tn**3 - 15*4*3*tn**2 + 10*3*2*tn)
+        return ddydt2
+
+    def smooth_setp3(self, t, t0, tf, x0, x1):
+        
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp(t, t0, tf, x0[0], x1[0]), self.smooth_setp(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp(t, t0, tf, x0[2], x1[2]))
+
+    def smooth_setp3_dt(self, t, t0, tf, x0, x1):
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp_dt(t, t0, tf, x0[0], x1[0]), self.smooth_setp_dt(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp_dt(t, t0, tf, x0[2], x1[2]))
+
+    def smooth_setp3_ddt(self, t, t0, tf, x0, x1):
+        """Return 3D vector derivative of 3D exponential trajectory"""
+        return (self.smooth_setp_ddt(t, t0, tf, x0[0], x1[0]), self.smooth_setp_ddt(t, t0, tf, x0[1], x1[1]),
+                self.smooth_setp_ddt(t, t0, tf, x0[2], x1[2]))
+    
+
+
+
     def _read_rc_out(self, data):
         self.u_current = self.model.mix_control_inputs(np.array([data.channels[:4]]))
 
@@ -234,6 +294,7 @@ if __name__ == '__main__':
     try:
         p_init = np.array([0.0, 0.0, 0.0])
         p_final = np.array([0.0, 2.0, 5.0])
-        drone = Robot(p_init=p_init, p_final=p_final, t=5.)
+        drone = Robot()
+        drone.gotopoint(p_init=p_init, p_final=p_final, tduration=5.)
     except rospy.ROSInterruptException:
         pass
