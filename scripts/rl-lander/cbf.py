@@ -26,7 +26,7 @@ class Barrier():
         self.P[N,N] = 1e20
         self.P = matrix(self.P, tc='d')
         self.q = matrix(np.zeros(N+1))
-        self.eta = 5
+        self.eta = 2.
         
         #eta*z - zdot >= 0,  eta*z + zdot >= 0     
         self.H1 = np.array([self.eta, -1])

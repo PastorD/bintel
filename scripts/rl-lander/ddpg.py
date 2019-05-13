@@ -74,12 +74,21 @@ class RL_Controller():
 
     def safety_filter(self, s, a):
         x = s
-        f = np.zeros(2)
-        g = np.zeros(2)
-        #[f, g, x] = get_dynamics(s) #TODO: get dynamics
+        # f = np.zeros(2)
+        # g = np.zeros(2)
+        [f, g, x] = self.get_dynamics(s)
         u_bar = self.cbf.control_barrier(a, f, g, x) 
         return a + u_bar
+
+    def get_dynamics(s):
+        G = 9.81
+        m = 0.56/9.81
+        s = np.squeeze(s)
+        f = np.array([s[1], -G])
+        g = np.array([0, 1/m])
+        return [f, g, s]
         
+    
     def train_rl(self):
         # Train based on replay buffer
         minibatch_size = 64
