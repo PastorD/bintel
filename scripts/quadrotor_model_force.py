@@ -27,7 +27,7 @@ class QuadrotorModel():
     def fit_parameters(self, data_filename, fit_type, is_simulation):
         pass
 
-    def predict_full_RHS(self):
+    def predict_full_RHS(self, X, u):
         pass
 
     def get_dynamics_matrices(self, X):
@@ -58,49 +58,52 @@ class QuadrotorModel():
         else:
             velocity_topic = "/mavros/local_position/velocity"
 
-        npos = 3
-        position_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/local_position/pose"]), npos])
-        time_pos = []
-        norient = 4
-        orientation_raw = np.empty([bag.get_message_count(topic_filters=["/mavros/local_position/pose"]), norient])
-        time_orient = []
-
-        k = 0
-        for topic, msg, t in bag.read_messages(topics=['/mavros/local_position/pose']):
-            position_raw[k, :] = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
-            time_pos.append(t.to_time())
-
-            orientation_raw[k, :] = [msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y,
-                                     msg.pose.orientation.z]
-            time_orient.append(t.to_time())
-
-            k = k + 1
-
-        nlinvel = 3
-        linvel_raw = np.empty([bag.get_message_count(topic_filters=[velocity_topic]), nlinvel])
-        time_linvel = []
-        nangvel = 3
-        angvel_raw = np.empty([bag.get_message_count(topic_filters=[velocity_topic]), nangvel])
-        time_angvel = []
-
-        k = 0
-        for topic, msg, t in bag.read_messages(topics=[velocity_topic]):
-            linvel_raw[k, :] = [msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z]
-            time_linvel.append(t.to_time())
-
-            angvel_raw[k, :] = [msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z]
-            time_angvel.append(t.to_time())
-
-            k = k + 1
-
         force_raw = np.empty([bag.get_message_count(topic_filters=["/bintel/desired_force"]), 3])
         time_force = []
 
         k = 0
         for topic, msg, t in bag.read_messages(topics=['/bintel/desired_force']):
-            force_raw[k, :] = msg.channels[0:4]
+            force_raw[k, :] = [msg.vector.x, msg.vector.y, msg.vector.z]
             time_force.append(t.to_time())
             k = k + 1
+
+        t_min_force = time_force[0]
+        t_max_force = time_force[-1]
+
+        npos = 3
+        norient = 4
+        position_raw = []
+        time_pos = []
+        orientation_raw = []
+        time_orient = []
+
+        for topic, msg, t in bag.read_messages(topics=['/mavros/local_position/pose']):
+            if t.to_time() >= t_min_force and t.to_time() <= t_max_force:
+                position_raw.append([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
+                time_pos.append(t.to_time())
+
+                orientation_raw.append([msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y,
+                                     msg.pose.orientation.z])
+                time_orient.append(t.to_time())
+        position_raw = np.array(position_raw)
+        orientation_raw = np.array(orientation_raw)
+
+        nlinvel = 3
+        nangvel = 3
+        linvel_raw = []
+        time_linvel = []
+        angvel_raw = []
+        time_angvel = []
+
+        for topic, msg, t in bag.read_messages(topics=[velocity_topic]):
+            if t.to_time() >= t_min_force and t.to_time() <= t_max_force:
+                linvel_raw.append([msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z])
+                time_linvel.append(t.to_time())
+
+                angvel_raw.append([msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z])
+                time_angvel.append(t.to_time())
+        linvel_raw = np.array(linvel_raw)
+        angvel_raw = np.array(angvel_raw)
 
         time_start = np.maximum(time_pos[0], np.maximum(time_linvel[0], time_force[0]))
         time_end = np.minimum(time_pos[-1], np.minimum(time_linvel[-1], time_force[-1]))
@@ -147,7 +150,6 @@ class QuadrotorModel():
         if not prediction:
             self.theta_mean = np.mean(Theta, axis=0)
             self.theta_mean[0] = 0.0  # Keep intercept term at 1
-
         Theta = Theta - self.theta_mean
 
         if not prediction:
@@ -186,93 +188,71 @@ class QuadrotorModel():
 
     def score(self, dataFilename, dataFormat, is_simulation, figure_path=""):
         import matplotlib.pyplot as plt
-        import string
         from datetime import datetime
         from sklearn.metrics import mean_squared_error
-        from scipy.integrate import odeint
 
         self.dataOrigin = dataFilename
-
+        self.testfraction = 0.2 #Amount of the test set to use (to reduce test time only)
         if (dataFormat == 'rosbag'):
-            time, position, orientation, linvel, angvel, rcout = self.read_ROSBAG(dataFilename,
+            time, position, orientation, linvel, angvel, force = self.read_ROSBAG(dataFilename,
                                                                                   is_simulation=is_simulation)
         elif (dataFormat == 'csv'):
             pass
         else:
             exit("Data format should be 'rosbag' or 'csv'")
 
+        # Reduce amount of test data
+        n_test = int(np.floor(time.shape[0]*self.testfraction))
+        time = time[:n_test]
+        position = position[:n_test,:]
+        orientation = orientation[:n_test, :]
+        linvel = linvel[:n_test, :]
+        angvel = angvel[:n_test, :]
+        force = force[:n_test, :]
+
         x_all = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        u = self.mix_control_inputs(rcout)
         dt = time[1] - time[0]
 
         k = int(np.round(0.1 / dt))  # k-step ahead prediction
-        x_sim = np.zeros((x_all.shape))
-        x_sim[:k, :] = np.copy(x_all[:k, :])
+        x_sim = np.zeros((x_all.shape[0],6))
+        x_sim[:k, :3] = np.copy(x_all[:k, :3])
+        x_sim[:k, 3:] = np.copy(x_all[:k, 10:])
+        x_pos_temp = np.empty((1,6))
 
         # Simulate model performance:
         for ii, t in enumerate(time):
             if ii + k >= len(time):
                 break
             x_temp = x_all[ii, :]
+            x_pos_temp[0, :3] = x_all[ii, :3]
+            x_pos_temp[0, 3:] = x_all[ii, 10:]
 
             for jj in range(k):
-                x_temp = x_temp + self.predict_full_RHS(x_temp, u[ii + jj, :]) * dt
+                x_temp = np.concatenate((x_pos_temp[0,:3], x_all[ii+jj,3:7], x_pos_temp[0,3:], x_all[ii+jj,10:]))
+                x_pos_temp = x_pos_temp + self.predict_full_RHS(x_temp, force[ii+jj,:])*dt
                 x_temp[3:7] = x_temp[3:7] / np.linalg.norm(x_temp[3:7])  # Normalize quaternion
-            x_sim[ii + k, :] = x_temp
-            # print(x_temp)
+            x_sim[ii + k, :] = x_pos_temp
+
 
         fig, axs = plt.subplots(3, 1)
-        axs[0].plot(time, x_all[:, 0], time, x_sim[:, 0])
-        # axs[0].set_xlim(0, 2)
-        axs[0].set_xlabel('time')
-        axs[0].set_ylabel('x')
+        axs[0].plot(time, x_sim[:, 0]-x_all[:,0], label="Prediction")
+        axs[0].set_xlabel('time (sec)')
+        axs[0].set_ylabel('x (m)')
         axs[0].grid(True)
-        axs[1].plot(time, x_all[:, 1], time, x_sim[:, 1])
-        # axs[0].set_xlim(0, 2)
-        axs[1].set_xlabel('time')
-        axs[1].set_ylabel('y')
+        axs[0].set_title("Tracking error, predicted VS true trajectory")
+        axs[1].plot(time, x_sim[:,1]-x_all[:, 1])
+        axs[1].set_xlabel('time (sec)')
+        axs[1].set_ylabel('y (m)')
         axs[1].grid(True)
-        axs[2].plot(time, x_all[:, 2], time, x_sim[:, 2])
-        # axs[0].set_xlim(0, 2)
-        axs[2].set_xlabel('time')
-        axs[2].set_ylabel('z')
+        axs[2].plot(time, x_all[:, 2]-x_sim[:,2])
+        axs[2].set_xlabel('time (sec)')
+        axs[2].set_ylabel('z (m)')
         axs[2].grid(True)
         plt.savefig(figure_path + "positions_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-
-        fig, axs = plt.subplots(4, 1)
-        axs[0].plot(time, x_all[:, 3], time, x_sim[:, 3])
-        # axs[0].set_xlim(0, 2)
-        axs[0].set_xlabel('time')
-        axs[0].set_ylabel('qw')
-        axs[0].grid(True)
-        axs[1].plot(time, x_all[:, 4], time, x_sim[:, 4])
-        # axs[0].set_xlim(0, 2)
-        axs[1].set_xlabel('time')
-        axs[1].set_ylabel('qx')
-        axs[1].grid(True)
-        axs[2].plot(time, x_all[:, 5], time, x_sim[:, 5])
-        # axs[0].set_xlim(0, 2)
-        axs[2].set_xlabel('time')
-        axs[2].set_ylabel('qy')
-        axs[2].grid(True)
-        axs[3].plot(time, x_all[:, 6], time, x_sim[:, 6])
-        # axs[0].set_xlim(0, 2)
-        axs[3].set_xlabel('time')
-        axs[3].set_ylabel('qz')
-        axs[3].grid(True)
-        plt.savefig(figure_path + "quaternions_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         x_err = mean_squared_error(x_all[:, 0], x_sim[:, 0])
         y_err = mean_squared_error(x_all[:, 1], x_sim[:, 1])
         z_err = mean_squared_error(x_all[:, 2], x_sim[:, 2])
-        qw_err = mean_squared_error(x_all[:, 3], x_sim[:, 3])
-        qx_err = mean_squared_error(x_all[:, 4], x_sim[:, 4])
-        qy_err = mean_squared_error(x_all[:, 5], x_sim[:, 5])
-        qz_err = mean_squared_error(x_all[:, 6], x_sim[:, 6])
         print("MSE x: ", x_err)
         print("MSE y: ", y_err)
         print("MSE z: ", z_err)
-        print("MSE qw: ", qw_err)
-        print("MSE qx: ", qx_err)
-        print("MSE qy: ", qy_err)
-        print("MSE qz: ", qz_err)

@@ -40,25 +40,24 @@ class learnNominalModel(QuadrotorModel):
             exit("Data format should be 'rosbag' or 'csv'")
 
         x_full = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        x_learn = np.concatenate((linvel, angvel), axis=1)
+        x_learn = linvel
 
         dt = time[1] - time[0]
-        xdot_learn = derivative(x_learn,dt)
+        pdot = derivative(x_learn,dt).reshape(-1,1)
 
         theta_xdt, theta_ydt, theta_zdt = self.create_observables(x_full, force)
 
         #Concatenate theta and xdot for position states to learn single coefficient for pos states
         theta_p = np.concatenate((theta_xdt, theta_ydt, theta_zdt), axis=0).reshape(-1,1)
-        pdot = np.concatenate((xdot_learn[:,0], xdot_learn[:,1], xdot_learn[:,2]), axis=0).reshape(-1,1)
+
 
         self.estimator_pdt = sp.sindy(l2=0.0, solver='lstsq')
         self.estimator_pdt.fit(theta_p, pdot)
-        print(self.estimator_pdt.coef_)
 
     def create_observables(self, X, u):
-        theta_xdt = u[0]
-        theta_ydt = u[1]
-        theta_zdt = -self.hover_throttle + u[2]
+        theta_xdt = u[:,0]
+        theta_ydt = u[:,1]
+        theta_zdt = -self.hover_throttle + u[:,2]
         return theta_xdt, theta_ydt, theta_zdt
 
     def predict_full_RHS(self, X, u):
@@ -66,7 +65,7 @@ class learnNominalModel(QuadrotorModel):
             X = X.reshape((1,-1))
             u = u.reshape((1,-1))
 
-        theta_xdt, theta_ydt, theta_zdt, theta_omg_x, theta_omg_y, theta_omg_z = self.create_observables(X, u)
+        theta_xdt, theta_ydt, theta_zdt = self.create_observables(X, u)
 
         xdot = np.concatenate((self.estimator_pdt.predict(theta_xdt),
                                 self.estimator_pdt.predict(theta_ydt),
@@ -75,6 +74,7 @@ class learnNominalModel(QuadrotorModel):
         return np.concatenate((self.get_kinematics(np.transpose(X)), xdot.reshape(1,-1)), axis=1)
 
     def get_dynamics_matrices(self, X):
+        #TODO: Not implemented for force-based model
         if len(X.shape) == 1:
             X = X.reshape((1,-1))
 

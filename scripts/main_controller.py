@@ -13,7 +13,7 @@ import math
 # ROS 
 import rospy
 import roslib
-from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, TwistStamped
+from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
 from visualization_msgs.msg import Marker
 
@@ -51,6 +51,7 @@ class Robot():
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
         self.omg_d = namedtuple("omg_d", "x y z")
+        self.f_d = namedtuple("f_d", "x y z") #Variable used to publish desired force commands
 
         self.main_loop_rate = 60
 
@@ -60,10 +61,11 @@ class Robot():
                                                                  use_learned_model=self.use_learned_model)
         self.msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
+        self.force_msg = Vector3Stamped()
 
         #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
 
-    def gotopoint(self,p_init, p_final, tduration,file_csv):
+    def gotopoint(self,p_init, p_final, tduration,file_csv=""):
         """
         Go to p_final
         """
@@ -83,7 +85,10 @@ class Robot():
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
-            self.save_csv()
+            if len(self.file) >= 1:
+                self.save_csv()
+            self.create_force_msg(stamp=rospy.Time.now())
+            self.pub_force.publish(self.force_msg)
             self.rate.sleep()
 
     def load_model(self,model_file_name):
@@ -103,6 +108,7 @@ class Robot():
     def init_ROS(self):
         self.pub_sp = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.pub_traj = rospy.Publisher('/mavros/setpoint_raw/trajectory', PoseStamped, queue_size=10)
+        self.pub_force = rospy.Publisher('/bintel/desired_force', Vector3Stamped, queue_size=10)
 
         
         rospy.init_node('controller_bintel', anonymous=True)
@@ -144,12 +150,13 @@ class Robot():
         self.p_d = p_d
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
-        T_d, q_d, omg_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
+        T_d, q_d, omg_d, f_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d,
                                                                   ddyaw_d=ddyaw_d, u=self.u_current)
         self.T_d = T_d
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
         self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d
+        self.f_d = f_d
 
     def create_attitude_msg(self, stamp):
         ## Set the header
@@ -169,6 +176,16 @@ class Robot():
         ## Set message content
         self.traj_msg.pose.position = Vector3(x=x, y=y, z=z)
         self.traj_msg.pose.orientation = Quaternion(x=0., y=0., z=0., w=1.)
+
+    def create_force_msg(self, stamp):
+        ## Set the header
+        self.force_msg.header.stamp = stamp
+        self.force_msg.header.frame_id = '/map'
+
+        ## Set message content
+        self.force_msg.vector.x = self.f_d.x
+        self.force_msg.vector.y = self.f_d.y
+        self.force_msg.vector.z = self.f_d.z
 
     def exp_traj(self, t, t0, tf, x0, xf):
         """ Exponential trajectory generator. See Giri Subramanian's thesis for details.
