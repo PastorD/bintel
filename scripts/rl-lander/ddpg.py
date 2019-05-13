@@ -91,7 +91,7 @@ class RL_Controller():
     
     def train_rl(self):
         # Train based on replay buffer
-        minibatch_size = 64
+        minibatch_size = 128
         if self.rl_buffer.count > 5*minibatch_size:
             self.learner.train(self.rl_buffer, minibatch_size) #Train
 

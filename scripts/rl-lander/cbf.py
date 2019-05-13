@@ -26,15 +26,15 @@ class Barrier():
         self.P[N,N] = 1e20
         self.P = matrix(self.P, tc='d')
         self.q = matrix(np.zeros(N+1))
-        self.eta = 5.
+        self.eta = 4.
         
         #eta*z - zdot >= 0,  eta*z + zdot >= 0     
         self.H1 = np.array([self.eta, -1])
         self.H2 = np.array([self.eta, 1])
-        self.F = 0.
+        self.F = 0.1
 
         # Define gamma parameter [0,1] for CBF  
-        self.gamma = 0.8
+        self.gamma = 0.5
 
     # Get compensatory action based on satisfaction of barrier function
     # (must be modified to be used with higher state/action dimensions)
