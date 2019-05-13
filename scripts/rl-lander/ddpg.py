@@ -68,7 +68,7 @@ class RL_Controller():
             self.rate.sleep()
 
     def output_command(self, s, a_prior):
-        l_mix = 5.
+        l_mix = 8.
         a = self.learner.actor.predict(s) + self.learner.actor_noise()
         return a/(1+l_mix) + l_mix*a_prior/(1+l_mix)
 
@@ -91,8 +91,8 @@ class RL_Controller():
     
     def train_rl(self):
         # Train based on replay buffer
-        minibatch_size = 128
-        if self.rl_buffer.count > 5*minibatch_size:
+        minibatch_size = 512
+        if self.rl_buffer.count > 2*minibatch_size:
             self.learner.train(self.rl_buffer, minibatch_size) #Train
 
     """
