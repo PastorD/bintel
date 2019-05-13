@@ -43,7 +43,7 @@ class RL_Controller():
 
         #Initialize safety filter (barrier function)
         a_max = 1.
-        a_min = 0.
+        a_min = -1.
         self.cbf = Barrier(state_dim, action_dim, a_max, a_min)
 
         # Initialize variables storing current data from environment
@@ -73,25 +73,25 @@ class RL_Controller():
         return a/(1+l_mix) + l_mix*a_prior/(1+l_mix)
 
     def safety_filter(self, s, a):
-        x = s
         # f = np.zeros(2)
         # g = np.zeros(2)
         [f, g, x] = self.get_dynamics(s)
         u_bar = self.cbf.control_barrier(a, f, g, x) 
         return a + u_bar
 
-    def get_dynamics(s):
-        G = 9.81
-        m = 0.56/9.81
+    def get_dynamics(self, s):
+        T = 1./60  # Sampling Frequency
+        G = 0.   # Gravity
+        m = 0.56/9.81   # Scaled mass
         s = np.squeeze(s)
-        f = np.array([s[1], -G])
-        g = np.array([0, 1/m])
+        f = np.array([s[0] + s[1]*T, s[1] - G*T])
+        g = np.array([T**2/(2*m), T/m])
         return [f, g, s]
         
     
     def train_rl(self):
         # Train based on replay buffer
-        minibatch_size = 64
+        minibatch_size = 128
         if self.rl_buffer.count > 5*minibatch_size:
             self.learner.train(self.rl_buffer, minibatch_size) #Train
 

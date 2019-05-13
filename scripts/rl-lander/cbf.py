@@ -26,12 +26,12 @@ class Barrier():
         self.P[N,N] = 1e20
         self.P = matrix(self.P, tc='d')
         self.q = matrix(np.zeros(N+1))
-        self.eta = 2.
+        self.eta = 4.
         
         #eta*z - zdot >= 0,  eta*z + zdot >= 0     
         self.H1 = np.array([self.eta, -1])
         self.H2 = np.array([self.eta, 1])
-        self.F = 0.
+        self.F = 0.1
 
         # Define gamma parameter [0,1] for CBF  
         self.gamma = 0.5
@@ -48,7 +48,7 @@ class Barrier():
         # Pre-process array dimensions
         f, g, x = np.squeeze(f), np.squeeze(g), np.squeeze(x)
         
-        # Solve the barrier function inequality:- H'gu < p'f - (1-gamma)*p'x + gamma*q + p'd
+        # Solve the barrier function inequality: -p'gu < p'f - (1-gamma)*p'x + gamma*q + p'd
         lhs = np.array([[-np.dot(self.H1,g), -np.dot(self.H2,g), 1, -1], [-1, -1, 0, 0]])
         lhs = np.transpose(lhs)
         rhs = np.array([gamma_b*self.F + np.dot(self.H1,f) + np.dot(self.H1,g)*u_rl - (1-gamma_b)*np.dot(self.H1,x) + np.dot(self.H1, mu) - kd*np.dot(np.abs(self.H1),std),
@@ -64,6 +64,9 @@ class Barrier():
         solvers.options['show_progress'] = False
         sol = solvers.qp(self.P, self.q, lhs, rhs)
         u_bar = sol['x']
+
+        if (np.abs(u_bar[0]) > 0.2):
+            print("CBF Active")
         if np.abs(u_bar[1]) > 0.001:
             print("Violation of Safety: ")
             print(u_bar[1])
