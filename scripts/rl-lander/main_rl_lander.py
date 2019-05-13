@@ -92,11 +92,12 @@ class RL_lander():
     def run_episode(self):
         cum_reward = 0.
         self.end_of_ep = False
+        #print("Waiting for RL commands...")
+        #while rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05:
+         #   pass
+
+        print("Running episode...")
         for t in range(self.ep_length):
-            print("Waiting for RL commands...")
-            while rospy.Duration.from_sec(rospy.get_time()-self.t_last_rl_msg.to_sec()).to_sec() > 0.05:
-                pass
-            print("Running episode...")
             self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
@@ -126,10 +127,20 @@ class RL_lander():
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
     def calc_reward(self):
-        if self.p.z < self.land_threshold:
-            self.cur_reward = -self.p.z + 1.0*self.v.z # Penalize negative velocity
-        else:
-            self.cur_reward = -self.p.z
+        reward_type = 1 #Specifies which  reward to use
+
+        if reward_type == 1:
+            if self.p.z < self.land_threshold:
+                self.cur_reward = -self.p.z + 1.0*self.v.z # Penalize negative velocity
+            else:
+                self.cur_reward = -self.p.z
+        elif reward_type == 2:
+            if self.p.z < self.land_threshold:
+                self.cur_reward = -1. + 1.0*self.v.z # Penalize negative velocity
+            else:
+                self.cur_reward = -1.
+        elif reward_type == 3:
+            self.cur_reward = -self.p.z + 1.0*self.v.z/self.p.z # Penalize negative velocity
 
     def reset_position(self):
         # Arm the drone
@@ -145,11 +156,11 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
-
-        while not rospy.is_shutdown() and np.linalg.norm(
+        while not rospy.is_shutdown() and (np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
-                          self.p_init.z - self.p.z])) > 0.05:
+                          self.p_init.z - self.p.z])) > 0.05 or \
+                          rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
             result_mode = change_mode(0, "OFFBOARD")
             self.pub_posmsg.publish(self.waypoint)
             self.rate.sleep()
