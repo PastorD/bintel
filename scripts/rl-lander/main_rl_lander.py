@@ -127,7 +127,7 @@ class RL_lander():
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
     def calc_reward(self):
-        reward_type = 1 #Specifies which  reward to use
+        reward_type = 5 #Specifies which  reward to use
 
         if reward_type == 1:
             if self.p.z < self.land_threshold:
@@ -141,6 +141,12 @@ class RL_lander():
                 self.cur_reward = -1.
         elif reward_type == 3:
             self.cur_reward = -self.p.z + 1.0*self.v.z/self.p.z # Penalize negative velocity
+        elif reward_type == 4:
+            d = 2.
+            self.cur_reward = max(-d, -d*abs(self.v.z)/self.p.z - d*self.p.z) # Penalize negative velocity
+        elif reward_type == 5:
+            d = 0.5
+            self.cur_reward = min(-10*d*self.p.z, -d*abs(self.v.z)/self.p.z - 5*d*self.p.z) # Penalize negative velocity
 
     def reset_position(self):
         # Arm the drone
