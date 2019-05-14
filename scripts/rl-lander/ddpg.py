@@ -40,7 +40,8 @@ class RL_Controller():
         gamma, tau = 0.99, 0.001
         minibatch_size = 100
         self.learner = Learner(sess, 0., state_dim, action_dim, action_bound, actor_lr, critic_lr, tau, gamma, minibatch_size)
-
+        self.l_mix = 1000.
+        
         #Initialize safety filter (barrier function)
         a_max = 1.
         a_min = -1.
@@ -68,16 +69,15 @@ class RL_Controller():
             self.rate.sleep()
 
     def output_command(self, s, a_prior):
-        l_mix = 8.
         a = self.learner.actor.predict(s) + self.learner.actor_noise()
-        return a/(1+l_mix) + l_mix*a_prior/(1+l_mix)
+        return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
 
     def safety_filter(self, s, a):
         # f = np.zeros(2)
         # g = np.zeros(2)
         [f, g, x] = self.get_dynamics(s)
         u_bar = self.cbf.control_barrier(a, f, g, x) 
-        return a + u_bar
+        return a + u_bar, u_bar
 
     def get_dynamics(self, s):
         T = 1./60  # Sampling Frequency
@@ -123,8 +123,11 @@ class RL_Controller():
         
         # Add to replay buffer
         s = np.array([self.z, self.zdot])  # TODO: Set s to be state at one timestep back
-        a = self.learner.actor.predict(s[np.newaxis,:])
 
+        #
+        a_s = np.squeeze(dep_thrust) - self.l_mix*np.squeeze(self.a_prior)/(1+self.l_mix)
+        a = (self.l_mix + 1)*a_s
+        
         s2 = np.array([z, zdot])
         #self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
         self.rl_buffer.add(s, a, cur_reward, t, s2)
@@ -143,7 +146,7 @@ class RL_Controller():
         s = np.array([[self.z, self.zdot]])
         a_rl = self.output_command(s, self.a_prior)
         ## Use cbf to filter output
-        self.rl_command_msg.thrust = self.safety_filter(s, a_rl)
+        self.rl_command_msg.thrust, _ = self.safety_filter(s, a_rl)
         #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
 
 

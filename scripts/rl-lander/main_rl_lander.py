@@ -107,7 +107,7 @@ class RL_lander():
             self.rate.sleep()
 
             cum_reward += self.cur_reward
-            if self.p.z < 0.01:
+            if self.p.z < 0.03:
                 break
 
         # Publish final message with end_of_ep flag set to true
