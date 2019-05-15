@@ -59,6 +59,8 @@ class RL_Controller():
     def run_experiment(self):
         last_ep = 0
         training_interval = 60
+        if (self.l_mix > 0.8):
+            self.l_mix = self.l_mix/1.05
         for ep in range(self.n_ep): #TODO: Define number of iterations
             self.create_rl_command_msg(stamp=rospy.Time.now())
             self.pub.publish(self.rl_command_msg)
