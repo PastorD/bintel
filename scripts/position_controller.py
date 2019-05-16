@@ -17,9 +17,10 @@ class PositionController():
         self.max_pitch_roll = math.pi/3
         self.use_learned_model = use_learned_model
 
-        use_lqr_gains = False
+        use_lqr_gains = True
         if (use_lqr_gains):
             self.K = sio.loadmat("scripts/lqr_gains_nominal.mat")["K"]
+            self.K /= 5.
         else:
             lam = math.sqrt(1.2/3*9.81/.7)
             lam_xy = math.sqrt(0.6/3*9.81/.7)
@@ -38,30 +39,28 @@ class PositionController():
             self.K[2, 2] = K_p_z
             self.K[2, 5] = K_d_z
 
-            self.K *= 2.
-
-    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
-        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
+        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
         T_d = self.get_thrust(f_d)
         q_d = self.get_attitude(f_d, yaw_d)
         omg_d = 0., 0., 0.
 
-        return T_d, q_d, omg_d
+        return T_d, q_d, omg_d, f_d
 
-    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
+    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         a_d = np.array([a_d.x, a_d.y, a_d.z])
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
         e_v = np.array([v.x - v_d.x, v.y - v_d.y, v.z - v_d.z])
         yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
         dyaw = omg.z
         e = np.concatenate((e_p, e_v)).reshape(-1, 1)
-
         f_d = namedtuple("f_d", "x y z")
-        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)/5.0 + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
-                                                                                   self.model.nom_model.g)
+        f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e) + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
+                                                                                    self.model.nom_model.g)
         if self.use_learned_model:
+            print("Warning: Functionality not tested for PD position controller")
             x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
-            f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
+            f_a = self.model.get_f_a(x)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
             f_d.x -= f_a[0, 0]
             f_d.y -= f_a[0, 1]
             f_d.z -= f_a[0, 2]
@@ -72,7 +71,7 @@ class PositionController():
 
         return f_d_achievable
     
-    def project_force_achievable (self, f_d):
+    def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
         try:
             if math.isnan(self.max_pitch_roll):
@@ -98,8 +97,8 @@ class PositionController():
             #print('Thrust clipping: soncone {}, s_onphere {}'.format(s_oncone, s_onsphere))
             f_d_ach.x = f_d.x*s
             f_d_ach.y = f_d.y*s
-            f_d_ach.z = f_d.z*s 
-            
+            f_d_ach.z = f_d.z*s
+
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")

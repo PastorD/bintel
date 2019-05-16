@@ -1,0 +1,72 @@
+!!python/object:learn_nominal_model_force.learnNominalModel
+dataOrigin: Experimental Data/sitl_force_9may19/force_test.bag
+data_path: Experimental Data/sitl_force_9may19/force_nom_training.bag
+estimator_pdt: !!python/object:sklearn.linear_model.base.LinearRegression
+  _residues: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - &id001 !!python/name:numpy.ndarray ''
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 1
+    - &id002 !!python/object/apply:numpy.dtype
+      args:
+      - f8
+      - 0
+      - 1
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - false
+    - !!binary |
+      /E5Nl4CDxEA=
+  _sklearn_version: 0.20.3
+  coef_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 1
+      - 1
+    - *id002
+    - false
+    - !!binary |
+      +fECPkEHKkA=
+  copy_X: true
+  fit_intercept: false
+  intercept_: 0.0
+  n_jobs: null
+  normalize: false
+  rank_: 1
+  singular_: !!python/object/apply:numpy.core.multiarray._reconstruct
+    args:
+    - *id001
+    - !!python/tuple
+      - 0
+    - b
+    state: !!python/tuple
+    - 1
+    - !!python/tuple
+      - 1
+    - *id002
+    - false
+    - !!binary |
+      efOjmjUdFUA=
+fit_type: lstsq
+g: 9.81
+hover_throttle: 0.564
+is_simulation: true
+testfraction: 0.2
