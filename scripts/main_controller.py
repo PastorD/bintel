@@ -8,6 +8,7 @@ import position_controller
 import numpy as np
 import exceptions
 import math
+import yaml
 
 
 # ROS 
@@ -25,6 +26,15 @@ from dynamics import goto_optitrack
 # Project
 from learn_full_model import learnFullModel
 from learn_nominal_model import learnNominalModel
+
+class Boundary():
+    def __init__(self,data):
+        self.xmin = data['boundary']['xmin']
+        self.xmax = data['boundary']['xmax']
+        self.ymin = data['boundary']['ymin']
+        self.ymax = data['boundary']['ymax']
+        self.zmin = data['boundary']['zmin']
+        self.zmax = data['boundary']['zmax']
 
 
 class Robot():
@@ -57,6 +67,9 @@ class Robot():
 
         self.main_loop_rate = 60
 
+        data = self.load_config('scripts/boundary.yaml')
+        self.boundary = Boundary(data)
+
         self.model = self.load_model(self.model_file_name)
         self.init_ROS()
         self.controller = position_controller.PositionController(model=self.model, rate=self.main_loop_rate,
@@ -80,18 +93,41 @@ class Robot():
 
         self.t0 = rospy.get_time()
 
-        while not rospy.is_shutdown() and np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.2:
+        while (not rospy.is_shutdown() \
+               and not self.reached_waypoint() \
+               and self.inside_boundary()):
+
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
-            self.desired_path_pub.publish(self.desired_path)
+            #self.desired_path_pub.publish(self.desired_path)
             if not self.file == "":
                 self.save_csv()
             self.create_force_msg(stamp=rospy.Time.now())
             self.pub_force.publish(self.force_msg)
 
             self.rate.sleep()
+
+    def load_config(self,config_file):
+        with open(config_file, 'r') as f:
+            config = yaml.load(f)
+
+        return config
+
+    def reached_waypoint(self):
+        return np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.2
+
+    def inside_boundary(self):
+        if( self.p.x < self.boundary.xmin or 
+                self.p.y < self.boundary.ymin or 
+                self.p.z < self.boundary.zmin or 
+                self.p.x > self.boundary.xmax or 
+                self.p.y > self.boundary.ymax or 
+                self.p.z > self.boundary.zmax ):
+            return False
+        else:
+            return True
 
     def load_model(self,model_file_name):
         with open(model_file_name, 'r') as stream:
