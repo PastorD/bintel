@@ -66,6 +66,7 @@ class RL_lander():
         self.cur_reward = 0.
         self.land_threshold = 0.075
         self.end_of_ep = False
+        self.safety_intervention = 0.
 
         # Initialize arrays to save episodic state and control values
         self.ep_length = ep_length
@@ -149,9 +150,10 @@ class RL_lander():
             self.cur_reward = min(-10*d*self.p.z, -d*abs(self.v.z)/self.p.z - 5*d*self.p.z) # Penalize negative velocity
         elif reward_type == 6:
             d = 20
-            h_alt = 0.05 #Hover altitude
+            h_alt = self.p_final.z #Hover altitude
             v_c = 0.5 #Max landing velocity
-            self.cur_reward = min(-d -d*abs(abs(self.p.z) - h_alt), -d -d*abs(abs(self.p.z) - h_alt) -(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
+            self.cur_reward = min(-1 -abs(abs(self.p.z) - h_alt) - self.safety_intervention, -1 -abs(abs(self.p.z) - h_alt)
+                                  -self.safety_intervention -0.2*(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
         elif reward_type == 7:
             T = 20 # Time penalty
             d = 20 # Scaling factor
@@ -217,7 +219,9 @@ class RL_lander():
 
     def _read_rl_commands(self, data):
         self.T_RL = data.thrust
+        self.safety_intervention = data.body_rate.z
         self.t_last_rl_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
+
 
     def _read_velocity(self, data):
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
