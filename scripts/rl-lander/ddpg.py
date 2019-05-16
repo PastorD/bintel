@@ -40,7 +40,7 @@ class RL_Controller():
         gamma, tau = 0.99, 0.001
         minibatch_size = 100
         self.learner = Learner(sess, 0., state_dim, action_dim, action_bound, actor_lr, critic_lr, tau, gamma, minibatch_size)
-        self.l_mix = 1000.
+        self.l_mix = 5.
         
         #Initialize safety filter (barrier function)
         a_max = 1.
@@ -59,8 +59,8 @@ class RL_Controller():
     def run_experiment(self):
         last_ep = 0
         training_interval = 60
-        if (self.l_mix > 0.8):
-            self.l_mix = self.l_mix/1.05
+        #if (self.l_mix > 3):
+        #    self.l_mix = self.l_mix/1.05
         for ep in range(self.n_ep): #TODO: Define number of iterations
             self.create_rl_command_msg(stamp=rospy.Time.now())
             self.pub.publish(self.rl_command_msg)
@@ -148,7 +148,7 @@ class RL_Controller():
         s = np.array([[self.z, self.zdot]])
         a_rl = self.output_command(s, self.a_prior)
         ## Use cbf to filter output
-        self.rl_command_msg.thrust, _ = self.safety_filter(s, a_rl)
+        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
         #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
 
 

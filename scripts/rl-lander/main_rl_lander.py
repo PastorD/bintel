@@ -127,7 +127,7 @@ class RL_lander():
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
     def calc_reward(self):
-        reward_type = 7 #Specifies which  reward to use
+        reward_type = 6 #Specifies which  reward to use
 
         if reward_type == 1:
             if self.p.z < self.land_threshold:
