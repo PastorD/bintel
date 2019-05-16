@@ -43,7 +43,7 @@ class RL_lander():
         self.p_final = namedtuple("p_final", "x y z")
         self.v_d = namedtuple("v_d", "x y z")
         self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-        self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.
+        self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.05
         self.v_d.x, self.v_d.y, self.v_d.z = 0., 0., 0.
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
@@ -107,8 +107,8 @@ class RL_lander():
             self.rate.sleep()
 
             cum_reward += self.cur_reward
-            if self.p.z < 0.03:
-                break
+            #if self.p.z < 0.03:
+             #   break
 
         # Publish final message with end_of_ep flag set to true
         self.end_of_ep = True
@@ -127,7 +127,7 @@ class RL_lander():
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
     def calc_reward(self):
-        reward_type = 5 #Specifies which  reward to use
+        reward_type = 7 #Specifies which  reward to use
 
         if reward_type == 1:
             if self.p.z < self.land_threshold:
@@ -147,6 +147,22 @@ class RL_lander():
         elif reward_type == 5:
             d = 0.5
             self.cur_reward = min(-10*d*self.p.z, -d*abs(self.v.z)/self.p.z - 5*d*self.p.z) # Penalize negative velocity
+        elif reward_type == 6:
+            d = 20
+            h_alt = 0.05 #Hover altitude
+            v_c = 0.5 #Max landing velocity
+            self.cur_reward = min(-d -d*abs(abs(self.p.z) - h_alt), -d -d*abs(abs(self.p.z) - h_alt) -(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
+        elif reward_type == 7:
+            T = 20 # Time penalty
+            d = 20 # Scaling factor
+            h_alt = self.p_final.z #Hover altitude
+            v_c = 0.5 #Max landing velocity
+
+            if abs(self.p.z-h_alt) <= 0.01: # Stop penalizing time if close enough to hover altitude
+                T = 0.
+
+            self.cur_reward = min(-T -d*abs(abs(self.p.z) - h_alt), -T -d*abs(abs(self.p.z) - h_alt) -(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
+
 
     def reset_position(self):
         # Arm the drone
@@ -165,7 +181,7 @@ class RL_lander():
         while not rospy.is_shutdown() and (np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
-                          self.p_init.z - self.p.z])) > 0.05 or \
+                          self.p_init.z - self.p.z])) > 0.1 or \
                           rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
             result_mode = change_mode(0, "OFFBOARD")
             self.pub_posmsg.publish(self.waypoint)
@@ -232,7 +248,7 @@ class RL_lander():
 
 if __name__ == '__main__':
     try:
-        lander = RL_lander(n_ep=200, ep_length=2000) #TODO: Decide n_ep, ep_length
+        lander = RL_lander(n_ep=200, ep_length=500) #TODO: Decide n_ep, ep_length
         lander.train_rl()
     except rospy.ROSInterruptException:
         pass
