@@ -192,7 +192,7 @@ class QuadrotorModel():
         from sklearn.metrics import mean_squared_error
 
         self.dataOrigin = dataFilename
-        self.testfraction = 0.2 #Amount of the test set to use (to reduce test time only)
+        self.testfraction = 0.1 #Amount of the test set to use (to reduce test time only)
         if (dataFormat == 'rosbag'):
             time, position, orientation, linvel, angvel, force = self.read_ROSBAG(dataFilename,
                                                                                   is_simulation=is_simulation)

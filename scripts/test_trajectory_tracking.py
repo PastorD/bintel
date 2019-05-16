@@ -14,7 +14,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 import rosbag
 
-from main_controller import Robot
+from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 

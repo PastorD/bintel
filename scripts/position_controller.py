@@ -39,15 +39,15 @@ class PositionController():
             self.K[2, 2] = K_p_z
             self.K[2, 5] = K_d_z
 
-    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
-        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u)
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
+        f_d = self.get_desired_force(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
         T_d = self.get_thrust(f_d)
         q_d = self.get_attitude(f_d, yaw_d)
         omg_d = 0., 0., 0.
 
         return T_d, q_d, omg_d, f_d
 
-    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d, u):
+    def get_desired_force(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         a_d = np.array([a_d.x, a_d.y, a_d.z])
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
         e_v = np.array([v.x - v_d.x, v.y - v_d.y, v.z - v_d.z])
@@ -58,8 +58,9 @@ class PositionController():
         f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e) + a_d.reshape((3,1))).flatten()*(self.model.nom_model.hover_throttle/
                                                                                     self.model.nom_model.g)
         if self.use_learned_model:
+            print("Warning: Functionality not tested for PD position controller")
             x = np.array([[p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z]])
-            f_a = self.model.get_f_a(x, u)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
+            f_a = self.model.get_f_a(x)*(self.model.nom_model.hover_throttle/self.model.nom_model.g)
             f_d.x -= f_a[0, 0]
             f_d.y -= f_a[0, 1]
             f_d.z -= f_a[0, 2]
@@ -70,7 +71,7 @@ class PositionController():
 
         return f_d_achievable
     
-    def project_force_achievable (self, f_d):
+    def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
         try:
             if math.isnan(self.max_pitch_roll):

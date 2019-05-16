@@ -46,20 +46,22 @@ class learnFullModel(QuadrotorModel):
             exit("Data format should be 'rosbag' or 'csv'")
 
         x_full = np.concatenate((position, orientation, linvel, angvel), axis=1)
-        pdot_residual = self.subtract_nom_model(x_full, force)
-
         dt = time[1] - time[0]
-        #pdot_residual = self.normalize_x(derivative(pdot_residual,dt))
-        pdot_residual = derivative(pdot_residual, dt)
+        vdot_residual = derivative(linvel,dt)
+        vdot_residual -= self.subtract_nom_model(x_full, force)
 
-        self.poly_lib = PolynomialFeatures(degree=3, include_bias=False) #TODO: Set include_bias to True if cvx regressor is used
+
+        #pdot_residual = self.normalize_x(derivative(pdot_residual,dt))
+        #pdot_residual = derivative(pdot_residual, dt)
+
+        self.poly_lib = PolynomialFeatures(degree=2, include_bias=True) #TODO: Set include_bias to True if cvx regressor is used
         Theta = self.create_observables(x_full, force)
         Theta = self.normalize_theta(Theta, prediction=False)
 
-        #self.estimator = sp.sindy(l1=1.0, solver='lasso')
-        self.estimator = Lasso(alpha = 1e-4, fit_intercept=True, normalize=True, max_iter=10000)
+        self.estimator = sp.sindy(l1=0.98, solver='lasso')
+        #self.estimator = Lasso(alpha = 1e-4, fit_intercept=True, normalize=True, max_iter=10000)
         print("Start training...")
-        self.estimator.fit(Theta, pdot_residual)
+        self.estimator.fit(Theta, vdot_residual)
         print("Finish training")
 
         #self.estimator.coef_ = np.divide(self.estimator.coef_, self.x_var)
@@ -73,7 +75,7 @@ class learnFullModel(QuadrotorModel):
         return Theta
 
     def subtract_nom_model(self, x, u):
-        return np.array([state[7:10]-self.nom_model.predict_full_RHS(state, ctrl)[:, 3:] for state, ctrl in zip(x,u)]).squeeze()
+        return np.array([-self.nom_model.predict_full_RHS(state, ctrl)[:, 3:] for state, ctrl in zip(x,u)]).squeeze()
 
     def predict_full_RHS(self, X, u):
         if len(X.shape) == 1 or len(u.shape) == 1:
@@ -89,28 +91,18 @@ class learnFullModel(QuadrotorModel):
 
     def get_f_a(self, x, u):
         #TODO: Not implemented for force-based model
-        Theta = self.create_observables(x, u)
+        pass
+
+    def get_dynamics_matrices(self, p, q, v, omg):
+        X = np.array([p.x, p.y, p.z, q.w, q.x, q.y, q.z, v.x, v.y, v.z, omg.x, omg.y, omg.z])
+        X = X.reshape(1, -1)
+
+        Theta = self.create_observables(X, np.ones((1,3)))
         Theta = self.normalize_theta(Theta, prediction=True)
-        return self.estimator.predict(Theta)[:, :3]
+        n_unactuated = int((Theta.shape[1])/4.0)
 
-    def get_dynamics_matrices(self, X):
-        #TODO: Not implemented for force-based model
-        if len(X.shape) == 1:
-            X = X.reshape((1,-1))
-
-        Theta = self.create_observables(X[:, 7:], np.ones((1,4)))
-        Theta = self.normalize_theta(Theta, prediction=True)
-        n_unactuated = int((Theta.shape[1])/5.0)
-
-        F_v = np.transpose(np.dot(Theta[:,:n_unactuated], self.estimator.coef_[:n_unactuated,:3]))
-        G_v = np.transpose(np.concatenate((np.dot(Theta[:, n_unactuated:2*n_unactuated], self.estimator.coef_[n_unactuated:2*n_unactuated, :3]),
-                                           np.dot(Theta[:, 2*n_unactuated:3*n_unactuated], self.estimator.coef_[2*n_unactuated:3*n_unactuated, :3]),
-                                           np.dot(Theta[:, 3*n_unactuated:4*n_unactuated], self.estimator.coef_[3*n_unactuated:4*n_unactx|uated, :3]),
-                                           np.dot(Theta[:, 4*n_unactuated:5*n_unactuated], self.estimator.coef_[4*n_unactuated:5*n_unactuated, :3])), axis=0))
-
-        F_omg = np.transpose(np.dot(Theta[:, :n_unactuated], self.estimator.coef_[:n_unactuated,3:]))
-        G_omg = np.transpose(np.concatenate((np.dot(Theta[:,n_unactuated:2*n_unactuated],self.estimator.coef_[n_unactuated:2*n_unactuated,3:]),
-                                             np.dot(Theta[:,2*n_unactuated:3*n_unactuated],self.estimator.coef_[2*n_unactuated:3*n_unactuated,3:]),
-                                             np.dot(Theta[:,3*n_unactuated:4*n_unactuated],self.estimator.coef_[3*n_unactuated:4*n_unactuated,3:]),
-                                             np.dot(Theta[:,4*n_unactuated:5*n_unactuated],self.estimator.coef_[4*n_unactuated:5*n_unactuated,3:])), axis=0))
-        return F_v.flatten(), G_v, F_omg.flatten(), G_omg
+        F_v = np.transpose(np.dot(Theta[:,:n_unactuated], self.estimator.coef_[:n_unactuated,:]))
+        G_v = np.transpose(np.concatenate((np.dot(Theta[:, n_unactuated:2*n_unactuated], self.estimator.coef_[n_unactuated:2*n_unactuated, :]),
+                                           np.dot(Theta[:, 2*n_unactuated:3*n_unactuated], self.estimator.coef_[2*n_unactuated:3*n_unactuated, :]),
+                                           np.dot(Theta[:, 3*n_unactuated:4*n_unactuated], self.estimator.coef_[3*n_unactuated:4*n_unactuated, :]),), axis=0))
+        return F_v.flatten(), G_v

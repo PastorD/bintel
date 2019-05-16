@@ -63,8 +63,6 @@ class Robot():
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
-        #TODO: Add test to check if modelfile is for simulation and local parameter is_for simulation (use try-except)
-
     def gotopoint(self,p_init, p_final, tduration,file_csv=""):
         """
         Go to p_final
@@ -85,7 +83,7 @@ class Robot():
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
-            if len(self.file) >= 1:
+            if not self.file == "":
                 self.save_csv()
             self.create_force_msg(stamp=rospy.Time.now())
             self.pub_force.publish(self.force_msg)
@@ -152,7 +150,7 @@ class Robot():
 
         T_d, q_d, omg_d, f_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
                                                                   p_d=p_d, v_d=v_d, a_d=a_d, yaw_d=yaw_d, dyaw_d=dyaw_d,
-                                                                  ddyaw_d=ddyaw_d, u=self.u_current)
+                                                                  ddyaw_d=ddyaw_d)
         self.T_d = T_d
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
         self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d

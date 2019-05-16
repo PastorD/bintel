@@ -26,6 +26,7 @@ class test_trajectory_tracking():
         self.duration_low = 1.
         self.duration_high = 8.
         self.n_waypoints = 100
+        self.train_nominal_model = True
 
         # Initialize robot
         bintel = Robot()
@@ -41,6 +42,11 @@ class test_trajectory_tracking():
             y = self.p_low[1] + (self.p_high[1] - self.p_low[1]) * np.random.rand()
             z = self.p_low[2] + (self.p_high[2] - self.p_low[2]) * np.random.rand()
             t = self.duration_low + (self.duration_high - self.duration_low) * np.random.rand()
+
+            if self.train_nominal_model:
+                x = 0.
+                y = 0.
+
             p_final = np.array([x, y, z])
             print("Waypoint ", experiment, ": ", p_final, ", duration: ", t)
             bintel.gotopoint(p_init, p_final, t)
