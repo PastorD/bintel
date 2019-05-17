@@ -4,7 +4,7 @@ trajectory:
   iterations: 5
   duration: 7.0
   points: 
-    - [0., 0., 1.]
+    - [0., 0., 1.5]
     - [1., 1., 2.]
 save_csv_file: True
 boundary: 
