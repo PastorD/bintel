@@ -109,6 +109,39 @@ class Robot():
 
             self.rate.sleep()
 
+    def constant_force(self,force,file_csv=""):
+        """
+        Publish a constant force
+        """
+        #Init
+        self.f_d = force
+        self.file = file_csv
+
+        yaw_d = 0.0
+        T_d = self.controller.get_thrust(self.f_d)
+        q_d = self.controller.get_attitude(self.f_d, yaw_d)
+        omg_d = 0., 0., 0.
+
+        self.T_d = T_d
+        self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
+        self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d
+        
+
+        while (not rospy.is_shutdown() \
+               and self.inside_boundary()):
+
+            self.create_attitude_msg(stamp=rospy.Time.now())
+            self.pub_sp.publish(self.msg)
+            self.pub_traj.publish(self.traj_msg)
+            #self.desired_path_pub.publish(self.desired_path)
+            if not self.file == "":
+                self.save_csv()
+            self.create_force_msg(stamp=rospy.Time.now())
+            self.pub_force.publish(self.force_msg)
+
+            self.rate.sleep()
+
+
     def load_config(self,config_file):
         with open(config_file, 'r') as f:
             config = yaml.load(f)

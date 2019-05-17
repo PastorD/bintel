@@ -21,12 +21,12 @@ from dynamics.goto_land import land
 class test_trajectory_tracking():
     def __init__(self):
 
-        self.p_low = np.array([-2., -2., 0.5])
-        self.p_high = np.array([2., 2., 2.])
+        self.p_low = np.array([-0.5., -.5., 0.5])
+        self.p_high = np.array([+0.5, +0.5, 0.8])
         self.duration_low = 1.
         self.duration_high = 8.
         self.n_waypoints = 100
-        self.train_nominal_model = True
+        self.train_nominal_model = False
 
         # Initialize robot
         bintel = Robot()
