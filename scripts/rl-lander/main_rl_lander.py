@@ -60,6 +60,8 @@ class RL_lander():
         # Initialize RL-related variables
         self.n_ep = n_ep
         self.save_ep_reward = np.empty(n_ep)
+        self.z_RL = 0.
+        self.zdot_RL = 0.
         self.T_RL = 0.
         self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
@@ -99,6 +101,8 @@ class RL_lander():
 
         print("Running episode...")
         for t in range(self.ep_length):
+            self.z_RL = self.p.z
+            self.zdot_RL = self.v.z
             self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
@@ -123,7 +127,12 @@ class RL_lander():
         print("Cumulative episode reward: ", cum_reward)
 
     def pd_attitude_ctrl(self):
-        self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
+        #Make sure state is consistent with what is sent to RL:
+        p = self.p
+        v = self.v
+        p.z = self.z_RL
+        v.z = self.zdot_RL
+        self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
                                                    p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
@@ -131,39 +140,39 @@ class RL_lander():
         reward_type = 6 #Specifies which  reward to use
 
         if reward_type == 1:
-            if self.p.z < self.land_threshold:
-                self.cur_reward = -self.p.z + 1.0*self.v.z # Penalize negative velocity
+            if self.z_RL < self.land_threshold:
+                self.cur_reward = -self.z_RL + 1.0*self.zdot_RL # Penalize negative velocity
             else:
-                self.cur_reward = -self.p.z
+                self.cur_reward = -self.z_RL
         elif reward_type == 2:
-            if self.p.z < self.land_threshold:
-                self.cur_reward = -1. + 1.0*self.v.z # Penalize negative velocity
+            if self.z_RL < self.land_threshold:
+                self.cur_reward = -1. + 1.0*self.zdot_RL # Penalize negative velocity
             else:
                 self.cur_reward = -1.
         elif reward_type == 3:
-            self.cur_reward = -self.p.z + 1.0*self.v.z/self.p.z # Penalize negative velocity
+            self.cur_reward = -self.z_RL + 1.0*self.zdot_RL/self.z_RL # Penalize negative velocity
         elif reward_type == 4:
             d = 2.
-            self.cur_reward = max(-d, -d*abs(self.v.z)/self.p.z - d*self.p.z) # Penalize negative velocity
+            self.cur_reward = max(-d, -d*abs(self.zdot_RL)/self.z_RL - d*self.z_RL) # Penalize negative velocity
         elif reward_type == 5:
             d = 0.5
-            self.cur_reward = min(-10*d*self.p.z, -d*abs(self.v.z)/self.p.z - 5*d*self.p.z) # Penalize negative velocity
+            self.cur_reward = min(-10*d*self.z_RL, -d*abs(self.zdot_RL)/self.z_RL - 5*d*self.z_RL) # Penalize negative velocity
         elif reward_type == 6:
             d = 20
             h_alt = self.p_final.z #Hover altitude
             v_c = 0.5 #Max landing velocity
-            self.cur_reward = min(-1 -abs(abs(self.p.z) - h_alt) - self.safety_intervention, -1 -abs(abs(self.p.z) - h_alt)
-                                  -self.safety_intervention -0.2*(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
+            self.cur_reward = min(-1 -abs(abs(self.z_RL) - h_alt) - self.safety_intervention, -1 -abs(abs(self.z_RL) - h_alt)
+                                  -self.safety_intervention -0.2*(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
         elif reward_type == 7:
             T = 20 # Time penalty
             d = 20 # Scaling factor
             h_alt = self.p_final.z #Hover altitude
             v_c = 0.5 #Max landing velocity
 
-            if abs(self.p.z-h_alt) <= 0.01: # Stop penalizing time if close enough to hover altitude
+            if abs(self.z_RL-h_alt) <= 0.01: # Stop penalizing time if close enough to hover altitude
                 T = 0.
 
-            self.cur_reward = min(-T -d*abs(abs(self.p.z) - h_alt), -T -d*abs(abs(self.p.z) - h_alt) -(abs(self.v.z) - v_c)/(self.p.z**2+0.1))
+            self.cur_reward = min(-T -d*abs(abs(self.z_RL) - h_alt), -T -d*abs(abs(self.z_RL) - h_alt) -(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
 
 
     def reset_position(self):
@@ -243,8 +252,8 @@ class RL_lander():
         self.rl_train_msg.header.frame_id = '/world'
 
         ## Set message content
-        self.rl_train_msg.pose.position.z = self.p.z
-        self.rl_train_msg.velocity.linear.z = self.v.z
+        self.rl_train_msg.pose.position.z = self.z_RL
+        self.rl_train_msg.velocity.linear.z = self.zdot_RL
         self.rl_train_msg.reward.data = self.cur_reward
         self.rl_train_msg.thrust.data = self.T_d
         self.rl_train_msg.prior.data = self.prior
