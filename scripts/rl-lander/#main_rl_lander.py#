@@ -151,8 +151,7 @@ class RL_lander():
             self.cur_reward = min(-10*d*self.z_RL, -d*abs(self.zdot_RL)/self.z_RL - 5*d*self.z_RL) # Penalize negative velocity
         elif reward_type == 6:
             d = 20
-            h_alt = self.p_final.z #Hover altitude
-            v_c = 0.5 #Max landing velocity
+            h_alt = self.p_final.z #Hover altitude            v_c = 0.5 #Max landing velocity
             self.cur_reward = min(-1 -abs(abs(self.z_RL) - h_alt) - self.safety_intervention, -1 -abs(abs(self.z_RL) - h_alt)
                                   -self.safety_intervention -0.2*(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
         elif reward_type == 7:

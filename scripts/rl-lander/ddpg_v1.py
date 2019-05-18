@@ -64,8 +64,10 @@ class RL_Controller():
         #if (self.l_mix > 3):
         #    self.l_mix = self.l_mix/1.05
         for ep in range(self.n_ep): #TODO: Define number of iterations
+            '''
             self.create_rl_command_msg(stamp=rospy.Time.now())  # Synchronize to state read
             self.pub.publish(self.rl_command_msg)
+            '''
             if ep-last_ep == training_interval:
                 last_ep = ep
                 self.train_rl()
@@ -143,6 +145,11 @@ class RL_Controller():
         self.act = a
         self.reward = cur_reward 
         self.prev_thrust = dep_thrust
+
+        # Publish new command after reading state
+        self.create_rl_command_msg(stamp=rospy.Time.now())  # Synchronize to state read                    
+        self.pub.publish(self.rl_command_msg)
+
 
     def create_rl_command_msg(self, stamp):
         ## Set the header
