@@ -103,7 +103,6 @@ class RL_lander():
             self.pub_rl.publish(self.rl_train_msg)
             self.rate.sleep()
 
-            print RL_received
             if RL_received:
                 cum_reward += self.cur_reward
             #if self.p.z < 0.03:
