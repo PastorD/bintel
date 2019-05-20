@@ -172,11 +172,11 @@ class RL_lander():
 
         elif reward_type == 8:
             if (self.z_RL < 0.3 and self.z_RL > -0.1):
-                self.cur_reward = -abs(self.z_RL-0.1) - abs(self.safety_intervention))
+                self.cur_reward = -abs(self.z_RL-0.1) - 3*abs(self.safety_intervention)
             elif (self.z_RL <= 0.0):
-                self.cur_reward = -0.2 - abs(self.safety_intervention))
+                self.cur_reward = -0.2 - 3*abs(self.safety_intervention)
             else:
-                self.cur_reward = -0.2 - abs(self.safety_intervention))
+                self.cur_reward = -0.2 - 3*abs(self.safety_intervention)
 
 
     def reset_position(self):

@@ -37,7 +37,7 @@ class RL_Controller():
         state_dim, action_dim = 2, 1
         action_bound = 1.0
         actor_lr, critic_lr = 0.0001, 0.0005
-        gamma, tau = 0.995, 0.0004
+        gamma, tau = 0.998, 0.0004
         self.minibatch_size = 512
         self.learner = Learner(sess, 0., state_dim, action_dim, action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
         self.l_mix = 10.
@@ -158,11 +158,11 @@ class RL_Controller():
 
         ## Set message content
         s = np.array([[self.z, self.zdot]])
-        #a_rl = self.output_command(s, self.a_prior)
         ## Use cbf to filter output
         self.rl_command_msg.body_rate.z = 0.
-        self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
-        #self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
+        #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
+        a_rl = self.output_command(s, self.a_prior)
+        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
 
 
 if __name__ == '__main__':

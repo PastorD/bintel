@@ -31,7 +31,7 @@ class Barrier():
         #eta*z - zdot >= 0,  eta*z + zdot >= 0     
         self.H1 = np.array([self.eta, 1])
         self.H2 = np.array([self.eta, 1])
-        self.F = 0.5
+        self.F = 0.05
 
         # Define gamma parameter [0,1] for CBF  
         self.gamma = 0.6

@@ -75,14 +75,15 @@ class ActorNetwork(object):
         self.num_trainable_vars = len(self.network_params) + len(self.target_network_params)
 
     def create_actor_network(self):
-        w_init = tflearn.initializations.uniform(minval=-0.1, maxval=0.1)
+        w_init = tflearn.initializations.uniform(minval=-0.02, maxval=0.02)
         inputs = tflearn.input_data(shape=[None, self.s_dim])
-        net = tflearn.fully_connected(inputs, 100, weights_init=w_init)
+        net = tflearn.fully_connected(inputs, 64, weights_init=w_init)
+        net = tflearn.dropout(net, 0.5)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
-        net = tflearn.fully_connected(net, 100, weights_init=w_init)
-        net = tflearn.layers.normalization.batch_normalization(net)
-        net = tflearn.activations.relu(net)
+        #net = tflearn.fully_connected(net, 100, weights_init=w_init)
+        #net = tflearn.layers.normalization.batch_normalization(net)
+        #net = tflearn.activations.relu(net)
         out = tflearn.fully_connected(
             net, self.a_dim, activation='tanh', weights_init=w_init)
         # Scale output to -action_bound to action_bound
@@ -162,14 +163,15 @@ class CriticNetwork(object):
     def create_critic_network(self):
         inputs = tflearn.input_data(shape=[None, self.s_dim])
         action = tflearn.input_data(shape=[None, self.a_dim])
-        net = tflearn.fully_connected(inputs, 100)
+        net = tflearn.fully_connected(inputs, 64)
+        net = tflearn.dropout(net, 0.5)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
 
         # Add the action tensor in the 2nd hidden layer
         # Use two temp layers to get the corresponding weights and biases
-        t1 = tflearn.fully_connected(net, 100)
-        t2 = tflearn.fully_connected(action, 100)
+        t1 = tflearn.fully_connected(net, 64)
+        t2 = tflearn.fully_connected(action, 64)
 
 
         net = tflearn.activation(
