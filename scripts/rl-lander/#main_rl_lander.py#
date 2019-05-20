@@ -95,7 +95,7 @@ class RL_lander():
         for t in range(self.ep_length):
             self.z_RL = self.p.z
             self.zdot_RL = self.v.z
-            RL_received = self.pd_attitude_ctrl()
+            self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
             self.calc_reward()
@@ -103,9 +103,7 @@ class RL_lander():
             self.pub_rl.publish(self.rl_train_msg)
             self.rate.sleep()
 
-            print RL_received
-            if RL_received:
-                cum_reward += self.cur_reward
+            cum_reward += self.cur_reward
             #if self.p.z < 0.03:
              #   break
 
@@ -126,12 +124,9 @@ class RL_lander():
         v = self.v
         p.z = self.z_RL
         v.z = self.zdot_RL
-        RL_received = rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() <= 0.05
         self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
-                                                   p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL, RL_received=RL_received)
+                                                   p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
-
-        return RL_received
 
     def calc_reward(self):
         reward_type = 8 #Specifies which  reward to use
@@ -156,8 +151,7 @@ class RL_lander():
             self.cur_reward = min(-10*d*self.z_RL, -d*abs(self.zdot_RL)/self.z_RL - 5*d*self.z_RL) # Penalize negative velocity
         elif reward_type == 6:
             d = 20
-            h_alt = self.p_final.z #Hover altitude
-            v_c = 0.5 #Max landing velocity
+            h_alt = self.p_final.z #Hover altitude            v_c = 0.5 #Max landing velocity
             self.cur_reward = min(-1 -abs(abs(self.z_RL) - h_alt) - self.safety_intervention, -1 -abs(abs(self.z_RL) - h_alt)
                                   -self.safety_intervention -0.2*(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
         elif reward_type == 7:
@@ -195,11 +189,11 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
-        while not rospy.is_shutdown() and np.linalg.norm(
+        while not rospy.is_shutdown() and (np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
-                          self.p_init.z - self.p.z])) > 0.1: # or \
-                          #rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
+                          self.p_init.z - self.p.z])) > 0.1 or \
+                          rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
             result_mode = change_mode(0, "OFFBOARD")
             self.pub_posmsg.publish(self.waypoint)
             self.rate.sleep()

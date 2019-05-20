@@ -77,10 +77,10 @@ class ActorNetwork(object):
     def create_actor_network(self):
         w_init = tflearn.initializations.uniform(minval=-0.1, maxval=0.1)
         inputs = tflearn.input_data(shape=[None, self.s_dim])
-        net = tflearn.fully_connected(inputs, 50, weights_init=w_init)
+        net = tflearn.fully_connected(inputs, 100, weights_init=w_init)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
-        net = tflearn.fully_connected(net, 40, weights_init=w_init)
+        net = tflearn.fully_connected(net, 100, weights_init=w_init)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
         out = tflearn.fully_connected(
@@ -162,14 +162,14 @@ class CriticNetwork(object):
     def create_critic_network(self):
         inputs = tflearn.input_data(shape=[None, self.s_dim])
         action = tflearn.input_data(shape=[None, self.a_dim])
-        net = tflearn.fully_connected(inputs, 50)
+        net = tflearn.fully_connected(inputs, 100)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
 
         # Add the action tensor in the 2nd hidden layer
         # Use two temp layers to get the corresponding weights and biases
-        t1 = tflearn.fully_connected(net, 40)
-        t2 = tflearn.fully_connected(action, 40)
+        t1 = tflearn.fully_connected(net, 100)
+        t2 = tflearn.fully_connected(action, 100)
 
 
         net = tflearn.activation(
@@ -211,7 +211,7 @@ class CriticNetwork(object):
 
 
 class OrnsteinUhlenbeckActionNoise:
-    def __init__(self, mu, sigma=0.3, theta=.15, dt=1e-2, x0=None):
+    def __init__(self, mu, sigma=0.2, theta=.1, dt=1e-2, x0=None):
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
