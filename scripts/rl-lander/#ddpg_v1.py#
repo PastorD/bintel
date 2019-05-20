@@ -158,11 +158,11 @@ class RL_Controller():
 
         ## Set message content
         s = np.array([[self.z, self.zdot]])
-        #a_rl = self.output_command(s, self.a_prior)
         ## Use cbf to filter output
         self.rl_command_msg.body_rate.z = 0.
-        self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
-        #self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
+        #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
+        a_rl = self.output_command(s, self.a_prior)
+        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
 
 
 if __name__ == '__main__':

@@ -43,9 +43,12 @@ class RLPosController:
             self.K[2, 2] = K_p_z
             self.K[2, 5] = K_d_z
 
-    def get_ctrl(self, p, q, v, omg, p_d, v_d, yaw_d=0., T_RL=0.):
+    def get_ctrl(self, p, q, v, omg, p_d, v_d, yaw_d=0., T_RL=0., RL_received=1):
         f_d, prior = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
-        T_d = self.get_thrust(f_d)
+        if RL_received:
+            T_d = self.get_thrust(f_d)
+        else:
+            T_d = self.get_thrust(f_d, prior)
         q_d = self.get_attitude(f_d, yaw_d)
 
         return T_d, q_d, prior
@@ -95,8 +98,11 @@ class RLPosController:
 
         return f_d, prior
 
-    def get_thrust(self, f_d):
-        return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
+    def get_thrust(self, f_d, prior=np.Inf):
+        if (prior == np.Inf):
+            return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
+        else:
+            return np.linalg.norm(np.array([f_d.x, f_d.y, prior]))
 
     def get_attitude(self, f_d, yaw_d):
         q_worldToYawed = tf.transformations.quaternion_from_euler(0,0,yaw_d, axes='rxyz')
