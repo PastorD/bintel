@@ -103,7 +103,7 @@ class RL_lander():
         for t in range(self.ep_length):
             self.z_RL = self.p.z
             self.zdot_RL = self.v.z
-            self.pd_attitude_ctrl()
+            RL_received = self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
             self.calc_reward()
@@ -111,7 +111,9 @@ class RL_lander():
             self.pub_rl.publish(self.rl_train_msg)
             self.rate.sleep()
 
-            cum_reward += self.cur_reward
+            print RL_received
+            if RL_received:
+                cum_reward += self.cur_reward
             #if self.p.z < 0.03:
              #   break
 
@@ -132,9 +134,12 @@ class RL_lander():
         v = self.v
         p.z = self.z_RL
         v.z = self.zdot_RL
+        RL_received = rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() <= 0.05
         self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
-                                                   p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL)
+                                                   p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL, RL_received=RL_received)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
+
+        return RL_received
 
     def calc_reward(self):
         reward_type = 6 #Specifies which  reward to use
@@ -189,11 +194,11 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
-        while not rospy.is_shutdown() and (np.linalg.norm(
+        while not rospy.is_shutdown() and np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
-                          self.p_init.z - self.p.z])) > 0.1 or \
-                          rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
+                          self.p_init.z - self.p.z])) > 0.1: # or \
+                          #rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
             result_mode = change_mode(0, "OFFBOARD")
             self.pub_posmsg.publish(self.waypoint)
             self.rate.sleep()
