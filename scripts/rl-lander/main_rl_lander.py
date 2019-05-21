@@ -21,6 +21,7 @@ from mavros import command
 # Import classes from other files
 from rl_pos_controller import RLPosController
 
+
 class RL_lander():
     """
     """
@@ -109,8 +110,8 @@ class RL_lander():
              #   break
 
         # Publish final message with end_of_ep flag set to true
-        self.end_of_ep = False  # True
-        self.pd_attitude_ctrl()
+        self.end_of_ep = False #True
+        RL_received = self.pd_attitude_ctrl()
         self.create_attitude_msg(stamp=rospy.Time.now())
         self.pub_attmsg.publish(self.msg)
         self.calc_reward()
@@ -171,12 +172,12 @@ class RL_lander():
             self.cur_reward = min(-T -d*abs(abs(self.z_RL) - h_alt), -T -d*abs(abs(self.z_RL) - h_alt) -(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
 
         elif reward_type == 8:
-            if (self.z_RL < 0.3 and self.z_RL > -0.1):
-                self.cur_reward = -abs(self.z_RL-0.1) - 3*abs(self.safety_intervention)
-            elif (self.z_RL <= 0.0):
-                self.cur_reward = -0.2 - 3*abs(self.safety_intervention)
+            if (self.z_RL < 0.3 and self.z_RL >= 0.06):
+                self.cur_reward = -abs(self.z_RL-0.1) #- 3*abs(self.safety_intervention)
+            elif (self.z_RL < 0.08):
+                self.cur_reward = -2*abs(self.z_RL-0.1) + min(self.zdot_RL, 0.)#- 3*abs(self.safety_intervention)
             else:
-                self.cur_reward = -0.2 - 3*abs(self.safety_intervention)
+                self.cur_reward = -0.2 #- 3*abs(self.safety_intervention)
 
 
     def reset_position(self):
@@ -259,7 +260,7 @@ class RL_lander():
         self.rl_train_msg.pose.position.z = self.z_RL
         self.rl_train_msg.velocity.linear.z = self.zdot_RL
         self.rl_train_msg.reward.data = self.cur_reward
-        self.rl_train_msg.thrust.data = self.T_d
+        self.rl_train_msg.thrust.data = self.T_RL
         self.rl_train_msg.prior.data = self.prior
         self.rl_train_msg.end_of_ep.data = self.end_of_ep
 

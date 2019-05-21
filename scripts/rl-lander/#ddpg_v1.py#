@@ -37,15 +37,15 @@ class RL_Controller():
         # Initialize learner
         sess = tf.Session()
         state_dim, action_dim = 2, 1
-        self.action_bound = 0.15
-        actor_lr, critic_lr = 0.0002, 0.001
-        gamma, tau = 0.998, 0.0005
+        self.action_bound = 0.1
+        actor_lr, critic_lr = 0.0001, 0.0005
+        gamma, tau = 0.998, 0.0004
         self.minibatch_size = 500
         self.learner = Learner(sess, 0., state_dim, action_dim, self.action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
         self.l_mix = 10.
         
         #Initialize safety filter (barrier function)
-        a_max = 0.44  # Saturation accounting for hover
+        a_max = 1
         a_min = -1.
         self.cbf = Barrier(state_dim, action_dim, a_max, a_min)
 

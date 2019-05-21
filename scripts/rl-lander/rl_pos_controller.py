@@ -61,7 +61,6 @@ class RLPosController:
         f_d = namedtuple("f_d", "x y z")
         f_d.x, f_d.y, f_d.z = (-np.dot(self.K, e)).flatten()*(self.hover_throttle/self.g)
         prior = f_d.z
-
         if not self.is_test_mode:
             f_d.z = T_RL #TODO: Check units of T_RL
 
@@ -89,6 +88,7 @@ class RLPosController:
             f_d.x = f_d.x*s
             f_d.y = f_d.y*s
             f_d.z = f_d.z*s + self.hover_throttle
+            prior = prior*s
         except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")

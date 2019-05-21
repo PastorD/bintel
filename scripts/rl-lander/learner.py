@@ -283,13 +283,21 @@ class Learner(object):
         #tflearn.is_training(True)
         
     # Training based on collected data
-    def train(self, replay_buffer, minibatch_size):
+    def train(self, replay_buffer_low, replay_buffer_mid, replay_buffer_high, minibatch_size):
         
         # Needed to enable BatchNorm
         #tflearn.is_training(True)
 
         #Sample a batch from the replay buffer            
-        s_batch, a_batch, r_batch, t_batch, s2_batch = replay_buffer.sample_batch(minibatch_size)
+        s_batch_l, a_batch_l, r_batch_l, t_batch_l, s2_batch_l = replay_buffer_low.sample_batch(minibatch_size/2)
+        s_batch_m, a_batch_m, r_batch_m, t_batch_m, s2_batch_m = replay_buffer_mid.sample_batch(minibatch_size/4)
+        s_batch_h, a_batch_h, r_batch_h, t_batch_h, s2_batch_h = replay_buffer_high.sample_batch(minibatch_size/4)
+
+        s_batch = np.concatenate((s_batch_l, s_batch_m, s_batch_h))
+        a_batch = np.concatenate((a_batch_l, a_batch_m, a_batch_h))
+        r_batch = np.concatenate((r_batch_l, r_batch_m, r_batch_h))
+        t_batch = np.concatenate((t_batch_l, t_batch_m, t_batch_h))
+        s2_batch = np.concatenate((s2_batch_l, s2_batch_m, s2_batch_h))
         
         # Calculate targets                                                                             
         target_q = self.critic.predict_target(s2_batch, self.actor.predict_target(s2_batch))
