@@ -49,8 +49,14 @@ class RL_lander():
         self.p_init = namedtuple("p_init", "x y z")
         self.p_final = namedtuple("p_final", "x y z")
         self.v_d = namedtuple("v_d", "x y z")
-        self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-        self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
+
+        if self.is_simulation:
+            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
+            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
+        else:
+            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
+            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.25
+
         self.v_d.x, self.v_d.y, self.v_d.z = 0., 0., 0.
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
@@ -231,10 +237,11 @@ class RL_lander():
             self.cur_reward = min(-T -d*abs(abs(self.z_RL) - h_alt), -T -d*abs(abs(self.z_RL) - h_alt) -(abs(self.zdot_RL) - v_c)/(self.z_RL**2+0.1))
 
         elif reward_type == 8:
-            if (self.z_RL < 0.3 and self.z_RL >= 0.06):
-                self.cur_reward = -abs(self.z_RL-0.1) #- 3*abs(self.safety_intervention)
-            elif (self.z_RL < 0.06):
-                self.cur_reward = -2*abs(self.z_RL-0.1) + min(self.zdot_RL, 0.)#- 3*abs(self.safety_intervention)
+            z_target = self.p_final.z
+            if (self.z_RL < z_target+0.2 and self.z_RL >= z_target-0.04):
+                self.cur_reward = -abs(self.z_RL-z_target) #- 3*abs(self.safety_intervention)
+            elif (self.z_RL < z_target-0.04):
+                self.cur_reward = -2*abs(self.z_RL-z_target) + min(self.zdot_RL, 0.)#- 3*abs(self.safety_intervention)
             else:
                 self.cur_reward = -0.2 #- 3*abs(self.safety_intervention)
 
