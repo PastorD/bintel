@@ -147,11 +147,11 @@ class RL_Controller():
         #self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
         #self.rl_buffer.add(s, a, cur_reward, t, s2)
         if (self.z <= 0.2):
-            self.rl_buffer_low.add(s, self.act, self.reward, t, s2, dep_thrust)
+            self.rl_buffer_low.add(s, self.act, self.reward, t, s2)
         elif (self.z > 0.2 and self.z < 0.8):
-            self.rl_buffer_mid.add(s, self.act, self.reward, t, s2, dep_thrust)
+            self.rl_buffer_mid.add(s, self.act, self.reward, t, s2)
         else:
-            self.rl_buffer_high.add(s, self.act, self.reward, t, s2, dep_thrust)
+            self.rl_buffer_high.add(s, self.act, self.reward, t, s2)
 
         #self.create_rl_command_msg(rospy.Time.now()) #TODO: Test if creating messages here allows "parallelization"
         #self.pub.publish(self.rl_command_msg)
