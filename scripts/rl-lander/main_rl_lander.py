@@ -195,7 +195,6 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
-        print(rospy.is_shutdown())
         while not rospy.is_shutdown() and np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
