@@ -17,6 +17,7 @@ from bintel_ros.msg import StateReward
 from mavros_msgs.srv import SetMode
 import mavros
 from mavros import command
+import message_filters
 
 # Import classes from other files
 from rl_pos_controller import RLPosController
@@ -66,10 +67,13 @@ class RL_lander():
         self.T_RL = 0.
         self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
+        self.t_last_msg_p = rospy.Time.now()
+        self.t_last_msg_v = rospy.Time.now()
         self.cur_reward = 0.
         self.land_threshold = 0.075
         self.end_of_ep = False
         self.safety_intervention = 0.
+        self.RL_received = False
 
         # Initialize arrays to save episodic state and control values
         self.ep_length = ep_length
@@ -88,29 +92,15 @@ class RL_lander():
     def run_episode(self):
         cum_reward = 0.
         self.end_of_ep = False
-        #print("Waiting for RL commands...")
-        #while rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05:
-         #   pass
 
         print("Running episode...")
         for t in range(self.ep_length):
-            self.z_RL = self.p.z
-            self.zdot_RL = self.v.z
-            RL_received = self.pd_attitude_ctrl()
-            self.create_attitude_msg(stamp=rospy.Time.now())
-            self.pub_attmsg.publish(self.msg)
-            self.calc_reward()
-            self.create_rl_train_message(stamp=rospy.Time.now())
-            self.pub_rl.publish(self.rl_train_msg)
+            if self.RL_received:
+                cum_reward += self.cur_reward
             self.rate.sleep()
 
-            if RL_received:
-                cum_reward += self.cur_reward
-            #if self.p.z < 0.03:
-             #   break
-
         # Publish final message with end_of_ep flag set to true
-        self.end_of_ep = False #True
+        self.end_of_ep = True
         RL_received = self.pd_attitude_ctrl()
         self.create_attitude_msg(stamp=rospy.Time.now())
         self.pub_attmsg.publish(self.msg)
@@ -127,11 +117,20 @@ class RL_lander():
         p.z = self.z_RL
         v.z = self.zdot_RL
         RL_received = rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() <= 0.05
-        self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
+        self.T_d, q_d = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
                                                    p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL, RL_received=RL_received)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
         return RL_received
+
+    def calc_control_prior(self):
+        #Make sure state is consistent with what is sent to RL:
+        p = self.p
+        v = self.v
+        p.z = self.z_RL
+        v.z = self.zdot_RL
+        self.prior = self.rl_pos_controller.get_prior(p=p, q=self.q, v=v, omg=self.omg,
+                                                   p_d=self.p_final, v_d=self.v_d)
 
     def calc_reward(self):
         reward_type = 8 #Specifies which  reward to use
@@ -194,6 +193,7 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
+        print(rospy.is_shutdown())
         while not rospy.is_shutdown() and np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
                           self.p_init.y - self.p.y,
@@ -216,11 +216,17 @@ class RL_lander():
         self.local_pose = PoseStamped()
         self.velocity = TwistStamped()
         self.rc_out = RCOut()
-        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
+        pos_sub = message_filters.Subscriber('/mavros/local_position/pose', PoseStamped)
+        #rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._read_position)
         if self.is_simulation:
-            rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, self._read_velocity)
+            #rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, self._read_velocity)
+            vel_sub = message_filters.Subscriber('/mavros/local_position/velocity_body', TwistStamped)
         else:
-            rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+            #rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
+            vel_sub = message_filters.Subscriber('/mavros/local_position/velocity', TwistStamped)
+
+        ts = message_filters.TimeSynchronizer([pos_sub, vel_sub], 1)
+        ts.registerCallback(self._read_pos_vel)
 
         # Subscribe to thrust commands from RL
         rospy.Subscriber('/rl/commands', AttitudeTarget, self._read_rl_commands)
@@ -229,7 +235,7 @@ class RL_lander():
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.z
         self.q.w, self.q.x, self.q.y, self.q.z = data.pose.orientation.w, data.pose.orientation.x, \
                                                  data.pose.orientation.y, data.pose.orientation.z
-        self.t_last_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
+        self.t_last_msg_p = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
 
     def _read_rl_commands(self, data):
         self.T_RL = data.thrust
@@ -240,6 +246,31 @@ class RL_lander():
     def _read_velocity(self, data):
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
         self.omg.x, self.omg.y, self.omg.z = data.twist.angular.x, data.twist.angular.y, data.twist.angular.z
+        self.t_last_msg_v = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
+
+    def _read_pos_vel(self, pos_data, vel_data):
+        self.p.x, self.p.y, self.p.z = pos_data.pose.position.x, pos_data.pose.position.y, pos_data.pose.position.z
+        self.q.w, self.q.x, self.q.y, self.q.z = pos_data.pose.orientation.w, pos_data.pose.orientation.x, \
+                                                 pos_data.pose.orientation.y, pos_data.pose.orientation.z
+        self.t_last_msg_p = rospy.Time(secs=int(pos_data.header.stamp.secs), nsecs=pos_data.header.stamp.nsecs)
+
+        self.v.x, self.v.y, self.v.z = vel_data.twist.linear.x, vel_data.twist.linear.y, vel_data.twist.linear.z
+        self.omg.x, self.omg.y, self.omg.z = vel_data.twist.angular.x, vel_data.twist.angular.y, vel_data.twist.angular.z
+        self.t_last_msg_v = rospy.Time(secs=int(vel_data.header.stamp.secs), nsecs=vel_data.header.stamp.nsecs)
+
+        # Get state pair, control prior and reward, send to RL
+        self.z_RL = self.p.z
+        self.zdot_RL = self.v.z
+        self.calc_control_prior()
+        self.calc_reward()
+        self.create_rl_train_message(stamp=rospy.Time.now())
+        self.pub_rl.publish(self.rl_train_msg)
+        rospy.wait_for_message('/rl/commands', AttitudeTarget)
+
+        # Calculate control action using command from RL
+        self.RL_received = self.pd_attitude_ctrl()
+        self.create_attitude_msg(stamp=rospy.Time.now())
+        self.pub_attmsg.publish(self.msg)
 
     def create_attitude_msg(self, stamp):
         ## Set the header
