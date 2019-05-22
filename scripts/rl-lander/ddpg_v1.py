@@ -37,16 +37,16 @@ class RL_Controller():
         # Initialize learner
         sess = tf.Session()
         state_dim, action_dim = 2, 1
-        self.action_bound = 0.15
+        self.action_bound = 0.5
         actor_lr, critic_lr = 0.0002, 0.001
-        gamma, tau = 0.998, 0.0005
-        self.minibatch_size = 500
+        gamma, tau = 0.995, 0.0005
+        self.minibatch_size = 256
         self.learner = Learner(sess, 0., state_dim, action_dim, self.action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
-        self.l_mix = 10.
+        self.l_mix = 3.
         
         #Initialize safety filter (barrier function)
         a_max = 0.44  # Saturation accounting for hover
-        a_min = -1.
+        a_min = -0.56
         self.cbf = Barrier(state_dim, action_dim, a_max, a_min)
 
         # Initialize variables storing current data from environment
@@ -63,7 +63,7 @@ class RL_Controller():
 
     def run_experiment(self):
         last_ep = 0
-        training_interval = 60
+        training_interval = 30
         #if (self.l_mix > 3):
         #    self.l_mix = self.l_mix/1.05
         for ep in range(self.n_ep): #TODO: Define number of iterations
@@ -79,11 +79,12 @@ class RL_Controller():
 
     def output_command(self, s, a_prior):
         a = self.learner.actor.predict(s) + self.action_bound*self.learner.actor_noise()
-        return a + a_prior
-        #return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
+        #return a + a_prior
+        return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
 
     def output_command_noNoise(self, s, a_prior):
-        return self.learner.actor.predict(s) + a_prior
+        a = self.learner.actor.predict(s)
+        return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
 
     def safety_filter(self, s, a):
         # f = np.zeros(2)
@@ -99,8 +100,7 @@ class RL_Controller():
         s = np.squeeze(s)
         f = np.array([s[0] + s[1]*T, s[1] - G*T])
         g = np.array([T**2/(2*m), T/m])
-        return [f, g, s]
-        
+        return [f, g, s]        
     
     def train_rl(self):
         # Train based on replay buffer
@@ -137,20 +137,21 @@ class RL_Controller():
         # Add to replay buffer
         s = np.array([self.z, self.zdot])  # TODO: Set s to be state at one timestep back
 
-        #
-        a = np.squeeze(dep_thrust) - self.a_prior
-        #a_s = np.squeeze(dep_thrust) - self.l_mix*np.squeeze(self.a_prior)/(1+self.l_mix)
-        #a = (self.l_mix + 1)*a_s
+        # Define control action
+        #a = np.squeeze(dep_thrust) - self.a_prior
+        a_s = np.squeeze(dep_thrust) - self.l_mix*np.squeeze(self.a_prior)/(1+self.l_mix)
+        print(a_s)
+        a = (self.l_mix + 1)*a_s
         
         s2 = np.array([z, zdot])
         #self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
         #self.rl_buffer.add(s, a, cur_reward, t, s2)
         if (self.z <= 0.2):
-            self.rl_buffer_low.add(s, self.act, self.reward, t, s2)
+            self.rl_buffer_low.add(s, self.act, self.reward, t, s2, dep_thrust)
         elif (self.z > 0.2 and self.z < 0.8):
-            self.rl_buffer_mid.add(s, self.act, self.reward, t, s2)
+            self.rl_buffer_mid.add(s, self.act, self.reward, t, s2, dep_thrust)
         else:
-            self.rl_buffer_high.add(s, self.act, self.reward, t, s2)
+            self.rl_buffer_high.add(s, self.act, self.reward, t, s2, dep_thrust)
 
         #self.create_rl_command_msg(rospy.Time.now()) #TODO: Test if creating messages here allows "parallelization"
         #self.pub.publish(self.rl_command_msg)
@@ -179,7 +180,8 @@ class RL_Controller():
             a_rl = self.output_command(s, self.a_prior)
         else:
             a_rl = self.output_command_noNoise(s, self.a_prior)
-        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
+        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = a_rl, 0.
+        #self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
 
 
 if __name__ == '__main__':

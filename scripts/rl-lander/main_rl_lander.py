@@ -64,6 +64,7 @@ class RL_lander():
         self.save_ep_reward = np.empty(n_ep)
         self.z_RL = 0.
         self.zdot_RL = 0.
+        self.T_z = 0.
         self.T_RL = 0.
         self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
@@ -94,6 +95,7 @@ class RL_lander():
         self.end_of_ep = False
 
         print("Running episode...")
+        dummy = 0
         for t in range(self.ep_length):
             if self.RL_received:
                 cum_reward += self.cur_reward
@@ -291,7 +293,7 @@ class RL_lander():
         self.rl_train_msg.pose.position.z = self.z_RL
         self.rl_train_msg.velocity.linear.z = self.zdot_RL
         self.rl_train_msg.reward.data = self.cur_reward
-        self.rl_train_msg.thrust.data = self.T_RL
+        self.rl_train_msg.thrust.data = self.T_z
         self.rl_train_msg.prior.data = self.prior
         self.rl_train_msg.end_of_ep.data = self.end_of_ep
 
