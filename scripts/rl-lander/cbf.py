@@ -26,12 +26,12 @@ class Barrier():
         self.P[N,N] = 1e20
         self.P = matrix(self.P, tc='d')
         self.q = matrix(np.zeros(N+1))
-        self.eta = 4.
+        self.eta = 6.
         
         #eta*z - zdot >= 0,  eta*z + zdot >= 0     
         self.H1 = np.array([self.eta, 1])
         self.H2 = np.array([self.eta, 1])
-        self.F = 0.05
+        self.F = 0.01
 
         # Define gamma parameter [0,1] for CBF  
         self.gamma = 0.6
@@ -65,7 +65,7 @@ class Barrier():
         sol = solvers.qp(self.P, self.q, lhs, rhs)
         u_bar = sol['x']
 
-        if (np.abs(u_bar[0]) > 0.2):
+        if (np.abs(u_bar[0]) > 0.04):
             print("CBF Active")
         if np.abs(u_bar[1]) > 0.001:
             print("Violation of Safety: ")
