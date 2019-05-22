@@ -52,8 +52,12 @@ class RLPosController:
             T_d = self.get_thrust(f_d, prior)
             T_z = prior
         q_d = self.get_attitude(f_d, yaw_d)
+        
+        return T_d, q_d
 
-        return T_d, q_d, prior, T_z
+    def get_prior(self, p, q, v, omg, p_d, v_d, yaw_d=0., T_RL=0.):
+        _, prior = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
+        return prior
 
     def get_desired_force(self, p, q, v, omg, p_d, v_d, T_RL):
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
@@ -104,7 +108,7 @@ class RLPosController:
         if (prior == np.Inf):
             return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
         else:
-            return np.linalg.norm(np.array([f_d.x, f_d.y, prior]))
+            return np.linalg.norm(np.array([f_d.x, f_d.y, prior + self.hover_throttle]))
 
     def get_attitude(self, f_d, yaw_d):
         q_worldToYawed = tf.transformations.quaternion_from_euler(0,0,yaw_d, axes='rxyz')
