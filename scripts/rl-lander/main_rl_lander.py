@@ -63,6 +63,7 @@ class RL_lander():
         self.save_ep_reward = np.empty(n_ep)
         self.z_RL = 0.
         self.zdot_RL = 0.
+        self.T_z = 0.
         self.T_RL = 0.
         self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
@@ -93,16 +94,22 @@ class RL_lander():
          #   pass
 
         print("Running episode...")
+        dummy = 0
         for t in range(self.ep_length):
-            self.z_RL = self.p.z
-            self.zdot_RL = self.v.z
-            RL_received = self.pd_attitude_ctrl()
-            self.create_attitude_msg(stamp=rospy.Time.now())
-            self.pub_attmsg.publish(self.msg)
-            self.calc_reward()
-            self.create_rl_train_message(stamp=rospy.Time.now())
-            self.pub_rl.publish(self.rl_train_msg)
-            self.rate.sleep()
+            if (dummy == 0):
+                self.z_RL = self.p.z
+                self.zdot_RL = self.v.z
+                RL_received = self.pd_attitude_ctrl()
+                self.create_attitude_msg(stamp=rospy.Time.now())
+                self.pub_attmsg.publish(self.msg)
+                self.calc_reward()
+                self.create_rl_train_message(stamp=rospy.Time.now())
+                self.pub_rl.publish(self.rl_train_msg)
+                dummy = 1
+                self.rate.sleep()
+            else:
+                dummy = 0
+                self.rate.sleep()
 
             if RL_received:
                 cum_reward += self.cur_reward
@@ -110,7 +117,7 @@ class RL_lander():
              #   break
 
         # Publish final message with end_of_ep flag set to true
-        self.end_of_ep = False #True
+        self.end_of_ep = True
         RL_received = self.pd_attitude_ctrl()
         self.create_attitude_msg(stamp=rospy.Time.now())
         self.pub_attmsg.publish(self.msg)
@@ -127,7 +134,7 @@ class RL_lander():
         p.z = self.z_RL
         v.z = self.zdot_RL
         RL_received = rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() <= 0.05
-        self.T_d, q_d, self.prior = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
+        self.T_d, q_d, self.prior, self.T_z = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
                                                    p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL, RL_received=RL_received)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
 
@@ -260,7 +267,7 @@ class RL_lander():
         self.rl_train_msg.pose.position.z = self.z_RL
         self.rl_train_msg.velocity.linear.z = self.zdot_RL
         self.rl_train_msg.reward.data = self.cur_reward
-        self.rl_train_msg.thrust.data = self.T_RL
+        self.rl_train_msg.thrust.data = self.T_z
         self.rl_train_msg.prior.data = self.prior
         self.rl_train_msg.end_of_ep.data = self.end_of_ep
 

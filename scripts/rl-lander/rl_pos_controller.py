@@ -19,7 +19,7 @@ class RLPosController:
         # Model specific vairables
         self.g = 9.81
         if self.is_simulation:
-            self.hover_throttle = 0.56
+            self.hover_throttle = 0.562
         else:
             self.hover_throttle = 0.672
         self.max_pitch_roll = math.pi / 3
@@ -47,11 +47,13 @@ class RLPosController:
         f_d, prior = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
         if RL_received:
             T_d = self.get_thrust(f_d)
+            T_z = f_d.z - self.hover_throttle
         else:
             T_d = self.get_thrust(f_d, prior)
+            T_z = prior
         q_d = self.get_attitude(f_d, yaw_d)
 
-        return T_d, q_d, prior
+        return T_d, q_d, prior, T_z
 
     def get_desired_force(self, p, q, v, omg, p_d, v_d, T_RL):
         e_p = np.array([p.x - p_d.x, p.y - p_d.y, p.z - p_d.z])
