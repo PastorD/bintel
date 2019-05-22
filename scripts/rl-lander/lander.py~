@@ -21,6 +21,10 @@ import message_filters
 
 # Import classes from other files
 from rl_pos_controller import RLPosController
+from replay_buffer import ReplayBuffer
+from learner import Learner
+from cbf import Barrier
+import tensorflow as tf
 
 
 class RL_lander():
@@ -45,14 +49,8 @@ class RL_lander():
         self.p_init = namedtuple("p_init", "x y z")
         self.p_final = namedtuple("p_final", "x y z")
         self.v_d = namedtuple("v_d", "x y z")
-
-        if self.is_simulation:
-            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
-        else:
-            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.25
-
+        self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
+        self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
         self.v_d.x, self.v_d.y, self.v_d.z = 0., 0., 0.
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
@@ -67,12 +65,40 @@ class RL_lander():
         self.rl_pos_controller = RLPosController(is_simulation=self.is_simulation, is_test_mode=self.is_test_mode)
 
         # Initialize RL-related variables
+        sess = tf.Session()
+        state_dim, action_dim = 2, 1
+        self.action_bound = 0.5
+        actor_lr, critic_lr = 0.0002, 0.0004
+        gamma, tau = 0.995, 0.0001
+        self.minibatch_size = 512
+        self.learner = Learner(sess, 0., state_dim, action_dim, self.action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
+        self.l_mix = 6.
+        self.counter = 0
+
+        # Create Replay Buffer to track explored points (for different areas of state)                  
+        self.rl_buffer_high = ReplayBuffer(1000000)    # ((z1, zdot1), T, r, (z2, zdot2))               
+        self.rl_buffer_mid = ReplayBuffer(1000000)
+        self.rl_buffer_low = ReplayBuffer(1000000)
+
+        # Train message initialization
+        self.z_RL_prev = 0.
+        self.zdot_RL_prev = 0.
+        self.cur_reward_prev = 0.
+        self.T_z_prev = 0.
+        self.prior_prev = 0.
+        self.end_of_ep_prev = False
+
+
+        # Initialize safety filter (barrier function)
+        a_max = 0.44  # Saturation accounting for hover                           
+        a_min = -0.56
+        self.cbf = Barrier(state_dim, action_dim, a_max, a_min)
+        
         self.n_ep = n_ep
         self.save_ep_reward = np.empty(n_ep)
         self.z_RL = 0.
         self.zdot_RL = 0.
         self.T_z = 0.
-        self.T_RL = 0.
         self.prior = 0.
         self.t_last_rl_msg = rospy.Time.now()
         self.t_last_msg_p = rospy.Time.now()
@@ -91,8 +117,40 @@ class RL_lander():
         self.rl_buffer = ReplayBuffer(1000000)  # ((z1, zdot1), T, r, (z2, zdot2))
 
 
+    def output_command(self, s, a_prior):
+        a = self.learner.actor.predict(s) + self.action_bound*self.learner.actor_noise()
+        #return a + a_prior                                                                                   
+        return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
+
+    def output_command_noNoise(self, s, a_prior):
+        a = self.learner.actor.predict(s)
+        return a/(1+self.l_mix) + self.l_mix*a_prior/(1+self.l_mix)
+
+    def safety_filter(self, s, a):
+        # f = np.zeros(2)
+        # g = np.zeros(2)
+        [f, g, x] = self.get_dynamics(s)
+        u_bar = self.cbf.control_barrier(a, f, g, x)
+        return a + u_bar, u_bar
+
+    def get_dynamics(self, s):
+        T = 1./60  # Sampling Frequency
+        G = 0.   # Gravity
+        m = 0.56/9.81   # Scaled mass
+        s = np.squeeze(s)
+        f = np.array([s[0] + s[1]*T, s[1] - G*T])
+        g = np.array([T**2/(2*m), T/m])
+        return [f, g, s]
+
     def train_rl(self):
+        # Train based on replay buffer
+        minibatch_size = self.minibatch_size
+        if self.rl_buffer_high.count > minibatch_size/8 and self.rl_buffer_mid.count > minibatch_size/4 and self.rl_buffer_low.count > 5*minibatch_size/8:
+            self.learner.train(self.rl_buffer_low, self.rl_buffer_mid, self.rl_buffer_high, minibatch_size) #Train
+
+    def training(self):
         for ep in range(self.n_ep):
+            self.counter = ep
             self.isTraining = False
             print("Resetting position...")
             self.reset_position()
@@ -104,21 +162,16 @@ class RL_lander():
 
         print("Running episode...")
         for t in range(self.ep_length):
-            if self.RL_received:
+            if self.isTraining:
                 cum_reward += self.cur_reward
             self.rate.sleep()
             self.isTraining = True
-
+        
         # Publish final message with end_of_ep flag set to true
         self.end_of_ep = True
-        RL_received = self.pd_attitude_ctrl()
-        self.create_attitude_msg(stamp=rospy.Time.now())
-        self.pub_attmsg.publish(self.msg)
-        self.calc_reward()
-        self.create_rl_train_message(stamp=rospy.Time.now())
-        self.pub_rl.publish(self.rl_train_msg)
-
-        print("Cumulative episode reward: ", cum_reward)
+        self.rate.sleep()
+        
+        print("Episode " + str(self.counter) + " reward: ", cum_reward)
 
     def pd_attitude_ctrl(self):
         #Make sure state is consistent with what is sent to RL:
@@ -126,12 +179,9 @@ class RL_lander():
         v = self.v
         p.z = self.z_RL
         v.z = self.zdot_RL
-        RL_received = rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() <= 0.05
-        self.T_d, q_d, self.T_z = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
-                                                   p_d=self.p_final, v_d=self.v_d, T_RL=self.T_RL, RL_received=RL_received)
+        self.T_d, q_d, _ = self.rl_pos_controller.get_ctrl(p=p, q=self.q, v=v, omg=self.omg,
+                                                           p_d=self.p_final, v_d=self.v_d, T_RL=self.T_z)
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
-
-        return RL_received
 
     def calc_control_prior(self):
         #Make sure state is consistent with what is sent to RL:
@@ -215,7 +265,6 @@ class RL_lander():
     def init_ROS(self):
         self.pub_attmsg = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.pub_posmsg = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
-        self.pub_rl = rospy.Publisher('/rl/training', StateReward, queue_size=10)
 
         rospy.init_node('controller_bintel', anonymous=True)
 
@@ -237,20 +286,12 @@ class RL_lander():
         ts = message_filters.TimeSynchronizer([pos_sub, vel_sub], 1)
         ts.registerCallback(self._read_pos_vel)
 
-        # Subscribe to thrust commands from RL
-        rospy.Subscriber('/rl/commands', AttitudeTarget, self._read_rl_commands)
 
     def _read_position(self, data):
         self.p.x, self.p.y, self.p.z = data.pose.position.x, data.pose.position.y, data.pose.position.z
         self.q.w, self.q.x, self.q.y, self.q.z = data.pose.orientation.w, data.pose.orientation.x, \
                                                  data.pose.orientation.y, data.pose.orientation.z
         self.t_last_msg_p = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
-
-    def _read_rl_commands(self, data):
-        self.T_RL = data.thrust
-        self.safety_intervention = data.body_rate.z
-        self.t_last_rl_msg = rospy.Time(secs=int(data.header.stamp.secs), nsecs=data.header.stamp.nsecs)
-
 
     def _read_velocity(self, data):
         self.v.x, self.v.y, self.v.z = data.twist.linear.x, data.twist.linear.y, data.twist.linear.z
@@ -273,12 +314,17 @@ class RL_lander():
             self.zdot_RL = self.v.z
             self.calc_control_prior()
             self.calc_reward()
+            s = [self.z_RL, self.zdot_RL]
+            if (self.counter < 30):
+                a_rl = np.squeeze(self.output_command(np.array([[self.z_RL, self.zdot_RL]]), self.prior))
+                self.T_z, _ = np.squeeze(self.safety_filter(s, a_rl))
+            else:
+                a_rl = np.squeeze(self.output_command_noNoise(np.array([[self.z_RL, self.zdot_RL]]), self.prior))
+                self.T_z, _ = np.squeeze(self.safety_filter(s, a_rl))
             self.create_rl_train_message(stamp=rospy.Time.now())
-            self.pub_rl.publish(self.rl_train_msg)
-            rospy.wait_for_message('/rl/commands', AttitudeTarget)
 
             # Calculate control action using command from RL
-            self.RL_received = self.pd_attitude_ctrl()
+            self.pd_attitude_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_attmsg.publish(self.msg)
 
@@ -293,22 +339,34 @@ class RL_lander():
         self.msg.thrust = self.T_d
 
     def create_rl_train_message(self, stamp):
-        ## Set the header
-        self.rl_train_msg.header.stamp = stamp
-        self.rl_train_msg.header.frame_id = '/world'
 
-        ## Set message content
-        self.rl_train_msg.pose.position.z = self.z_RL
-        self.rl_train_msg.velocity.linear.z = self.zdot_RL
-        self.rl_train_msg.reward.data = self.cur_reward
-        self.rl_train_msg.thrust.data = self.T_z
-        self.rl_train_msg.prior.data = self.prior
-        self.rl_train_msg.end_of_ep.data = self.end_of_ep
+        # Add to replay buffer                                                                                    
+        s = np.array([self.z_RL_prev, self.zdot_RL_prev])  # TODO: Set s to be state at one timestep back                         
+
+        # Define control action                                                                                   
+        a_s = self.T_z_prev - self.l_mix*np.squeeze(self.prior_prev)/(1+self.l_mix)
+        a = (self.l_mix + 1)*a_s
+
+        s2 = np.array([self.z_RL, self.zdot_RL])
+        if abs(self.z_RL - self.z_RL_prev) < 0.2 and (s2[1] - s[1])*np.squeeze(self.T_z_prev) > 0:
+            if (self.z_RL <= 0.2):
+                self.rl_buffer_low.add(s, a, self.cur_reward_prev, self.end_of_ep, s2)
+            elif (self.z_RL > 0.2 and self.z_RL < 0.8):
+                self.rl_buffer_mid.add(s, a, self.cur_reward_prev, self.end_of_ep, s2)
+            else:
+                self.rl_buffer_high.add(s, a, self.cur_reward_prev, self.end_of_ep, s2)
+
+        self.z_RL_prev = self.z_RL
+        self.zdot_RL_prev = self.zdot_RL
+        self.cur_reward_prev = self.cur_reward
+        self.T_z_prev = self.T_z
+        self.prior_prev = self.prior
+        self.end_of_ep_prev = self.end_of_ep
 
 if __name__ == '__main__':
     try:
         lander = RL_lander(n_ep=200, ep_length=500) #TODO: Decide n_ep, ep_length
-        lander.train_rl()
+        lander.training()
     except rospy.ROSInterruptException:
         pass
 

@@ -23,11 +23,12 @@ class RL_Controller():
     """
     def __init__(self):
         self.is_simulation = True
+        self.start= False
 
         # Create Replay Buffer to track explored points (for different areas of state)
-        self.rl_buffer_high = ReplayBuffer(100000)    # ((z1, zdot1), T, r, (z2, zdot2))
-        self.rl_buffer_mid = ReplayBuffer(100000)
-        self.rl_buffer_low = ReplayBuffer(100000)
+        self.rl_buffer_high = ReplayBuffer(1000000)    # ((z1, zdot1), T, r, (z2, zdot2))
+        self.rl_buffer_mid = ReplayBuffer(1000000)
+        self.rl_buffer_low = ReplayBuffer(1000000)
         
         # Initialize ROS
         self.main_loop_rate = 60
@@ -38,11 +39,11 @@ class RL_Controller():
         sess = tf.Session()
         state_dim, action_dim = 2, 1
         self.action_bound = 0.5
-        actor_lr, critic_lr = 0.0002, 0.001
-        gamma, tau = 0.995, 0.0005
-        self.minibatch_size = 256
+        actor_lr, critic_lr = 0.0002, 0.0005
+        gamma, tau = 0.995, 0.0002
+        self.minibatch_size = 512
         self.learner = Learner(sess, 0., state_dim, action_dim, self.action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
-        self.l_mix = 3.
+        self.l_mix = 10.
         
         #Initialize safety filter (barrier function)
         a_max = 0.44  # Saturation accounting for hover
@@ -63,19 +64,20 @@ class RL_Controller():
 
     def run_experiment(self):
         last_ep = 0
-        training_interval = 30
+        training_interval = 60
         #if (self.l_mix > 3):
         #    self.l_mix = self.l_mix/1.05
-        for ep in range(self.n_ep): #TODO: Define number of iterations
-            '''
-            self.create_rl_command_msg(stamp=rospy.Time.now())  # Synchronize to state read
-            self.pub.publish(self.rl_command_msg)
-            '''
-            if ep-last_ep == training_interval:
-                last_ep = ep
-                self.train_rl()
+        if self.start:
+            for ep in range(self.n_ep): #TODO: Define number of iterations
+                '''
+                self.create_rl_command_msg(stamp=rospy.Time.now())  # Synchronize to state read
+                self.pub.publish(self.rl_command_msg)
+                '''
+                if ep-last_ep == training_interval:
+                    last_ep = ep
+                    self.train_rl()
 
-            self.rate.sleep()
+                self.rate.sleep()
 
     def output_command(self, s, a_prior):
         a = self.learner.actor.predict(s) + self.action_bound*self.learner.actor_noise()
@@ -105,7 +107,7 @@ class RL_Controller():
     def train_rl(self):
         # Train based on replay buffer
         minibatch_size = self.minibatch_size
-        if self.rl_buffer_high.count > minibatch_size/4 and self.rl_buffer_mid.count > minibatch_size/4 and self.rl_buffer_low.count > minibatch_size/2:
+        if self.rl_buffer_high.count > minibatch_size/8 and self.rl_buffer_mid.count > minibatch_size/4 and self.rl_buffer_low.count > 5*minibatch_size/8:
             self.learner.train(self.rl_buffer_low, self.rl_buffer_mid, self.rl_buffer_high, minibatch_size) #Train
 
     """
@@ -140,18 +142,20 @@ class RL_Controller():
         # Define control action
         #a = np.squeeze(dep_thrust) - self.a_prior
         a_s = np.squeeze(dep_thrust) - self.l_mix*np.squeeze(self.a_prior)/(1+self.l_mix)
-        print(a_s)
         a = (self.l_mix + 1)*a_s
+        #a = np.squeeze(dep_thrust)
+        #print(a)
         
         s2 = np.array([z, zdot])
         #self.rl_buffer.add(s, self.prev_thrust, cur_reward, t, s2)
         #self.rl_buffer.add(s, a, cur_reward, t, s2)
-        if (self.z <= 0.2):
-            self.rl_buffer_low.add(s, self.act, self.reward, t, s2)
-        elif (self.z > 0.2 and self.z < 0.8):
-            self.rl_buffer_mid.add(s, self.act, self.reward, t, s2)
-        else:
-            self.rl_buffer_high.add(s, self.act, self.reward, t, s2)
+        if self.start and abs(self.z - z) < 0.2 and (s2[1] - s[1])*np.squeeze(dep_thrust) > 0:
+            if (self.z <= 0.2):
+                self.rl_buffer_low.add(s, self.act, self.reward, t, s2)
+            elif (self.z > 0.2 and self.z < 0.8):
+                self.rl_buffer_mid.add(s, self.act, self.reward, t, s2)
+            else:
+                self.rl_buffer_high.add(s, self.act, self.reward, t, s2)
 
         #self.create_rl_command_msg(rospy.Time.now()) #TODO: Test if creating messages here allows "parallelization"
         #self.pub.publish(self.rl_command_msg)
@@ -167,6 +171,9 @@ class RL_Controller():
 
 
     def create_rl_command_msg(self, stamp):
+        # Start training
+        self.start = True
+        
         ## Set the header
         self.rl_command_msg.header.stamp = stamp
         self.rl_command_msg.header.frame_id = '/world'
@@ -176,12 +183,13 @@ class RL_Controller():
         ## Use cbf to filter output
         self.rl_command_msg.body_rate.z = 0.
         #self.rl_command_msg.thrust = self.output_command(s, self.a_prior)
-        if (self.iteration < 100):
+        if (self.iteration < 1000000000):
             a_rl = self.output_command(s, self.a_prior)
         else:
             a_rl = self.output_command_noNoise(s, self.a_prior)
-        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = a_rl, 0.
-        #self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
+            print("no noise")
+        #self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = a_rl, 0.
+        self.rl_command_msg.thrust, self.rl_command_msg.body_rate.z = self.safety_filter(s, a_rl)
 
 
 if __name__ == '__main__':

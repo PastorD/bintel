@@ -80,7 +80,7 @@ class ActorNetwork(object):
         net = tflearn.fully_connected(inputs, 64, weights_init=w_init)
         net = tflearn.dropout(net, 0.5)
         net = tflearn.layers.normalization.batch_normalization(net)
-        net = tflearn.activations.relu(net)
+        #net = tflearn.activations.relu(net)
         #net = tflearn.fully_connected(net, 100, weights_init=w_init)
         #net = tflearn.layers.normalization.batch_normalization(net)
         #net = tflearn.activations.relu(net)
@@ -163,15 +163,15 @@ class CriticNetwork(object):
     def create_critic_network(self):
         inputs = tflearn.input_data(shape=[None, self.s_dim])
         action = tflearn.input_data(shape=[None, self.a_dim])
-        net = tflearn.fully_connected(inputs, 64)
+        net = tflearn.fully_connected(inputs, 100)
         net = tflearn.dropout(net, 0.5)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
 
         # Add the action tensor in the 2nd hidden layer
         # Use two temp layers to get the corresponding weights and biases
-        t1 = tflearn.fully_connected(net, 64)
-        t2 = tflearn.fully_connected(action, 64)
+        t1 = tflearn.fully_connected(net, 100)
+        t2 = tflearn.fully_connected(action, 100)
 
 
         net = tflearn.activation(
@@ -289,9 +289,9 @@ class Learner(object):
         #tflearn.is_training(True)
 
         #Sample a batch from the replay buffer            
-        s_batch_l, a_batch_l, r_batch_l, t_batch_l, s2_batch_l = replay_buffer_low.sample_batch(minibatch_size/2)
+        s_batch_l, a_batch_l, r_batch_l, t_batch_l, s2_batch_l = replay_buffer_low.sample_batch(5*minibatch_size/8)
         s_batch_m, a_batch_m, r_batch_m, t_batch_m, s2_batch_m = replay_buffer_mid.sample_batch(minibatch_size/4)
-        s_batch_h, a_batch_h, r_batch_h, t_batch_h, s2_batch_h = replay_buffer_high.sample_batch(minibatch_size/4)
+        s_batch_h, a_batch_h, r_batch_h, t_batch_h, s2_batch_h = replay_buffer_high.sample_batch(minibatch_size/8)
 
         s_batch = np.concatenate((s_batch_l, s_batch_m, s_batch_h))
         a_batch = np.concatenate((a_batch_l, a_batch_m, a_batch_h))

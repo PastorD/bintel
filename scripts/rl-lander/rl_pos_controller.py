@@ -53,7 +53,7 @@ class RLPosController:
             T_z = prior
         q_d = self.get_attitude(f_d, yaw_d)
         
-        return T_d, q_d
+        return T_d, q_d, T_z
 
     def get_prior(self, p, q, v, omg, p_d, v_d, yaw_d=0., T_RL=0.):
         _, prior = self.get_desired_force(p, q, v, omg, p_d, v_d, T_RL)
