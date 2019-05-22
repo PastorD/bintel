@@ -44,8 +44,14 @@ class RL_lander():
         self.p_init = namedtuple("p_init", "x y z")
         self.p_final = namedtuple("p_final", "x y z")
         self.v_d = namedtuple("v_d", "x y z")
-        self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-        self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
+
+        if self.is_simulation:
+            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
+            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
+        else:
+            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
+            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.25
+
         self.v_d.x, self.v_d.y, self.v_d.z = 0., 0., 0.
         self.T_d = 0.0
         self.q_d = namedtuple("q_d", "w x y z")
