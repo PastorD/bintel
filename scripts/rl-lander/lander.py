@@ -33,7 +33,7 @@ class RL_lander():
 
     def __init__(self, n_ep, ep_length):
         # Development environment variables
-        self.is_simulation = True
+        self.is_simulation = False
         self.is_test_mode = False  # Calculates all controls with PD (no RL)
         self.isTraining = False
 
@@ -78,7 +78,7 @@ class RL_lander():
         gamma, tau = 0.995, 0.0001
         self.minibatch_size = 512
         self.learner = Learner(sess, 0., state_dim, action_dim, self.action_bound, actor_lr, critic_lr, tau, gamma, self.minibatch_size)
-        self.l_mix = 8.
+        self.l_mix = 1000.
         self.counter = 0
 
         # Create Replay Buffer to track explored points (for different areas of state)                  
