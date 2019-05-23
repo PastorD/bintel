@@ -32,7 +32,7 @@ class Barrier():
         self.H1 = np.array([self.eta, 1])
         self.H2 = np.array([-self.eta, -1])
         self.F = -0.02
-        self.F2 = 2.0
+        self.F2 = 2.0*self.eta
 
         # Define gamma parameter [0,1] for CBF  
         self.gamma = 0.6
@@ -53,7 +53,7 @@ class Barrier():
         lhs = np.array([[-np.dot(self.H1,g), -np.dot(self.H2,g), 1, -1], [-1, -1, 0, 0]])
         lhs = np.transpose(lhs)
         rhs = np.array([gamma_b*self.F + np.dot(self.H1,f) + np.dot(self.H1,g)*u_rl - (1-gamma_b)*np.dot(self.H1,x) + np.dot(self.H1, mu) - kd*np.dot(np.abs(self.H1),std),
-                        gamma_b*self.F + np.dot(self.H2,f) + np.dot(self.H2,g)*u_rl - (1-gamma_b)*np.dot(self.H2,x) + np.dot(self.H2, mu) - kd*np.dot(np.abs(self.H2),std),
+                        gamma_b*self.F2 + np.dot(self.H2,f) + np.dot(self.H2,g)*u_rl - (1-gamma_b)*np.dot(self.H2,x) + np.dot(self.H2, mu) - kd*np.dot(np.abs(self.H2),std),
                         -u_rl + self.u_max,
                         u_rl - self.u_min])
         rhs = np.squeeze(rhs).astype(np.double)
