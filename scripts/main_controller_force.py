@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 # Python Common
-import argparse
-from yaml import load, dump
+from yaml import load
 from collections import namedtuple
 import position_controller_FL
 import numpy as np
@@ -11,17 +10,13 @@ import math
 
 # ROS
 import rospy
-import roslib
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
-from visualization_msgs.msg import Marker
+
 
 # Initialize trajeftory
-from dynamics import goto_optitrack
 
 # Project
-from learn_full_model import learnFullModel
-from learn_nominal_model import learnNominalModel
 
 
 class Robot():

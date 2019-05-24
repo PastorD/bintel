@@ -28,7 +28,7 @@ class learnFullModel(QuadrotorModel):
             model = load(stream)
         return model
 
-    def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
+    def fit_parameters(self, data_filename, fit_type, dt=0.01):
         """
          Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
@@ -39,7 +39,7 @@ class learnFullModel(QuadrotorModel):
         data_format = os.path.splitext(data_filename)[1]
         if (data_format=='.bag'):
             time, position, orientation, linvel, angvel, force = self.read_ROSBAG(data_filename, dt=dt,
-                                                                                  is_simulation=is_simulation)
+                                                                                  is_simulation=self.is_simulation)
         elif (data_format=='.csv'):
             pass
         else:

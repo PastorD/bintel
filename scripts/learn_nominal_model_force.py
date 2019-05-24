@@ -13,8 +13,9 @@ class learnNominalModel(QuadrotorModel):
     Class for a control-affine quadrotor dynamical model of the form \dot{x} = f(x) + g(x)u with known kinematics
     """
 
-    def __init__(self, is_simulation=False):
+    def __init__(self, is_simulation=False, learn_residual=True):
         self.is_simulation = is_simulation
+        self.learn_residual = learn_residual
 
         self.g = 9.81
         if self.is_simulation:
@@ -22,7 +23,7 @@ class learnNominalModel(QuadrotorModel):
         else:
             self.hover_throttle = 0.672
 
-    def fit_parameters(self, data_filename, fit_type, is_simulation, dt=0.01):
+    def fit_parameters(self, data_filename, fit_type, dt=0.01):
         """
          Use data to fit the model parameters of the velocity states (linvel, angvel)
         """
@@ -33,7 +34,7 @@ class learnNominalModel(QuadrotorModel):
         data_format = os.path.splitext(data_filename)[1]
         if (data_format=='.bag'):
             time, position, orientation, linvel, angvel, force = self.read_ROSBAG(data_filename, dt=dt,
-                                                                                  is_simulation=is_simulation)
+                                                                                  is_simulation=self.is_simulation)
         elif (data_format=='.csv'):
             pass
         else:
@@ -64,19 +65,23 @@ class learnNominalModel(QuadrotorModel):
 
         theta_xdt, theta_ydt, theta_zdt = self.create_observables(X, u)
 
-        xdot = np.concatenate((self.estimator_pdt.predict(theta_xdt),
-                                self.estimator_pdt.predict(theta_ydt),
-                                self.estimator_pdt.predict(theta_zdt)), axis=0)
+        if self.learn_residual:
+            xdot = np.concatenate((self.estimator_pdt.predict(theta_xdt),
+                                    self.estimator_pdt.predict(theta_ydt),
+                                    self.estimator_pdt.predict(theta_zdt)), axis=0)
+        else:
+            xdot = np.zeros((3,1))
 
         return np.concatenate((self.get_kinematics(np.transpose(X)), xdot.reshape(1,-1)), axis=1)
 
     def get_dynamics_matrices(self, p, q, v, omg):
-        m = 1/self.estimator_pdt.coef_.squeeze()
-
         F_v = np.zeros(3)
         #F_v[2] = -self.hover_throttle #TODO: Check if this should be left out because of definition of observables and controller
         G_v = np.zeros((3,3))
-        G_v[0,0], G_v[1,1], G_v[2,2] = 1/m, 1/m, 1/m
+
+        if self.learn_residual:
+            m = 1 / self.estimator_pdt.coef_.squeeze()
+            G_v[0,0], G_v[1,1], G_v[2,2] = 1/m, 1/m, 1/m
 
         return F_v, G_v
 
