@@ -1,7 +1,7 @@
 boundary:
   xmin: -2.0
   ymin: -2.0
-  zmin:  1.0
+  zmin:  0.5
   xmax:  2.0
   ymax:  2.0
   zmax:  4.0 
