@@ -158,6 +158,23 @@ See the tmux file 'tmux_sim_sitl.sh' for details. To run the tmux files you need
 ```
 The yaml file describes all commands to run a sitl session.
 
+### Squid SITL
+
+from the bintel root folder, execute
+```console
+  $ tmuxp load bash/tmux_ros_stil.yaml
+```
+The script will
+- start a px4 instance
+- start a Gazebo instance
+- launch mavros
+- open a terminal to monitor /mavros/state
+- launch rviz 
+- launch QGroundControl, assuming it is at ~/Downloads/QGroundControl.AppImage 
+- launch the squidPX4manager. if you have connected a Joystick with neutral position it will not arm. The left stick needs to be at the bottom
+- prepare the set_seepd script
+
+To start the simulation press 'Enter' on the set_speed_script terminal. Disclaimer: sometimes the px4 instances does not open in time, so other terminals may fail. Restart them if neccesary.
 
 
 ## Setting Up Optitrack for Positioning
