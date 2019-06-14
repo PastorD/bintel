@@ -3,8 +3,8 @@ import os
 
 import rospy
 
-from learn_full_model import learnFullModel
-from learn_nominal_model import learnNominalModel
+from old.learn_full_model import learnFullModel
+from old.learn_nominal_model import learnNominalModel
 
 def fit_main():
   

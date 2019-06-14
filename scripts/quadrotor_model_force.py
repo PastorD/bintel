@@ -24,7 +24,7 @@ class QuadrotorModel():
         pass
 
     # =======Functions overloaded by methods=======
-    def fit_parameters(self, data_filename, fit_type, is_simulation):
+    def fit_parameters(self, data_filename, fit_type, dt):
         pass
 
     def predict_full_RHS(self, X, u):

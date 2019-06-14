@@ -4,7 +4,7 @@ windows:
   - window_name: bintel_cast
     layout: tiled
     shell_command_before:
-    - roscd bintel_ros; export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=192.168.1.102 
+    - export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=192.168.1.102
     panes:
       - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack.launch
       - shell_command:

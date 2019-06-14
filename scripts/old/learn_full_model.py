@@ -5,9 +5,10 @@ from sys import exit
 import os.path
 import sparse_identification as sp
 from sklearn.preprocessing import PolynomialFeatures
-from quadrotor_model import QuadrotorModel
+from old.quadrotor_model import QuadrotorModel
 from sparse_identification.utils import derivative
-from yaml import load, dump
+from yaml import load
+
 
 class learnFullModel(QuadrotorModel):
     """
