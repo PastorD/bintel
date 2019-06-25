@@ -25,7 +25,7 @@ f_ud = @(t,x,u) ( x + (deltaT/6) * ( k1(t,x,u) + 2*k2(t,x,u) + 2*k3(t,x,u) + k4(
 
 basisFunction = 'rbf';
 % RBF centers
-Nrbf = 100;
+Nrbf = 20;
 cent = rand(n,Nrbf)*2 - 1;
 rbf_type = 'thinplate'; 
 % Lifting mapping - RBFs + the state itself
@@ -36,21 +36,21 @@ Nlift = Nrbf + n;
 %% ************************** Collect data ********************************
 tic
 disp('Starting data collection')
-Nsim = 200;
-Ntraj = 1000;
+Ntime = 300;
+Ntraj = 100;
 
 % Random forcing
-Ubig = 2*rand([Nsim Ntraj]) - 1;
+Ubig = 2*rand([Ntime Ntraj]) - 1;
 
 % Random initial conditions
 Xcurrent = (rand(n,Ntraj)*2 - 1);
 
-X = []; Y = []; U = [];
-for i = 1:Nsim
+Xacc = []; Yacc = []; Uacc = [];
+for i = 1:Ntime
     Xnext = f_ud(0,Xcurrent,Ubig(i,:));
-    X = [X Xcurrent];
-    Y = [Y Xnext];
-    U = [U Ubig(i,:)];
+    Xacc = [Xacc Xcurrent];
+    Yacc = [Yacc Xnext];
+    Uacc = [Uacc Ubig(i,:)];
     Xcurrent = Xnext;
 end
 fprintf('Data collection DONE, time = %1.2f s \n', toc);
@@ -60,16 +60,16 @@ fprintf('Data collection DONE, time = %1.2f s \n', toc);
 
 disp('Starting LIFTING')
 tic
-Xlift = liftFun(X);
-Ylift = liftFun(Y);
+Xlift = liftFun(Xacc);
+Ylift = liftFun(Yacc);
 fprintf('Lifting DONE, time = %1.2f s \n', toc);
 
 %% ********************** Build predictor *********************************
 
 disp('Starting REGRESSION')
 tic
-W = [Ylift ; X];
-V = [Xlift; U];
+W = [Ylift ; Xacc];
+V = [Xlift; Uacc];
 VVt = V*V';
 WVt = W*V';
 M = WVt * pinv(VVt); % Matrix [A B; C 0]
@@ -82,11 +82,11 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 %% *********************** Predictor comparison ***************************
 
 Tmax = 3;
-Nsim = Tmax/deltaT;
+Ntime = Tmax/deltaT;
 u_dt = @(i)((-1).^(round(i/30))); % control signal
 
 % Initial condition
-x0 = [0.5;0.5];
+x0 = [-0.2021;-0.2217]; % x0 = [0.5;0.5];
 x_true = x0;
 
 % Lifted initial condition
@@ -112,7 +112,7 @@ X_loc_0 = x0;
 
 
 % Simulate
-for i = 0:Nsim-1
+for i = 0:Ntime-1
     % Koopman predictor
     xlift = [xlift, Alift*xlift(:,end) + Blift*u_dt(i)]; % Lifted dynamics
     
@@ -132,18 +132,20 @@ x_koop = Clift * xlift; % Koopman predictions
 
 %% ****************************  Plots  ***********************************
 
+%
+
 lw = 4;
 
 figure
-plot([0:Nsim-1]*deltaT,u_dt(0:Nsim-1),'linewidth',lw); hold on
+plot([0:Ntime-1]*deltaT,u_dt(0:Ntime-1),'linewidth',lw); hold on
 title('Control input $u$', 'interpreter','latex'); xlabel('Time [s]','interpreter','latex');
 set(gca,'fontsize',20)
 
 figure
-plot([0:Nsim]*deltaT,x_true(2,:),'linewidth',lw); hold on
-plot([0:Nsim]*deltaT,x_koop(2,:), '--r','linewidth',lw)
-plot([0:Nsim]*deltaT,X_loc_x0(2,:), '--g','linewidth',lw-1)
-plot([0:Nsim]*deltaT,X_loc_0(2,:), '--k','linewidth',lw-1)
+plot([0:Ntime]*deltaT,x_true(2,:),'linewidth',lw); hold on
+plot([0:Ntime]*deltaT,x_koop(2,:), '--r','linewidth',lw)
+plot([0:Ntime]*deltaT,X_loc_x0(2,:), '--g','linewidth',lw-1)
+plot([0:Ntime]*deltaT,X_loc_0(2,:), '--k','linewidth',lw-1)
 axis([0 Tmax min(x_koop(2,:))-0.15 max(x_koop(2,:))+0.15])
 title('Predictor comparison - $x_2$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
 set(gca,'fontsize',20)
@@ -151,10 +153,10 @@ LEG = legend('True','Koopman','Local at $x_0$','Local at 0','location','southwes
 set(LEG,'interpreter','latex')
 
 figure
-plot([0:Nsim]*deltaT,x_true(1,:),'linewidth',lw); hold on
-plot([0:Nsim]*deltaT,x_koop(1,:), '--r','linewidth',lw)
-plot([0:Nsim]*deltaT,X_loc_x0(1,:), '--g','linewidth',lw-1)
-plot([0:Nsim]*deltaT,X_loc_0(1,:), '--k','linewidth',lw-1)
+plot([0:Ntime]*deltaT,x_true(1,:),'linewidth',lw); hold on
+plot([0:Ntime]*deltaT,x_koop(1,:), '--r','linewidth',lw)
+plot([0:Ntime]*deltaT,X_loc_x0(1,:), '--g','linewidth',lw-1)
+plot([0:Ntime]*deltaT,X_loc_0(1,:), '--k','linewidth',lw-1)
 axis([0 Tmax min(x_koop(1,:))-0.1 max(x_koop(1,:))+0.1])
 title('Predictor comparison - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
 set(gca,'fontsize',20)
