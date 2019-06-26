@@ -10,7 +10,6 @@ f_u =  @(t,x,u)([2*x(2,:) ; -0.8*x(1,:) - 10*x(1,:).^2.*x(2,:) + 2*x(2,:) + u] )
 n = 2;
 m = 1; % number of control inputs
 
-
 % ************************** Discretization ******************************
 
 deltaT = 0.01;
@@ -28,8 +27,6 @@ basisFunction = 'rbf';
 Nrbf = 20;
 cent = rand(n,Nrbf)*2 - 1;
 rbf_type = 'thinplate'; 
-% Lifting mapping - RBFs + the state itself
-
 
 liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
 Nlift = Nrbf + n;
@@ -45,13 +42,11 @@ Ntime = 300;
 Ntraj = 1000;
 
 % Random forcing
-Ubig = 2*rand([Ntime Ntraj]) - 1;
-
+%Ubig = 2*rand([Ntime Ntraj]) - 1;
 Ubig = zeros(Ntime,Ntraj);
 
 % Random initial conditions
-X0 = (rand(n,Ntraj)*2 - 1);
-
+%X0 = (rand(n,Ntraj)*2 - 1);
 
 phi0 = rand(1,Ntraj)*2*pi;
 r0 = 0.2;
@@ -88,20 +83,6 @@ lambda = zeros(Nlambda,1);
 lambda(1:length(lambda_dmd)) = lambda_dmd; % start the first lambda to dmd ones
 dlambda = Nlambda - length(lambda_dmd); % how many more to add
 nlambda = length(lambda_dmd); % starting lambda number
-% while nlambda < Nlambda % stop when we have enough lambda    
-%     sum_k = 0;
-%     
-%    for idmd = 1:dlambda
-%         for k =1:length(lambda_dmd) % combination of dmd lambdas
-%             if (idmd + sum_k < dlambda)
-%                 sum_k = sum_k + idmd; % to control how many is the sum                
-%                 lambda(nlambda) = lambda(nlambda) + lambda_dmd(k);
-%             end
-%         end
-%     end
-%     nlambda = nlambda+1;
-% end
-
 
 vlambda = [0,1
            1,0
@@ -113,33 +94,22 @@ vlambda = [0,1
            1,3
            3,2
            2,3];
-%vlambda = zeros(Nlambda,2);
+
 while nlambda < Nlambda % stop when we have enough lambda  
-%     for idmd = 1:3
-%         for jdmd = 1:3
-           % vlambda(nlambda,:) = [idmd,jdmd];
-           nlambda = nlambda+1;
-            for k =1:length(lambda_dmd) % combination of dmd lambdas            
-                lambda(nlambda) = lambda(nlambda) + lambda_dmd(k)*vlambda(nlambda,k);
-            end
-            
-%         end
-%     end
+    nlambda = nlambda+1;
+    for k =1:length(lambda_dmd) % combination of dmd lambdas            
+        lambda(nlambda) = lambda(nlambda) + lambda_dmd(k)*vlambda(nlambda,k);
+    end
 end
 
 Nlambda = length(lambda);
 y_reg = @(x) [x(1),x(2)];
 [phi_fun, A_eigen, C_eigen] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
 
-
 %C_eigen = get_c(Xstr, phi_fun, y_reg);
-fprintf('Eigen Generation DONE, time = %1.2f s \n', toc);
-
-%plot_eigen(phi_fun)
+fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
 
 %% ******************************* Lift ***********************************
-
-
 
 disp('Starting LIFT GENERATION')
 tic
@@ -162,16 +132,16 @@ Clift = M(Nlift+1:end,1:Nlift);
 
 fprintf('Regression done, time = %1.2f s \n', toc);
 
-cplot = @(r,x0,y0) plot(x0 + r*cos(linspace(0,2*pi,200)),y0 + r*sin(linspace(0,2*pi,200)),'-');
-afigure
-hold on
-plot(eig(Alift),'*')
-cplot(1,0,0)
-axis equal
+% cplot = @(r,x0,y0) plot(x0 + r*cos(linspace(0,2*pi,200)),y0 + r*sin(linspace(0,2*pi,200)),'-');
+% afigure
+% hold on
+% plot(eig(Alift),'*')
+% cplot(1,0,0)
+% axis equal
 
 %% *********************** Predictor comparison ***************************
 
-Tmax = 2.5;
+Tmax = 3;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
@@ -188,15 +158,6 @@ phi_fun_v = @(x) phiFunction(phi_fun,x);
 % Eigen value at zero
 zeigen = phi_fun_v(x0);
 
-
-% Local linearization predictor at x0
-% x = sym('x',[2;1]); u = sym('u',[1;1]);
-% Ac_x0 = double(subs(jacobian(f_u(0,x,u),x),[x;u],[x0;0]));
-% Bc_x0 = double(subs(jacobian(f_u(0,x,u),u),[x;u],[x0;0]));
-% c_x0 = double(subs(f_u(0,x,u),[x;u],[x0;0])) - Ac_x0*x0 - Bc_x0*0;
-% ABc = expm([Ac_x0 [Bc_x0 c_x0] ; zeros(2,4)]*deltaT); % discretize
-% Ad_x0 = ABc(1:2,1:2); Bd_x0 = ABc(1:2,3); cd_x0 = ABc(1:2,4);
-% X_loc_x0 = x0;
 Ab_eigen = expm(A_eigen*deltaT);
 
 % Simulate
@@ -209,22 +170,17 @@ for i = 0:Ntime-1
     
     % True dynamics
     x_true = [x_true, f_ud(0,x_true(:,end),u_dt(i)) ];
-    
-    % Local linearization predictor at x0
-    %X_loc_x0 = [X_loc_x0, Ad_x0*X_loc_x0(:,end) + Bd_x0*u_dt(i) + cd_x0];
-       
 end
 x_koop  = Clift * xlift; % Koopman predictions
 x_eigen = C_eigen*zeigen;
 
-%check the interpolation is ok
 
 % Compute error
 trueRMS = sqrt( sum(x_true.*x_true,'all'));
 e_lift  = 100*sqrt( sum((x_true-x_koop).*(x_true-x_koop),'all'))/trueRMS;
 e_eigen = 100*sqrt( sum((x_true-x_eigen).*(x_true-x_eigen),'all'))/trueRMS;
 
-
+fprintf('Simulation done. Error: \n - eDMD:  %1.2f%% \n - eigen: %1.2f%% \n', e_lift, e_eigen);
 %% ****************************  Plots  ***********************************
 
 % Plot trajectories Learning
@@ -263,13 +219,6 @@ scatter(x_flat,y_flat)
 % xlabel('x')
 % xlabel('y')
 % title('Difference when projecting back')
-
-
-
-
-%h = drawpoint
-%drawnow limitrate
-
 
 %%
 lw = 4;
