@@ -20,37 +20,25 @@ k3 = @(t,x,u) ( f_u(t,x + k2(t,x,u)*deltaT/2,u) );
 k4 = @(t,x,u) ( f_u(t,x + k1(t,x,u)*deltaT,u) );
 f_ud = @(t,x,u) ( x + (deltaT/6) * ( k1(t,x,u) + 2*k2(t,x,u) + 2*k3(t,x,u) + k4(t,x,u)  )   );
 
-%% ************************** Basis functions *****************************
-
-basisFunction = 'rbf';
-% RBF centers
-Nrbf = 20;
-cent = rand(n,Nrbf)*2 - 1;
-rbf_type = 'thinplate'; 
-
-liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
-Nlift = Nrbf + n;
-
-Nlambda = 10;
-Ngen = Nlambda*Nrbf;
-gfun = @(xx) rbf(xx',cent,rbf_type);
 
 %% ************************** Collect data ********************************
 tic
 disp('Starting data collection')
 Ntime = 300;
-Ntraj = 1000;
+Ntraj = 20;
 
 % Random forcing
 %Ubig = 2*rand([Ntime Ntraj]) - 1;
 Ubig = zeros(Ntime,Ntraj);
 
 % Random initial conditions
-%X0 = (rand(n,Ntraj)*2 - 1);
+X0 = (rand(n,Ntraj)*2 - 1);
 
 phi0 = rand(1,Ntraj)*2*pi;
 r0 = 0.2;
 X0 = r0*([cos(phi0);sin(phi0)]);
+
+
 
 Xstr = zeros(2,Ntraj,Ntime); % *str is structure
 Xacc = []; Yacc = []; Uacc = []; % *acc is accumulated vectors
@@ -71,43 +59,27 @@ end
 
 fprintf('Data collection DONE, time = %1.2f s \n', toc);
 
+%% ************************** Basis functions *****************************
 
-%% ******************************* Generate Eigenfunctions ***********************************
-disp('Starting  GENERATION')
-
-tic
-%lambda = rand(Nlambda,1)-1;
-
-lambda_dmd = dmd(Xstr,deltaT);
-lambda = zeros(Nlambda,1);
-lambda(1:length(lambda_dmd)) = lambda_dmd; % start the first lambda to dmd ones
-dlambda = Nlambda - length(lambda_dmd); % how many more to add
-nlambda = length(lambda_dmd); % starting lambda number
-
-vlambda = [0,1
-           1,0
-           2,0
-           0,2
-           2,1
-           1,2
-           3,1
-           1,3
-           3,2
-           2,3];
-
-while nlambda < Nlambda % stop when we have enough lambda  
-    nlambda = nlambda+1;
-    for k =1:length(lambda_dmd) % combination of dmd lambdas            
-        lambda(nlambda) = lambda(nlambda) + lambda_dmd(k)*vlambda(nlambda,k);
-    end
+basisFunction = 'rbf';
+Nrbf = 20;
+center_type = 'data';
+switch center_type 
+    case 'random'
+        cent = rand(n,Nrbf)*2 - 1;
+    case 'data'
+        cent = datasample(Xacc',Nrbf)'+0.05*(rand(n,Nrbf)*2-1);
 end
+rbf_type = 'thinplate'; 
 
-Nlambda = length(lambda);
-y_reg = @(x) [x(1),x(2)];
-[phi_fun, A_eigen, C_eigen] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
+liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
+Nlift = Nrbf + n;
 
-%C_eigen = get_c(Xstr, phi_fun, y_reg);
-fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
+Nlambda = 20;
+Ngen = Nlambda*Nrbf;
+gfun = @(xx) rbf(xx',cent,rbf_type);
+
+
 
 %% ******************************* Lift ***********************************
 
@@ -132,6 +104,7 @@ Clift = M(Nlift+1:end,1:Nlift);
 
 fprintf('Regression done, time = %1.2f s \n', toc);
 
+% Plot the eigenvalues
 % cplot = @(r,x0,y0) plot(x0 + r*cos(linspace(0,2*pi,200)),y0 + r*sin(linspace(0,2*pi,200)),'-');
 % afigure
 % hold on
@@ -139,15 +112,61 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 % cplot(1,0,0)
 % axis equal
 
-%% *********************** Predictor comparison ***************************
 
-Tmax = 3;
+%% ******************************* Generate Eigenfunctions ***********************************
+disp('Starting  GENERATION'); tic
+
+lambda_type = 'eDMD';
+switch lambda_type
+    case 'random'
+        lambda = 2*(rand(Nlambda,1)*2-1) + 2i*(rand(Nlambda,1)*2-1);
+    case 'DMDmixing'
+        lambda_dmd = dmd(Xstr,deltaT);
+        lambda = zeros(Nlambda,1);
+        lambda(1:length(lambda_dmd)) = lambda_dmd; % start the first lambda to dmd ones
+        dlambda = Nlambda - length(lambda_dmd); % how many more to add
+        nlambda = length(lambda_dmd); % starting lambda number
+
+        vlambda = [0,1
+                   1,0
+                   2,0
+                   0,2
+                   2,1
+                   1,2
+                   3,1
+                   1,3
+                   3,2
+                   2,3];
+
+        while nlambda < Nlambda % stop when we have enough lambda  
+            nlambda = nlambda+1;
+            for k =1:length(lambda_dmd) % combination of dmd lambdas            
+                lambda(nlambda) = lambda(nlambda) + lambda_dmd(k)*vlambda(nlambda,k);
+            end
+        end
+    case 'eDMD'
+        lambda =  log(eig(Alift))/deltaT;
+end
+
+Nlambda = length(lambda);
+y_reg = @(x) [x(1),x(2)];
+[phi_fun, A_eigen, C_eigen] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
+
+%C_eigen = get_c(Xstr, phi_fun, y_reg);
+fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
+
+
+%% *********************** Predictor comparison ***************************
+tic
+
+Tmax = 2.5;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
 
 % Initial condition
 x0 = [-0.2021;-0.2217];
+%x0 = [-1.6021;-1.417];
 x_true = x0;
 
 % Lifted initial condition
@@ -160,6 +179,9 @@ zeigen = phi_fun_v(x0);
 
 Ab_eigen = expm(A_eigen*deltaT);
 
+fprintf('Preparation done, time = %1.2f s \n', toc);
+
+tic
 % Simulate
 for i = 0:Ntime-1
     % Koopman predictor
@@ -180,6 +202,8 @@ trueRMS = sqrt( sum(x_true.*x_true,'all'));
 e_lift  = 100*sqrt( sum((x_true-x_koop).*(x_true-x_koop),'all'))/trueRMS;
 e_eigen = 100*sqrt( sum((x_true-x_eigen).*(x_true-x_eigen),'all'))/trueRMS;
 
+fprintf('Simulation done.time = %1.2f s \n', toc);
+
 fprintf('Simulation done. Error: \n - eDMD:  %1.2f%% \n - eigen: %1.2f%% \n', e_lift, e_eigen);
 %% ****************************  Plots  ***********************************
 
@@ -194,16 +218,12 @@ end
 plot(x_true(1,:),x_true(2,:),'-r')
 plot(x_koop(1,:),x_koop(2,:),'-b')
 plot(x_eigen(1,:),x_eigen(2,:),'-g')
+scatter(cent(1,:),cent(2,:),'o')
 axis equal
 xlabel('x')
 xlabel('y')
+legend('True','Koopman','eigen')
 title('Learning Trajectories')
-
-
-[X,Y] = meshgrid(-0.5:0.2:0.5,-0.5:0.2:0.5);
-x_flat = reshape(X,[1,size(X,1)*size(X,2)]);
-y_flat = reshape(Y,[1,size(X,1)*size(X,2)]);
-scatter(x_flat,y_flat)
 
 %% Transform and plot back
 
