@@ -6,9 +6,26 @@ rng(2141444)
 
 %% *************************** Dynamics ***********************************
 
-f_u =  @(t,x,u)([2*x(2,:) ; -0.8*x(1,:) - 10*x(1,:).^2.*x(2,:) + 2*x(2,:) + u] );
-n = 2;
-m = 1; % number of control inputs
+dynamic_problem = 'VanDerPol';
+
+switch dynamic_problem
+    case 'VanDerPol'
+        f_u =  @(t,x,u)([2*x(2,:) ; -0.8*x(1,:) - 10*x(1,:).^2.*x(2,:) + 2*x(2,:) + u] );
+        n = 2;
+        m = 1; % number of control inputs
+        Ntime = 400;
+        Ntraj = 30;
+        phi0 = rand(1,Ntraj)*2*pi;
+        r0 = 0.2;
+        X0 = r0*([cos(phi0);sin(phi0)]);
+    case 'nPendulum'
+        f_u =  @(t,x,u)([x(2,:) ; -sin(x(1,:))+u] );
+        n = 2;
+        Ntime = 300;
+        Ntraj = 30;
+        m = 1; % number of control inputs
+        X0 =[0.1:(2.4/(Ntraj-1)):2.5].*([1;0]);
+end
 
 % ************************** Discretization ******************************
 
@@ -24,21 +41,13 @@ f_ud = @(t,x,u) ( x + (deltaT/6) * ( k1(t,x,u) + 2*k2(t,x,u) + 2*k3(t,x,u) + k4(
 %% ************************** Collect data ********************************
 tic
 disp('Starting data collection')
-Ntime = 300;
-Ntraj = 20;
 
 % Random forcing
 %Ubig = 2*rand([Ntime Ntraj]) - 1;
 Ubig = zeros(Ntime,Ntraj);
 
 % Random initial conditions
-X0 = (rand(n,Ntraj)*2 - 1);
-
-phi0 = rand(1,Ntraj)*2*pi;
-r0 = 0.2;
-X0 = r0*([cos(phi0);sin(phi0)]);
-
-
+%X0 = (rand(n,Ntraj)*2 - 1);
 
 Xstr = zeros(2,Ntraj,Ntime); % *str is structure
 Xacc = []; Yacc = []; Uacc = []; % *acc is accumulated vectors
@@ -61,8 +70,10 @@ fprintf('Data collection DONE, time = %1.2f s \n', toc);
 
 %% ************************** Basis functions *****************************
 
-basisFunction = 'rbf';
 Nrbf = 20;
+eps_rbf = 1;
+basisFunction = 'rbf';
+rbf_type = 'thinplate'; 
 center_type = 'data';
 switch center_type 
     case 'random'
@@ -70,14 +81,28 @@ switch center_type
     case 'data'
         cent = datasample(Xacc',Nrbf)'+0.05*(rand(n,Nrbf)*2-1);
 end
-rbf_type = 'thinplate'; 
 
-liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
-Nlift = Nrbf + n;
 
-Nlambda = 20;
-Ngen = Nlambda*Nrbf;
-gfun = @(xx) rbf(xx',cent,rbf_type);
+% Plot RBFs
+ [X,Y] = meshgrid(-1:0.1:1,-1:0.1:1);
+ x_flat = reshape(X,[1,size(X,1)*size(X,2)]);
+ y_flat = reshape(Y,[1,size(X,1)*size(X,2)]);
+ xy_flat = [x_flat;y_flat];
+ 
+
+ 
+ afigure
+ hold on
+ for i=1:16
+    rbf_flat = rbf( xy_flat,cent(:,i), rbf_type, eps_rbf);
+    rbf_pack = reshape(rbf_flat,[size(X,1),size(X,2)]);
+    surf(X,Y,rbf_pack)
+ end
+ alpha 0.2
+ xlabel('x')
+ ylabel('y')
+
+    
 
 
 
@@ -85,6 +110,8 @@ gfun = @(xx) rbf(xx',cent,rbf_type);
 
 disp('Starting LIFT GENERATION')
 tic
+liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
+Nlift = Nrbf + n;
 Xlift = liftFun(Xacc);
 Ylift = liftFun(Yacc);
 fprintf('Lifting DONE, time = %1.2f s \n', toc);
@@ -116,7 +143,13 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 %% ******************************* Generate Eigenfunctions ***********************************
 disp('Starting  GENERATION'); tic
 
+Nlambda = 10;
+Ngen = Nlambda*Nrbf;
+gfun = @(xx) rbf(xx',cent,rbf_type,eps_rbf);
+
+
 lambda_type = 'eDMD';
+%lambda_type = 'DMDmixing'
 switch lambda_type
     case 'random'
         lambda = 2*(rand(Nlambda,1)*2-1) + 2i*(rand(Nlambda,1)*2-1);
@@ -147,19 +180,47 @@ switch lambda_type
     case 'eDMD'
         lambda =  log(eig(Alift))/deltaT;
 end
+%lambda = [[-10:1:10]'*0.1i];
 
 Nlambda = length(lambda);
 y_reg = @(x) [x(1),x(2)];
 [phi_fun, A_eigen, C_eigen] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
-
-%C_eigen = get_c(Xstr, phi_fun, y_reg);
 fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
+
+%% Analize Results
+
+% Sort lambdas
+[~,realLambdaIndex] = sort(real(lambda)); % real value
+[~,absLambdaIndex] = sort(abs(lambda)); % real value
+
+vC_eigen = vecnorm(C_eigen);
+
+% Sort based on C values
+[~,sCindex] = sort(vC_eigen); % real value
+
+
+afigure
+plot(vecnorm(C_eigen))
+
+
+
+% Evaluate effect of each eigenvalue
+sC_eigen = reshape(vC_eigen,[Nrbf,Nlambda]); % square abs value
+
+
+figure
+pcolor(sC_eigen(:,realLambdaIndex))
+xlabel('\lambda index')
+ylabel('g(x_0) index')
+colorbar
+
+
 
 
 %% *********************** Predictor comparison ***************************
 tic
 
-Tmax = 2.5;
+Tmax = 3;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
