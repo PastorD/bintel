@@ -7,7 +7,7 @@ rng(2141444)
 %% *************************** Dynamics ***********************************
 
 dynamic_problem = 'VanDerPol';
-
+dynamic_problem=  'nPendulum'
 switch dynamic_problem
     case 'VanDerPol'
         f_u =  @(t,x,u)([2*x(2,:) ; -0.8*x(1,:) - 10*x(1,:).^2.*x(2,:) + 2*x(2,:) + u] );
@@ -21,7 +21,7 @@ switch dynamic_problem
     case 'nPendulum'
         f_u =  @(t,x,u)([x(2,:) ; -sin(x(1,:))+u] );
         n = 2;
-        Ntime = 300;
+        Ntime = 2000;
         Ntraj = 30;
         m = 1; % number of control inputs
         X0 =[0.1:(2.4/(Ntraj-1)):2.5].*([1;0]);
@@ -29,7 +29,7 @@ end
 
 % ************************** Discretization ******************************
 
-deltaT = 0.01;
+deltaT = 0.02;
 %Runge-Kutta 4
 k1 = @(t,x,u) (  f_u(t,x,u) );
 k2 = @(t,x,u) ( f_u(t,x + k1(t,x,u)*deltaT/2,u) );
@@ -90,21 +90,16 @@ end
  xy_flat = [x_flat;y_flat];
  
 
- 
- afigure
- hold on
- for i=1:16
+afigure
+hold on
+for i=1:1
     rbf_flat = rbf( xy_flat,cent(:,i), rbf_type, eps_rbf);
     rbf_pack = reshape(rbf_flat,[size(X,1),size(X,2)]);
     surf(X,Y,rbf_pack)
- end
- alpha 0.2
- xlabel('x')
- ylabel('y')
-
-    
-
-
+end
+alpha 0.2
+xlabel('x')
+ylabel('y')
 
 %% ******************************* Lift ***********************************
 
@@ -143,13 +138,16 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 %% ******************************* Generate Eigenfunctions ***********************************
 disp('Starting  GENERATION'); tic
 
-Nlambda = 10;
-Ngen = Nlambda*Nrbf;
-gfun = @(xx) rbf(xx',cent,rbf_type,eps_rbf);
+Nlambda = 30;
+Ng0 = Nrbf+n;
+Ngen = Nlambda*Ng0;
+centG0 = datasample(Xacc',Nrbf)'+0.05*(rand(n,Nrbf)*2-1);
+gfun = @(xx) [xx';rbf(xx',cent,rbf_type,eps_rbf)];
 
 
 lambda_type = 'eDMD';
 %lambda_type = 'DMDmixing'
+%lambda_type = 'random'
 switch lambda_type
     case 'random'
         lambda = 2*(rand(Nlambda,1)*2-1) + 2i*(rand(Nlambda,1)*2-1);
@@ -180,12 +178,15 @@ switch lambda_type
     case 'eDMD'
         lambda =  log(eig(Alift))/deltaT;
 end
-%lambda = [[-10:1:10]'*0.1i];
+%lambda = [lambda;[-10:1:10]'*0.1i];
 
 Nlambda = length(lambda);
 y_reg = @(x) [x(1),x(2)];
-[phi_fun, A_eigen, C_eigen] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
+[phi_fun, A_eigen, C_eigen, phi_grid] = get_phi_A(Xstr, time_str, lambda, gfun,y_reg);
 fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
+
+
+%plot_()
 
 %% Analize Results
 
@@ -194,9 +195,8 @@ fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
 [~,absLambdaIndex] = sort(abs(lambda)); % real value
 
 vC_eigen = vecnorm(C_eigen);
-
+dA_eigen = diag(A_eigen);
 % Sort based on C values
-[~,sCindex] = sort(vC_eigen); % real value
 
 
 afigure
@@ -205,28 +205,44 @@ plot(vecnorm(C_eigen))
 
 
 % Evaluate effect of each eigenvalue
-sC_eigen = reshape(vC_eigen,[Nrbf,Nlambda]); % square abs value
+sC_eigen = reshape(vC_eigen,[Ng0,Nlambda]); % square abs value
+
+[~,sCindex] = sort(vC_eigen); % real value
+
+afigure
+scatter(real(dA_eigen),imag(dA_eigen),vC_eigen'/max(vC_eigen)*36*50+0.001) 
+xlabel('Real part')
+ylabel('Imaginary part')
+title('Eigenvalues location. Size is proportional to C contribution')
+%axis equal
+
+% afigure
+% plot(dA_eigen(sCindex(1:10)),'*')
 
 
 figure
 pcolor(sC_eigen(:,realLambdaIndex))
 xlabel('\lambda index')
 ylabel('g(x_0) index')
+title('C column value for a given eigenfunction')
 colorbar
 
 
+% Plot the best eigenfunction
+traj_flat = reshape(Xstr,[n,Ntime*Ntraj]);
+plot_eigenTraj(phi_grid,traj_flat,'scatter3',sCindex(1))
 
 
 %% *********************** Predictor comparison ***************************
 tic
 
-Tmax = 3;
+Tmax = 10;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
 
 % Initial condition
-x0 = [-0.2021;-0.2217];
+x0 = [1.2021;-1.2217];
 %x0 = [-1.6021;-1.417];
 x_true = x0;
 

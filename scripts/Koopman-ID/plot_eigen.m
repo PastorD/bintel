@@ -20,7 +20,6 @@ function [] = plot_eigen(phi_fun)
         surf(X,Y,Z)
         alpha 0.3
     end
-
     xlabel('x')
     ylabel('y')
 

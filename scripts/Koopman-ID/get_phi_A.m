@@ -1,6 +1,6 @@
 
 
-function [phi_lambda_g_out,A,C] = get_phi_A(traj, time, lambda, gfun, y_reg)
+function [phi_lambda_g_out,A,C,phi_grid] = get_phi_A(traj, time, lambda, gfun, y_reg)
 
     % Input:
     %   - traj (number of states
@@ -19,7 +19,7 @@ function [phi_lambda_g_out,A,C] = get_phi_A(traj, time, lambda, gfun, y_reg)
     Ntraj = size(traj,2); % number of discontinous trajectories
     Nt = size(traj,3); % number of timesteps per trajectory 
     Nlambda = length(lambda);
-    Ng = length(gfun(1));    
+    Ng = length(gfun([0,0]));    
     Nphi = Nlambda*Ng; % number of eigenfunctions
     
     % Define Variables
@@ -61,8 +61,7 @@ function [phi_lambda_g_out,A,C] = get_phi_A(traj, time, lambda, gfun, y_reg)
     end
     
     C = y_reg_grid/phi_grid; 
-           
-    
+  
 end
 
 

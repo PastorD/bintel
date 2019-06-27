@@ -1,23 +1,31 @@
 
 clear all
-x = -1:0.01:1;
-%x = x'
-C = zeros(size(x));
+x = -2:0.01:2;
+C = 0;
 
 afigure
+
+hold on
+plot(x,rbf( x,C, 'thinplate'))
+plot(x,rbf( x,C,'gauss'))
+plot(x,rbf( x,C, 'invquad'))
+plot(x,rbf( x,C, 'invmultquad'))
 xlabel('x')
 ylabel('RBF')
-hold on
+legend('thinplate','gauss','invquad','invmultquad')
 
-subplot(2,2,1)
-plot(x,rbf( x,C, 'thinplate'))
 
-subplot(2,2,2)
-plot(x,rbf( x,C,'gauss'))
 
-subplot(2,2,3)
-plot(x,rbf( x,C, 'invquad'))
-
-subplot(2,2,4)
-plot(x,rbf( x,C, 'invmultquad'))
-%legend('thinplate','gauss','invquad','invmultquad')
+ [X,Y] = meshgrid(-1:0.1:1,-1:0.1:1);
+ x_flat = reshape(X,[1,size(X,1)*size(X,2)]);
+ y_flat = reshape(Y,[1,size(X,1)*size(X,2)]);
+ xy_flat = [x_flat;y_flat];
+ 
+ rbf_flat = rbf( xy_flat,[0;0], 'invmultquad');
+ rbf_pack = reshape(rbf_flat,[size(X,1),size(X,2)]);
+ 
+ afigure
+ surf(X,Y,rbf_pack)
+ xlabel('x')
+ ylabel('y')
+  
