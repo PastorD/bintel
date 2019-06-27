@@ -21,7 +21,7 @@ switch dynamic_problem
     case 'nPendulum'
         f_u =  @(t,x,u)([x(2,:) ; -sin(x(1,:))+u] );
         n = 2;
-        Ntime = 2000;
+        Ntime = 500;
         Ntraj = 30;
         m = 1; % number of control inputs
         X0 =[0.1:(2.4/(Ntraj-1)):2.5].*([1;0]);
@@ -29,7 +29,7 @@ end
 
 % ************************** Discretization ******************************
 
-deltaT = 0.02;
+deltaT = 0.01;
 %Runge-Kutta 4
 k1 = @(t,x,u) (  f_u(t,x,u) );
 k2 = @(t,x,u) ( f_u(t,x + k1(t,x,u)*deltaT/2,u) );
@@ -139,10 +139,10 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 disp('Starting  GENERATION'); tic
 
 Nlambda = 30;
-Ng0 = Nrbf+n;
+Ng0 = n;
 Ngen = Nlambda*Ng0;
 centG0 = datasample(Xacc',Nrbf)'+0.05*(rand(n,Nrbf)*2-1);
-gfun = @(xx) [xx';rbf(xx',cent,rbf_type,eps_rbf)];
+gfun = @(xx) [xx]'%;rbf(xx',cent,rbf_type,eps_rbf)];
 
 
 lambda_type = 'eDMD';
@@ -178,7 +178,7 @@ switch lambda_type
     case 'eDMD'
         lambda =  log(eig(Alift))/deltaT;
 end
-%lambda = [lambda;[-10:1:10]'*0.1i];
+lambda = [-10:1:10]'*0.1i;
 
 Nlambda = length(lambda);
 y_reg = @(x) [x(1),x(2)];
@@ -236,7 +236,7 @@ plot_eigenTraj(phi_grid,traj_flat,'scatter3',sCindex(1))
 %% *********************** Predictor comparison ***************************
 tic
 
-Tmax = 10;
+Tmax = 4;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
