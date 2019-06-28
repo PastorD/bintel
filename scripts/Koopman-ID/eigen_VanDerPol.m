@@ -7,7 +7,7 @@ rng(2141444)
 %% *************************** Dynamics ***********************************
 
 dynamic_problem = 'VanDerPol';
-dynamic_problem=  'nPendulum'
+dynamic_problem=  'nPendulum';
 switch dynamic_problem
     case 'VanDerPol'
         f_u =  @(t,x,u)([2*x(2,:) ; -0.8*x(1,:) - 10*x(1,:).^2.*x(2,:) + 2*x(2,:) + u] );
@@ -19,12 +19,21 @@ switch dynamic_problem
         r0 = 0.2;
         X0 = r0*([cos(phi0);sin(phi0)]);
     case 'nPendulum'
-        f_u =  @(t,x,u)([x(2,:) ; -sin(x(1,:))+u] );
+        m = 1; g = 9.81; l = 1;
+        % Do nominal control design:
+        A_nom = [0 1; g/l 0];
+        B_nom = [0; 1];
+        Q = eye(2);
+        R = 1;
+        K_nom = -lqr(A_nom,B_nom,Q,R);
+        
+        f_u =  @(t,x,u) [x(2,:); g/l*sin(x(1,:))+ u];
         n = 2;
-        Ntime = 500;
-        Ntraj = 30;
+        Ntime = 200;
+        Ntraj = 20;
         m = 1; % number of control inputs
-        X0 =[0.1:(2.4/(Ntraj-1)):2.5].*([1;0]);
+        X0 = randn(n,Ntraj);
+        X0 = X0./vecnorm(X0,2,1);
 end
 
 % ************************** Discretization ******************************
@@ -57,11 +66,12 @@ time_str = zeros(Ntraj,Ntime);
 Xcurrent = X0;
 Xstr(:,:,1) = X0;
 for i = 2:Ntime
-    Xnext = f_ud(0,Xcurrent,Ubig(i,:));
+    noise = 0.1*randn();
+    Xnext = f_ud(0,Xcurrent,K_nom*Xcurrent+noise);
     Xstr(:,:,i) = Xnext;
     Xacc = [Xacc Xcurrent];
     Yacc = [Yacc Xnext];
-    Uacc = [Uacc Ubig(i,:)];
+    Uacc = [Uacc K_nom*Xcurrent+noise];
     Xcurrent = Xnext;
     time_str(:,i) = i*deltaT*ones(Ntraj,1);
 end
@@ -139,10 +149,10 @@ fprintf('Regression done, time = %1.2f s \n', toc);
 disp('Starting  GENERATION'); tic
 
 Nlambda = 30;
-Ng0 = n;
+Ng0 = Nrbf+n;
 Ngen = Nlambda*Ng0;
 centG0 = datasample(Xacc',Nrbf)'+0.05*(rand(n,Nrbf)*2-1);
-gfun = @(xx) [xx]'%;rbf(xx',cent,rbf_type,eps_rbf)];
+gfun = @(xx) [xx'; rbf(xx',cent,rbf_type,eps_rbf)];
 
 
 lambda_type = 'eDMD';
@@ -178,7 +188,6 @@ switch lambda_type
     case 'eDMD'
         lambda =  log(eig(Alift))/deltaT;
 end
-lambda = [-10:1:10]'*0.1i;
 
 Nlambda = length(lambda);
 y_reg = @(x) [x(1),x(2)];
@@ -187,6 +196,86 @@ fprintf('Eigenvalue Generation DONE, time = %1.2f s \n', toc);
 
 
 %plot_()
+
+%% Add control
+%
+% ************************** Collect data (with control) ********************************
+tic
+disp('Starting data collection with  control')
+Nsim = 200; % was 200 % !!!! (Make larger - as for uncontrolled?)
+
+
+% Random forcing
+Ubig = 10*rand([Nsim Ntraj]) - 5;
+
+
+% Generate trajectories with control (vectorized - faster)
+tic
+% Initial conditions
+Xcurrent = [];
+for i = 1:Ntraj
+    Xcurrent = [Xcurrent, Xstr(:,i,1)];
+end
+X_Data = zeros(n,Nsim+1,Ntraj);
+U_Data = zeros(m,Nsim,Ntraj);
+X_Data(:,1,:) = Xcurrent;
+X = []; Y = []; U = [];
+for i = 1:Nsim
+    Xnext = f_ud(0,Xcurrent,K_nom*Xcurrent+Ubig(i,:));
+    X = [X Xcurrent];
+    Y = [Y Xnext];
+    U = [U K_nom*Xcurrent+Ubig(i,:)];
+    
+    U_Data(:,i,:) = K_nom*reshape(X_Data(:,i,:),n,Ntraj)+Ubig(i,:); % Record data trajectory - by trajectory
+    X_Data(:,i+1,:) = Xnext;
+    Xcurrent = Xnext;
+end
+
+% inds = false(1,Ntraj);
+% for i = 1:Ntraj
+%     if( ~any(any(abs(X_Data(:,:,i)) > 3)) && ~any(any(isnan(X_Data(:,:,i)))) )
+%         inds(i) = 1;
+%     end
+% end
+% Convert to cell array - pretty useless, but the Regression code after assumes cell array
+Xtraj = cell(1,Ntraj); Utraj = cell(1,Ntraj);
+for i = 1:Ntraj
+    Xtraj{i} = X_Data(:,:,i);
+    Utraj{i} = U_Data(:,:,i);
+end
+%Xtraj = Xtraj(inds); Utraj = Utraj(inds); Ntraj = numel(Xtraj);
+toc
+
+
+%% Regression for B
+% Setup regression problem min ||Q * vec(Blift) - b||_2^2 corresponding to
+% min_{Blift} \sum_{j=1}^{Nsim} ||xpred - xtrue||^2 where
+% xpred = C*Alift^j*x0_lift + sum_{k=0}^{j-1} kron(u_k',C*Alift^{j-k-1})*vec(BLift)
+% (And this sum over all trajectories)
+phi_fun_v = @(x) phiFunction(phi_fun,x);
+Obs =  obsvk(sparse(A_eigen),C_eigen,Nsim+1); % Not an efficient implementation
+b = [];
+nc = size(C_eigen,1);
+Q = zeros(Ntraj*Nsim*nc,size(A_eigen,1)*m);
+for q = 1 : Ntraj
+    fprintf('Building regression matrces for B: %f percent complete \n', 100*q / Ntraj)
+    x0 = Xtraj{q}(:,1);
+    Obsx0 = Obs*phi_fun_v(x0);
+    for j = 1:Nsim
+        b = [b ; Obsx0( j*nc + 1 : (j+1)*nc, : ) - Xtraj{q}(:,j+1)] ;
+        tmp = 0;
+        for k = 0 : j-1
+            kprime = j - k -1;
+            tmp = tmp + kron(Utraj{q}(:,k+1)',Obs(kprime*nc + 1 : (kprime+1)*nc,:));
+        end
+        Q((q-1)*Nsim*nc + (j-1)*nc + 1 : (q-1)*Nsim*nc + j*nc,:) = tmp;
+    end
+end
+b = -b;
+
+B_eigen = pinv(Q)*b; % = vec(Blift)
+B_eigen = reshape(B_eigen,size(A_eigen,1),m); % Unvectorize
+
 
 %% Analize Results
 
@@ -232,24 +321,21 @@ colorbar
 traj_flat = reshape(Xstr,[n,Ntime*Ntraj]);
 plot_eigenTraj(phi_grid,traj_flat,'scatter3',sCindex(1))
 
-
 %% *********************** Predictor comparison ***************************
 tic
 
-Tmax = 4;
+Tmax = 1;
 Ntime = Tmax/deltaT;
 %u_dt = @(i)((-1).^(round(i/30))); % control signal
 u_dt = @(i) 0;
 
 % Initial condition
-x0 = [1.2021;-1.2217];
+x0 = [0.5;-0.2];
 %x0 = [-1.6021;-1.417];
 x_true = x0;
 
 % Lifted initial condition
 xlift = liftFun(x0);
-
-phi_fun_v = @(x) phiFunction(phi_fun,x);
 
 % Eigen value at zero
 zeigen = phi_fun_v(x0);
@@ -262,22 +348,22 @@ tic
 % Simulate
 for i = 0:Ntime-1
     % Koopman predictor
-    xlift = [xlift, Alift*xlift(:,end) + Blift*u_dt(i)]; % Lifted dynamics
+    xlift = [xlift, Alift*xlift(:,end) + Blift*(K_nom*Clift*xlift(:,end)+u_dt(i))]; % Lifted dynamics
     
     % Eigen
-    zeigen = [zeigen,Ab_eigen*zeigen(:,end)];
+    zeigen = [zeigen,Ab_eigen*zeigen(:,end)+B_eigen*(u_dt(i))]; %K_nom*C_eigen*zeigen(:,end) (nominal controller subtracted)
     
     % True dynamics
-    x_true = [x_true, f_ud(0,x_true(:,end),u_dt(i)) ];
+    x_true = [x_true, f_ud(0,x_true(:,end),K_nom*x_true(:,end)+u_dt(i)) ];
 end
 x_koop  = Clift * xlift; % Koopman predictions
 x_eigen = C_eigen*zeigen;
 
 
 % Compute error
-trueRMS = sqrt( sum(x_true.*x_true,'all'));
-e_lift  = 100*sqrt( sum((x_true-x_koop).*(x_true-x_koop),'all'))/trueRMS;
-e_eigen = 100*sqrt( sum((x_true-x_eigen).*(x_true-x_eigen),'all'))/trueRMS;
+trueRMS = sqrt( sum(x_true.*x_true));
+e_lift  = 100*sqrt( sum((x_true-x_koop).*(x_true-x_koop)))/trueRMS;
+e_eigen = 100*sqrt( sum((x_true-x_eigen).*(x_true-x_eigen)))/trueRMS;
 
 fprintf('Simulation done.time = %1.2f s \n', toc);
 
@@ -297,6 +383,8 @@ plot(x_koop(1,:),x_koop(2,:),'-b')
 plot(x_eigen(1,:),x_eigen(2,:),'-g')
 scatter(cent(1,:),cent(2,:),'o')
 axis equal
+xaxis([-2 2])
+yaxis([-2 2])
 xlabel('x')
 xlabel('y')
 legend('True','Koopman','eigen')
