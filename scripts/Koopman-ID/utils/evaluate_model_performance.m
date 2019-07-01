@@ -9,46 +9,19 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std] = ...
     n_edmd = size(A_edmd,1);
     n_koop = size(A_koop,1);
     Ntime = Tsim/deltaT;
-    u = 5*rand(m,Nsim,Ntime)-2.5;
-    
-    x = zeros(n,Nsim,Ntime+1);
-    z_edmd = zeros(n_edmd,Nsim,Ntime+1);
-    z_koop = zeros(n_koop,Nsim,Ntime+1);
-    x(:,:,1) = X0;
-    z_edmd(:,:,1) = liftFun(X0);
-    z_koop(:,:,1) = phi_fun_v(X0);
-    
     A_koop_d = expm(A_koop*deltaT); %Discretize A_koop
+    
+    %Prediction task:
+    [x,x_edmd,x_koop,mse_edmd_avg,mse_koop_avg,mse_edmd_std,mse_koop_std]...
+            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,f_u,liftFun,...
+            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop_d,B_koop,C_koop);
+    
+    %Closed loop task:
+    [x_track,x_edmd_track,x_koop_track,mse_nom_avg, mse_edmd_track_avg,...
+        mse_koop_track_avg,t_plot,traj_d] = sim_closed_loop(n,m,n_edmd,n_koop,Nsim,...
+        Ntime,deltaT,Tsim,f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,...
+        C_edmd,A_koop_d,B_koop,C_koop)
 
-    % Simulate all systems and initial points
-    for i = 1:Ntime
-        %True dynamics:
-        x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), K_nom*x(:,:,i)+u(:,:,i));
-        
-        %EDMD predictor:
-        z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*(K_nom*C_edmd*z_edmd(:,:,i) + u(:,:,i));
-
-        %Koopman eigenfunction predictor:
-        z_koop(:,:,i+1) = A_koop_d*z_koop(:,:,i) + B_koop*u(:,:,i);
-    end
-    
-    % Calculate corresponding predictions and MSE
-    x_edmd = zeros(n,Nsim,Ntime+1);
-    x_koop = zeros(n,Nsim,Ntime+1);
-    mse_edmd = zeros(Nsim,1);
-    mse_koop = zeros(Nsim,1);
-    for i = 1 : Nsim
-        x_edmd(:,i,:) = C_edmd * reshape(z_edmd(:,i,:),n_edmd,Ntime+1); %EDMD predictions
-        x_koop(:,i,:) = C_koop * reshape(z_koop(:,i,:),n_koop,Ntime+1); %Koopman eigenfunction predictions
-        mse_edmd(i) = immse(reshape(x(:,i,:),n,Ntime+1), reshape(x_edmd(:,i,:),n,Ntime+1));
-        mse_koop(i) = immse(reshape(x(:,i,:),n,Ntime+1), reshape(x_koop(:,i,:),n,Ntime+1));
-    end
-    
-    mse_edmd_avg = mean(mse_edmd);
-    mse_koop_avg = mean(mse_koop);
-    mse_edmd_std = std(mse_edmd);
-    mse_koop_std = std(mse_koop);
-    
     %Plot results
     if plot_results
         lw=4;
@@ -83,7 +56,7 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std] = ...
         h2.Position = h2.Position + [0 0.1 0 -0.1]; %Modify size of 1st subplot
         
         % Plot trajectories Learning
-        h3 = subplot(2,2,3:4);
+        h3 = subplot(2,2,3);
         hold on
         for i=1:Ntraj
            scatter(Xstr(1,i,1),Xstr(2,i,1),'+')
@@ -97,13 +70,26 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std] = ...
         end
         %scatter(cent(1,:),cent(2,:),'o')
         %axis equal
-        xaxis([-1.5 1.5])
-        yaxis([-1.5 1.5])
+        xaxis([-5 5])
+        yaxis([-5 5])
         xlabel('x')
         xlabel('y')
         %legend('True','EDMD','Koopman e-func')
         title('Training and simulated trajectories','interpreter','latex');
         h3.Position = h3.Position + [0 0 0 0.125]; %Modify size of 3rd subplot
         set(gcf, 'Position',  [0, 0, 1670, 980]) %Modify size of figure window
+        
+        %Closed loop plot:
+        h4 = subplot(2,2,4);
+        plot(t_plot,traj_d(1,:),':b','linewidth',lw); hold on
+        plot(t_plot,x_track(1,1:end-1),'k','linewidth',lw); hold on
+        plot(t_plot,x_edmd_track(1,1:end-1),'--r','linewidth',lw); hold on
+        plot(t_plot,x_koop_track(1,1:end-1),'--g','linewidth',lw); hold on
+        %axis([0 Tsim min(x_edmd(1,1,:))-0.15 max(x_edmd(1,1,:))+0.15])
+        title('Closed loop trajectory tracking - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
+        set(gca,'fontsize',20)
+        LEG = legend('Reference', 'Nominal controller','EDMD','Koopman e-func','location','southeast');
+        set(LEG,'interpreter','latex')
+        h4.Position = h4.Position + [0 0 0 0.125]; %Modify size of 4th subplot
     end
 end

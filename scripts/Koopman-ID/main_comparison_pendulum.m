@@ -29,7 +29,7 @@ Ntime = 200;    %Length of each trajectory (# of time steps)
 Ntraj = 40;     %Number of trajectories
 deltaT = 0.01;  %Time step length of simulation
 X0 = randn(n,Ntraj); %Sample initial points for each trajectory
-X0 = X0./vecnorm(X0,2,1); %Normalize so initial points lie on unit circle
+X0 = pi*X0./vecnorm(X0,2,1); %Normalize so initial points lie on unit circle
 
 %E-DMD parameters:
 N_basis_edmd = 20; %Number of basis functions 
@@ -57,7 +57,7 @@ ylim = [-1, 1]; %Plot limits
 Nsim = 5;
 Tsim = 1;
 plot_results = true;
-X0_sim = 1.5*rand(n,Nsim)-0.75;
+X0_sim = 2*rand(n,Nsim)-1;
 
 %% ************************** Data Collection *****************************
 disp('Starting data collection...'); tic
@@ -67,33 +67,34 @@ disp('Starting data collection...'); tic
 [A_nom, B_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R);
 
 % Collect data to learn autonomous dynamics:
-
+autonomous_learning = true;
 U_perturb = 0.2*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
 [Xstr, Xacc, Yacc, Ustr, Uacc, timestr] = collect_data(n,m,Ntraj,...
-                                       Ntime,deltaT,X0,K_nom,f_u,U_perturb);
+                  Ntime,deltaT,X0,K_nom,f_u,U_perturb, autonomous_learning);
 
 % Collect data to learn controlled dynamics:
-
-U_perturb_c = 10*rand(Ntime,Ntraj)-5; %Significantly perturb nominal controller
+autonomous_learning = false;
+U_perturb_c = 20*rand(Ntime,Ntraj)-10; %Significantly perturb nominal controller
 [Xstr_c, Xacc_c, Yacc_c, Ustr_c, Uacc_c, timestr_c] = collect_data(n,m,Ntraj,...
-                                       Ntime,deltaT,X0,K_nom,f_u,U_perturb_c);
+                Ntime,deltaT,X0,K_nom,f_u,U_perturb_c, autonomous_learning);
 
 fprintf('Data collection done, execution time: %1.2f s \n', toc);
 %% *********************** Model Identification ***************************
                                    
 % Identify model using E-DMD to get eigenvalues and model to use for
 % comparison:
-
+disp('Starting EDMD...'); tic
 [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis_edmd,basis_function_edmd,...
     rbf_type_edmd, center_type_edmd, eps_rbf_edmd, plot_basis_edmd, xlim,...
     ylim, Xacc, Yacc, Uacc);
+fprintf('EDMD done, execution time: %1.2f s \n', toc);
 
 %Identify model using Koopman eigenfunctions:
 
 [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id(n, m, Ntraj, Ntime, N_basis_koop,...
     basis_function_koop, rbf_type_koop, center_type_koop, eps_rbf_koop, ...
-    N_lambda, lambda_type, A_edmd, A_nom, B_nom, ...
-                        K_nom, Xacc, Xstr, Xstr_c, Ustr_c, timestr, deltaT);
+    N_lambda, lambda_type, A_edmd, A_nom, B_nom, K_nom, Xacc, Xstr, Xacc_c,...
+    Yacc_c, Uacc_c, Xstr_c, Ustr_c, timestr, deltaT);
                     
 %% ************************ Analysis of Results ***************************
 
@@ -101,5 +102,5 @@ fprintf('Data collection done, execution time: %1.2f s \n', toc);
     evaluate_model_performance(K_nom, A_edmd, B_edmd, C_edmd, A_koop, B_koop, ...
     C_koop, Nsim, X0_sim, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
 
- fprintf('\nSimulation for model evaluation finalized. Average MSE: \n - EDMD:   %1.2f%% \n - Koopman eigenfunctions: %1.2f%% \nStandard Deviation MSE: \n - EDMD:  %1.2f%% \n - Koopman eigenfunctions: %1.2f%% \n', ...
+ fprintf('\nSimulation for model evaluation finalized. Average MSE: \n - EDMD:   %1.5f%% \n - Koopman eigenfunctions: %1.5f%% \nStandard Deviation MSE: \n - EDMD:  %1.5f%% \n - Koopman eigenfunctions: %1.5f%% \n', ...
         mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std);
