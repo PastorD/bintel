@@ -30,7 +30,7 @@ switch dynamic_problem
         f_u =  @(t,x,u) [x(2,:); g/l*sin(x(1,:))+ u];
         n = 2;
         Ntime = 200;
-        Ntraj = 20;
+        Ntraj = 30;
         m = 1; % number of control inputs
         X0 = randn(n,Ntraj);
         X0 = X0./vecnorm(X0,2,1);
@@ -67,7 +67,7 @@ Xcurrent = X0;
 Xstr(:,:,1) = X0;
 for i = 2:Ntime
     noise = 0.1*randn();
-    Xnext = f_ud(0,Xcurrent,K_nom*Xcurrent+noise);
+    Xnext = f_ud(0,Xcurrent,Ubig(i,:));
     Xstr(:,:,i) = Xnext;
     Xacc = [Xacc Xcurrent];
     Yacc = [Yacc Xnext];
@@ -221,7 +221,7 @@ U_Data = zeros(m,Nsim,Ntraj);
 X_Data(:,1,:) = Xcurrent;
 X = []; Y = []; U = [];
 for i = 1:Nsim
-    Xnext = f_ud(0,Xcurrent,K_nom*Xcurrent+Ubig(i,:));
+    Xnext = f_ud(0,Xcurrent,Ubig(i,:));
     X = [X Xcurrent];
     Y = [Y Xnext];
     U = [U K_nom*Xcurrent+Ubig(i,:)];
@@ -257,10 +257,21 @@ Obs =  obsvk(sparse(A_eigen),C_eigen,Nsim+1); % Not an efficient implementation
 b = [];
 nc = size(C_eigen,1);
 Q = zeros(Ntraj*Nsim*nc,size(A_eigen,1)*m);
+
+% Collect all X0
+x0_m = zeros(n,Ntraj);
+tic
+for q = 1:Ntraj
+    x0_m(:,1) = Xtraj{q}(:,1);     
+end
+
+% Collect all initial data points
+phi_fun_v_x0 = phi_fun_v(x0_m);
+%b = zeros(
 for q = 1 : Ntraj
     fprintf('Building regression matrces for B: %f percent complete \n', 100*q / Ntraj)
     x0 = Xtraj{q}(:,1);
-    Obsx0 = Obs*phi_fun_v(x0);
+    Obsx0 = Obs*phi_fun_v_x0(:,q);%(x0);
     for j = 1:Nsim
         b = [b ; Obsx0( j*nc + 1 : (j+1)*nc, : ) - Xtraj{q}(:,j+1)] ;
         tmp = 0;
@@ -276,6 +287,7 @@ b = -b;
 B_eigen = pinv(Q)*b; % = vec(Blift)
 B_eigen = reshape(B_eigen,size(A_eigen,1),m); % Unvectorize
 
+%[B_eigen] = get_B(Xstr, U_Data, time_str, A_eigen, phi_fun_v, C_eigen);
 
 %% Analize Results
 
@@ -383,8 +395,7 @@ plot(x_koop(1,:),x_koop(2,:),'-b')
 plot(x_eigen(1,:),x_eigen(2,:),'-g')
 scatter(cent(1,:),cent(2,:),'o')
 axis equal
-xaxis([-2 2])
-yaxis([-2 2])
+axis([-2 2 -2 2])
 xlabel('x')
 xlabel('y')
 legend('True','Koopman','eigen')
