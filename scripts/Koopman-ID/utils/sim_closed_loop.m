@@ -1,9 +1,9 @@
-function [x,x_edmd,x_koop,mse_nom_avg,mse_edmd_avg,mse_koop_avg t_plot, traj_d]...
+function [x,x_edmd,x_koop,mse_nom_avg,mse_edmd_avg,mse_koop_avg, t_plot, traj_d]...
             = sim_closed_loop(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,Tsim,...
             f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop_d,...
             B_koop,C_koop)
 
-    %Trajectory tracking task:
+    %Set up trajectory to track:
     t = 0 : deltaT : Tsim;
     t1 = t(1:floor(Ntime/3));
     t2 = t(floor(Ntime/3):floor(2*Ntime/3));
@@ -18,31 +18,43 @@ function [x,x_edmd,x_koop,mse_nom_avg,mse_edmd_avg,mse_koop_avg t_plot, traj_d].
                 spline([t3(1) t3(end)], [0 [x2 x3] 0], t3)];
     traj_d = [traj_d; diff([traj_d traj_d(end)])/deltaT];
     
+    %Initialize variables:
     Ntime_track = size(traj_d,2);
     x = zeros(n,Ntime_track+1);
     z_edmd = zeros(n_edmd,Ntime_track+1);
+    x_edmd = zeros(n,Ntime_track+1);
     z_koop = zeros(n_koop,Ntime_track+1);
+    x_koop = zeros(n,Ntime_track+1);
     x(:,1) = traj_d(:,1);
+    x_edmd(:,1) = traj_d(:,1);
+    x_koop(:,1) = traj_d(:,1);
     z_edmd(:,1) = liftFun(traj_d(:,1));
     z_koop(:,1) = phi_fun_v(traj_d(:,1));
-
-    % Simulate all systems and initial points
     
+    %Design controller for EDMD and Koopman systems
+    Q_edmd = zeros(size(A_edmd)); Q_edmd(1:2,1:2) = eye(2);
+    R_edmd = 1;
+    K_edmd = lqr(A_edmd,B_edmd, Q_edmd, R_edmd);
+
+    % Simulate all trajectories with linear feedback law
     for i = 1:Ntime_track
         %True dynamics:
         x(:,i+1) = sim_timestep(deltaT,f_u,0,x(:,i), K_nom*(x(:,i)-traj_d(:,i)));
         
         %EDMD predictor:
-        z_edmd(:,i+1) = A_edmd*z_edmd(:,i) + B_edmd*(K_nom*(C_edmd*z_edmd(:,i)-traj_d(:,i)));
-
+        %u_edmd = K_nom*(C_edmd*z_edmd(:,i)-traj_d(:,i));
+        u_edmd = K_edmd*(liftFun(x_edmd(:,i)-traj_d(:,i)));
+        z_edmd(:,i+1) = A_edmd*z_edmd(:,i) + B_edmd*u_edmd;
+        x_edmd(:,i+1) = sim_timestep(deltaT,f_u,0,x_edmd(:,i), u_edmd);
+        
+        
         %Koopman eigenfunction predictor:
-        z_koop(:,i+1) = A_koop_d*z_koop(:,i) + ...
-            B_koop*(K_nom*(C_koop*z_koop(:,i) - traj_d(:,i) - C_koop*z_koop(:,i)));
+        u_koop = K_nom*(C_koop*z_koop(:,i) - traj_d(:,i) - C_koop*z_koop(:,i));
+        z_koop(:,i+1) = A_koop_d*z_koop(:,i) + B_koop*u_koop;
+        x_koop(:,i+1) = sim_timestep(deltaT,f_u,0,x_koop(:,i), u_koop);
     end
     
     % Calculate corresponding predictions and MSE
-    x_edmd = zeros(n,Nsim,Ntime+1);
-    x_koop = zeros(n,Nsim,Ntime+1);
     mse_edmd = zeros(Nsim,1);
     mse_koop = zeros(Nsim,1);
     x_edmd = C_edmd * z_edmd; %EDMD predictions
