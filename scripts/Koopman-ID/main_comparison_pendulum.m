@@ -74,13 +74,14 @@ U_perturb = 0.2*randn(Ntime,Ntraj); %Add normally distributed noise to nominal c
 
 % Collect data to learn controlled dynamics:
 autonomous_learning = false;
-U_perturb_c = 20*rand(Ntime,Ntraj)-10; %Significantly perturb nominal controller
+U_perturb_c = 50*rand(Ntime,Ntraj)-25; %Significantly perturb nominal controller
 [Xstr_c, Xacc_c, Yacc_c, Ustr_c, Uacc_c, timestr_c] = collect_data(n,m,Ntraj,...
                 Ntime,deltaT,X0,K_nom,f_u,U_perturb_c, autonomous_learning);
 
 fprintf('Data collection done, execution time: %1.2f s \n', toc);
 %% *********************** Model Identification ***************************
-                                   
+           
+
 % Identify model using E-DMD to get eigenvalues and model to use for
 % comparison:
 disp('Starting EDMD...'); tic
@@ -104,8 +105,9 @@ fprintf('EDMD done, execution time: %1.2f s \n', toc);
     C_koop, Nsim, X0_sim, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
  
  fprintf('-----------------------------------------------------------------\n');
- fprintf('Predicition performance: \nAverage MSE: \n - EDMD:   %1.5f%% \n - Koopman eigenfunctions: %1.5f%% \nStandard Deviation MSE: \n - EDMD:  %1.5f%% \n - Koopman eigenfunctions: %1.5f%% \n', ...
+ fprintf('Predicition performance: \nAverage MSE: \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nStandard Deviation MSE: \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
         mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std);
  fprintf('-----------------------------------------------------------------\n');
- fprintf('Closed loop performance (MPC): \nAverage MSE: \n - Nominal:   %1.5f%% \n - EDMD:   %1.5f%% \n - Koopman eigenfunctions: %1.5f%% \nEnergy consumption proxy: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
+ fprintf('Closed loop performance (MPC): \nAverage MSE: \n - Nominal:   %1.5f \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nEnergy consumption proxy: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
         mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop);
+ fprintf('-----------------------------------------------------------------\n');

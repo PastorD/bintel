@@ -36,7 +36,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
 
     % Define Koopman controller
     Q = eye(2); % Weight matrices
-    R = 0.001;
+    R = 0.01;
     Tpred = 0.1; % Prediction horizon
     Np = round(Tpred / deltaT);
     traj_d = [traj_d traj_d(:,end).*ones(n,Np)]; %Add extra points to trajectory to allow prediction horizon
