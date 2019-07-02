@@ -1,4 +1,4 @@
-function [A_edmd, B_edmd, C_edmd] = extendedDMD(n,m,N_basis,basis_function,...
+function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis,basis_function,...
     rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc)
     %Identify lifted state space model using Extended Dynamic Mode
 
@@ -53,7 +53,7 @@ function [A_edmd, B_edmd, C_edmd] = extendedDMD(n,m,N_basis,basis_function,...
     % ******************************* Lift ***********************************
 
     %disp('Starting LIFT GENERATION')
-    liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type)] );
+    liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type,eps)] );
     Nlift = N_basis + n;
     Xlift = liftFun(Xacc);
     Ylift = liftFun(Yacc);

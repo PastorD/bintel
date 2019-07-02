@@ -1,5 +1,5 @@
-function [Xstr, Xacc, Yacc, Uacc, time_str] = collect_data(n,m,Ntraj,...
-                                       Ntime,deltaT,X0,K_nom,f_u,U_perturb)
+function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
+                  Ntime,deltaT,X0,K_nom,f_u,U_perturb, autonomous_learning)
     %Collect data from the "true" system with nominal controller plus
     %perturbation
     %Inputs:
@@ -18,23 +18,30 @@ function [Xstr, Xacc, Yacc, Uacc, time_str] = collect_data(n,m,Ntraj,...
     %              point from each trajectory
 
 
-    Xstr = zeros(n,Ntraj,Ntime); % *str is structure
+    Xstr = zeros(n,Ntraj,Ntime+1); % *str is structure
     Ustr = zeros(m,Ntraj,Ntime); 
-    Xacc = zeros(n,Ntraj*(Ntime-1)); % *acc is accumulated vectors
-    Yacc = zeros(n,Ntraj*(Ntime-1)); 
-    Uacc = zeros(m,Ntraj*(Ntime-1)); 
+    Xacc = zeros(n,Ntraj*(Ntime)); % *acc is accumulated vectors
+    Yacc = zeros(n,Ntraj*(Ntime)); 
+    Uacc = zeros(m,Ntraj*(Ntime)); 
 
     time_str = zeros(Ntraj,Ntime);
     Xcurrent = X0;
     Xstr(:,:,1) = X0;
-    for i = 2:Ntime
-        Xnext = sim_timestep(deltaT, f_u, 0, Xcurrent,K_nom*Xcurrent+U_perturb(i,:));
+    for i = 2:Ntime+1
+        Ucurrent = K_nom*Xcurrent+U_perturb(i-1,:);
+        Xnext = sim_timestep(deltaT, f_u, 0, Xcurrent, Ucurrent);
         Xstr(:,:,i) = Xnext;
-        Ustr(:,:,i) = K_nom*Xcurrent+U_perturb(i,:);
         Xacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Xcurrent;
         Yacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Xnext;
-        Uacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = K_nom*Xcurrent+U_perturb(i,:);
         Xcurrent = Xnext;
         time_str(:,i) = i*deltaT*ones(Ntraj,1);
+        
+        if autonomous_learning
+            Ustr(:,:,i-1) = Ucurrent;
+            Uacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Ucurrent;
+        else
+            Ustr(:,:,i-1) = Ucurrent - K_nom*Xcurrent;
+            Uacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Ucurrent - K_nom*Xcurrent;
+        end
     end
 end
