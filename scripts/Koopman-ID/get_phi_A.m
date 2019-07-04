@@ -13,7 +13,7 @@ function [phi_lambda_g_out,A,C,phi_grid] = get_phi_A(traj, time, lambda, gfun, y
     %   - gfun (number of g functions): function handle for g's
     
     
-        
+    k_steps = 10;
     % Get sizes
     Ns = size(traj,1); % number of states
     Ntraj = size(traj,2); % number of discontinous trajectories
@@ -39,7 +39,16 @@ function [phi_lambda_g_out,A,C,phi_grid] = get_phi_A(traj, time, lambda, gfun, y
 
             for j=1:Ntraj
                 gtemp =  gfun(traj(:,j,1)');
-                for k=1:Nt                    
+                for k=1:Nt
+                    %----------------------------------------
+                    %k-steps ahead eigenfunction evolution:
+%                     if k > k_steps
+%                         gtemp = gfun(traj(:,j,k-k_steps)');
+%                         phi_lambda_g(j,k) = exp(lambda(iLambda)*(time(j,k)-time(j,k-k_steps)))*gtemp(iG,:);
+%                     else
+%                         phi_lambda_g(j,k) = exp(lambda(iLambda)*time(j,k))*gtemp(iG,:);
+%                     end
+                    %----------------------------------------
                     phi_lambda_g(j,k) = exp(lambda(iLambda)*time(j,k))*gtemp(iG,:);
                 end
             end

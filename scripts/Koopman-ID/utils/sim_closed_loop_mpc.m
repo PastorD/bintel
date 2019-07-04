@@ -86,7 +86,8 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         
         % Koopman e-func MPC
 %         z_koop(:,i) = phi_fun_v(x_koop(:,i)); % Lift
-%         u_koop(:,i) = MPC_koop(z_koop(:,i),yr) + K_nom*x_edmd(:,i); % Get control input
+%         disp(sum(sum(isnan(z_koop(:,i)))));
+%         u_koop(:,i) = MPC_koop(z_koop(:,i),yr) + K_nom*x_koop(:,i); % Get control input
 %         x_koop(:,i+1) = sim_timestep(deltaT, f_u, 0, x_koop(:,i), u_koop(:,i));
         
         disp([u_nom(:,i), u_edmd(:,i) u_koop(:,i)])
