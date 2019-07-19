@@ -1,5 +1,5 @@
 function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0,K_nom,f_u,U_perturb, autonomous_learning)
+                  Ntime,deltaT,X0,Xf_A,K_nom,f_u,U_perturb, autonomous_learning)
     %Collect data from the "true" system with nominal controller plus
     %perturbation
     %Inputs:
@@ -24,24 +24,24 @@ function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
     Yacc = zeros(n,Ntraj*(Ntime)); 
     Uacc = zeros(m,Ntraj*(Ntime)); 
 
-    time_str = zeros(Ntraj,Ntime);
+    time_str = zeros(Ntraj,Ntime+1);
     Xcurrent = X0;
     Xstr(:,:,1) = X0;
-    for i = 2:Ntime+1
-        Ucurrent = K_nom*Xcurrent+U_perturb(i-1,:);
+    for i = 1:Ntime
+        Ucurrent = K_nom*(Xcurrent-Xf_A)+U_perturb(i,:);
         Xnext = sim_timestep(deltaT, f_u, 0, Xcurrent, Ucurrent);
-        Xstr(:,:,i) = Xnext;
-        Xacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Xcurrent;
-        Yacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Xnext;
+        Xstr(:,:,i+1) = Xnext;
+        Xacc(:,Ntraj*(i-1)+1:Ntraj*(i)) = Xcurrent;
+        Yacc(:,Ntraj*(i-1)+1:Ntraj*(i)) = Xnext;
         Xcurrent = Xnext;
-        time_str(:,i) = i*deltaT*ones(Ntraj,1);
+        time_str(:,i+1) = i*deltaT*ones(Ntraj,1);
         
         if autonomous_learning
-            Ustr(:,:,i-1) = Ucurrent;
-            Uacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Ucurrent;
+            Ustr(:,:,i) = Ucurrent;
+            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent;
         else
-            Ustr(:,:,i-1) = Ucurrent - K_nom*Xcurrent;
-            Uacc(:,Ntraj*(i-2)+1:Ntraj*(i-1)) = Ucurrent - K_nom*Xcurrent;
+            Ustr(:,:,i) = Ucurrent - K_nom*Xcurrent;
+            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent - K_nom*Xcurrent;
         end
     end
 end

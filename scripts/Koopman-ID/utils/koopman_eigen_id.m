@@ -1,7 +1,7 @@
 function [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id(n,m, Ntraj, Ntime, ...
     N_basis,basis_function, rbf_type, center_type, eps_rbf, N_lambda, ...
     lambda_type, A_edmd, A_nom, B_nom, K_nom, Xacc, Xstr, Xacc_c,...
-    Yacc_c, Uacc_c, Xstr_c, Ustr_c, timestr, deltaT)
+    Yacc_c, Uacc_c, Xstr_c, Ustr_c, timestr, deltaT, learn_type)
 
     %Identify lifted state space model using approximate Koopman invariant
     %subspace
@@ -89,7 +89,7 @@ function [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id(n,m, Ntraj, Ntim
     
     disp('Starting actuated dynamics learning...'); tic
     [B_koop, phi_fun_v] = learn_B_koop(n, m, Ntraj, Ntime, phi_fun, A_koop,...
-                    C_koop, Xstr_c, Ustr_c, Xacc_c, Yacc_c, Uacc_c, deltaT);
+                    C_koop, Xstr_c, Ustr_c, Xacc_c, Yacc_c, Uacc_c, deltaT, learn_type);
     fprintf('Learning actuated dynamics done, execution time: %1.2f s \n', toc);
     
 end
