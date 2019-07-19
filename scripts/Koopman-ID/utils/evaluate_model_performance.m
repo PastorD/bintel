@@ -72,8 +72,7 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
         end
         %scatter(cent(1,:),cent(2,:),'o')
         %axis equal
-        xaxis([-5 5])
-        yaxis([-5 5])
+        axis([-5 5 -5 5])
         xlabel('x')
         xlabel('y')
         %legend('True','EDMD','Koopman e-func')

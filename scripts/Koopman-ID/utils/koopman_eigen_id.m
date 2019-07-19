@@ -31,14 +31,16 @@ function [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id(n,m, Ntraj, Ntim
     %   Uacc_c          - Control input for trajectory data, perturbed control
 
     %Outputs:
-    %   A_edmd          - Passive dynamics matrix in lifted space
-    %   B_edmd          - Actuation matrix in lifted space
-    %   C_edmd          - Projection matrix from lifted space to output
+    %   A_koop          - Passive dynamics matrix in lifted space
+    %   B_koop          - Actuation matrix in lifted space
+    %   C_koop          - Projection matrix from lifted space to output
 
     
     % Generate eigenfunctions and learn autonomous dynamics:
     
     disp('Starting autonomous dynamics learning...'); tic
+    
+    fprintf('Starting autonomous dynamics learning...'); tic
     
     %N_g0 = N_basis+n;
     %N_gen = N_lambda*N_g0;

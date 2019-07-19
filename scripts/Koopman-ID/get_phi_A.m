@@ -4,8 +4,8 @@ function [phi_lambda_g_out,A,C,phi_grid] = get_phi_A(traj, time, lambda, gfun, y
 
     % Input:
     %   - traj (number of states
-    %number of discontinous trajectories): trajectory data
-    %            number of timesteps per trajectory
+    %           number of discontinous trajectories): trajectory data
+    %           number of timesteps per trajectory
     %            
     %   - time (number of discontinous trajectories): time vector
     %           number of timesteps per trajectory
@@ -47,6 +47,9 @@ function [phi_lambda_g_out,A,C,phi_grid] = get_phi_A(traj, time, lambda, gfun, y
             
             phi_lambda_g_flat = reshape(phi_lambda_g,[1,Nt*Ntraj]);
             
+            
+            %F{iphi} = scatteredInterpolant(traj_flat(1,:)',traj_flat(2,:)', phi_lambda_g_flat');
+            %phi_lambda_g_out{iphi} = @(x) F{iphi}(x(1,:)',x(2,:)');
             phi_grid(iphi,:) = phi_lambda_g_flat+rand(size(phi_lambda_g_flat))*0.0;
             phi_lambda_g_out{iphi} = @(x) griddata(traj_flat(1,:), ...
                             traj_flat(2,:),phi_lambda_g_flat,x(1,:),x(2,:));

@@ -69,6 +69,7 @@ disp('Starting data collection...'); tic
 % Collect data to learn autonomous dynamics:
 autonomous_learning = true;
 U_perturb = 0.2*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
+%U_perturb_handle = @(x,t) U_perturb
 [Xstr, Xacc, Yacc, Ustr, Uacc, timestr]  = collect_data(n,m,Ntraj,...
                   Ntime,deltaT,X0,K_nom,f_u,U_perturb, autonomous_learning);
 
