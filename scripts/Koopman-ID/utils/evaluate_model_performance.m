@@ -1,5 +1,6 @@
 function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
-    mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop] = ...
+    mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop,...
+    cost_nom, cost_edmd, cost_koop] = ...
     evaluate_model_performance(K_nom, A_edmd, B_edmd, C_edmd, A_koop, B_koop, ...
     C_koop, Nsim, X0, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results)
     
@@ -8,19 +9,19 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
     n_edmd = size(A_edmd,1);
     n_koop = size(A_koop,1);
     Ntime = Tsim/deltaT;
-    A_koop_d = expm(A_koop*deltaT); %Discretize A_koop
     
     %Prediction task:
     [x,x_edmd,x_koop,mse_edmd_avg,mse_koop_avg,mse_edmd_std,mse_koop_std]...
             = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,f_u,liftFun,...
-            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop_d,B_koop,C_koop);
+            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop);
     
     %Closed loop task:
     [x_track,x_edmd_track,x_koop_track,mse_nom_track, mse_edmd_track,...
-        mse_koop_track,t_plot,traj_d, E_nom, E_edmd, E_koop] = ...
+        mse_koop_track,t_plot,traj_d, E_nom, E_edmd, E_koop,...
+        cost_nom, cost_edmd, cost_koop] = ...
         sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,...
         Ntime,deltaT,Tsim,f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,...
-        C_edmd,A_koop_d,B_koop,C_koop);
+        C_edmd,A_koop,B_koop,C_koop);
 
     %Plot results
     if plot_results
@@ -34,10 +35,10 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
             plot([0:Ntime]*deltaT,reshape(x_edmd(1,i,:),Ntime+1,1), '--r','linewidth',lw)
             plot([0:Ntime]*deltaT,reshape(x_koop(1,i,:),Ntime+1,1), '--g','linewidth',lw-1)
         end
-        axis([0 Tsim min(x_edmd(1,1,:))-0.15 max(x_edmd(1,1,:))+0.15])
-        title('Predictor comparison, 1st trajectory - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
+        axis([0 Tsim min(x(1,1,:))-0.2 max(x(1,1,:))+0.2])
+        title('Prediction comparison, 1st trajectory - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
         set(gca,'fontsize',20)
-        LEG = legend('True','EDMD','Koopman e-func','location','southwest');
+        LEG = legend('True','EDMD','Koopman e-func','location','best');
         set(LEG,'interpreter','latex')
         h1.Position = h1.Position + [0 0.1 0 -0.1]; %Modify size of 1st subplot
         
@@ -48,8 +49,8 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
             plot([0:Ntime]*deltaT,reshape(x_edmd(2,i,:),Ntime+1,1), '--r','linewidth',lw)
             plot([0:Ntime]*deltaT,reshape(x_koop(2,i,:),Ntime+1,1), '--g','linewidth',lw-1)
         end
-        axis([0 Tsim min(x_edmd(2,1,:))-0.15 max(x_edmd(2,1,:))+0.15])
-        title('Predictor comparison, 1st trajectory - $x_2$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
+        axis([0 Tsim min(x(2,1,:))-0.2 max(x(2,1,:))+0.2])
+        title('Prediction comparison, 1st trajectory - $x_2$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');      
         set(gca,'fontsize',20)
         %LEG = legend('True','EDMD','Koopman e-func','location','southwest');
         set(LEG,'interpreter','latex')
@@ -60,12 +61,12 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
         hold on
         for i=1:Ntraj
            scatter(Xstr(1,i,1),Xstr(2,i,1),'+')
-           p(i) = plot(squeeze(Xstr(1,i,:)),squeeze(Xstr(2,i,:)),'Color',[0.2,0.2,0.2],'linewidth',1);
+           p(i) = plot(squeeze(Xstr(1,i,:)),squeeze(Xstr(2,i,:)),':k','linewidth',1);
            %alpha(p(i),0.2)   
         end
         for i = 1 : Nsim
-            plot(reshape(x(1,i,:),Ntime+1,1),reshape(x(2,i,:),Ntime+1,1),'-r')
-            plot(reshape(x_edmd(1,i,:),Ntime+1,1),reshape(x_edmd(2,i,:),Ntime+1,1),'-b')
+            plot(reshape(x(1,i,:),Ntime+1,1),reshape(x(2,i,:),Ntime+1,1),'-k')
+            plot(reshape(x_edmd(1,i,:),Ntime+1,1),reshape(x_edmd(2,i,:),Ntime+1,1),'-r')
             plot(reshape(x_koop(1,i,:),Ntime+1,1),reshape(x_koop(2,i,:),Ntime+1,1),'-g')
         end
         %scatter(cent(1,:),cent(2,:),'o')

@@ -1,5 +1,5 @@
 function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0,Xf_A,K_nom,f_u,U_perturb, autonomous_learning)
+                  Ntime,deltaT,X0,Xf,K_nom,f_u,U_perturb, autonomous_learning)
     %Collect data from the "true" system with nominal controller plus
     %perturbation
     %Inputs:
@@ -28,7 +28,7 @@ function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
     Xcurrent = X0;
     Xstr(:,:,1) = X0;
     for i = 1:Ntime
-        Ucurrent = K_nom*(Xcurrent-Xf_A)+U_perturb(i,:);
+        Ucurrent = K_nom*(Xcurrent-Xf)+U_perturb(i,:);
         Xnext = sim_timestep(deltaT, f_u, 0, Xcurrent, Ucurrent);
         Xstr(:,:,i+1) = Xnext;
         Xacc(:,Ntraj*(i-1)+1:Ntraj*(i)) = Xcurrent;
@@ -40,8 +40,8 @@ function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
             Ustr(:,:,i) = Ucurrent;
             Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent;
         else
-            Ustr(:,:,i) = Ucurrent - K_nom*Xcurrent;
-            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent - K_nom*Xcurrent;
+            Ustr(:,:,i) = Ucurrent - K_nom*(Xcurrent-Xf);
+            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent - K_nom*(Xcurrent-Xf);
         end
     end
 end

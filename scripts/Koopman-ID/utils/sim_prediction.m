@@ -1,8 +1,8 @@
 function [x,x_edmd,x_koop,mse_edmd_avg,mse_koop_avg,mse_edmd_std,mse_koop_std]...
             = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,f_u,liftFun,...
-            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop_d,B_koop,C_koop)
+            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop)
         
-    u = 5*rand(m,Nsim,Ntime)-2.5;
+    u = zeros(m,Nsim,Ntime);
     
     x = zeros(n,Nsim,Ntime+1);
     z_edmd = zeros(n_edmd,Nsim,Ntime+1);
@@ -11,20 +11,19 @@ function [x,x_edmd,x_koop,mse_edmd_avg,mse_koop_avg,mse_edmd_std,mse_koop_std]..
     z_edmd(:,:,1) = liftFun(X0);
     z_koop(:,:,1) = phi_fun_v(X0);
     
-    
-
     % Simulate all systems and initial points
-    K_mod = K_nom + randn(size(K_nom));
     for i = 1:Ntime
+        %Controller:
+        u(:,:,i) = K_nom*x(:,:,i) + 2*rand()-1;
+        
         %True dynamics:
-        x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), K_mod*x(:,:,i)+u(:,:,i));
+        x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), u(:,:,i));
         
         %EDMD predictor:
-        z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*(K_mod*C_edmd*z_edmd(:,:,i) + u(:,:,i));
+        z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*u(:,:,i);
 
         %Koopman eigenfunction predictor:
-        z_koop(:,:,i+1) = A_koop_d*z_koop(:,:,i) + ...
-            B_koop*(K_mod*C_koop*z_koop(:,:,i)+u(:,:,i)-K_nom*C_koop*z_koop(:,:,i));
+        z_koop(:,:,i+1) = A_koop*z_koop(:,:,i) + B_koop*u(:,:,i);
     end
     
     % Calculate corresponding predictions and MSE

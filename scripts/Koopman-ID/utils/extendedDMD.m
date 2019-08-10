@@ -1,8 +1,8 @@
-function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis,basis_function,...
-    rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc)
+function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_basis,basis_function,...
+    rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc, Xstr, A_nom, B_nom, K_nom, deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
-
     %Decomposition
+    
     %Inputs:
     %   n               - Number of states
     %   m               - Number of control inputs
@@ -53,8 +53,15 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis,basis_funct
     % ******************************* Lift ***********************************
 
     %disp('Starting LIFT GENERATION')
-    liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type,eps)] );
-    Nlift = N_basis + n;
+    switch basis_function
+        case 'rbf'
+            liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type,eps)] );
+        case 'koopman_efunc'
+            [~, liftFun] = construct_eigfuncs(n, Ntraj, Ntime, N_basis, ...
+                A_nom, B_nom, K_nom, Xstr, deltaT);
+            liftFun = @(xx) [xx; liftFun(xx)];
+    end
+    Nlift = length(liftFun(zeros(n,1)));
     Xlift = liftFun(Xacc);
     Ylift = liftFun(Yacc);
     %fprintf('Lifting DONE, time = %1.2f s \n', toc);
@@ -71,6 +78,11 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis,basis_funct
     A_edmd= M(1:Nlift,1:Nlift);
     B_edmd = M(1:Nlift,Nlift+1:end);
     C_edmd = M(Nlift+1:end,1:Nlift);
+    
+    % Add known structure (overwrite parts of the learned matrices):
+    A_edmd(n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_edmd,2)-n)];
+    C_edmd = zeros(size(C_edmd));
+    C_edmd(:,1:n) = eye(n);
 
     %fprintf('Regression done, time = %1.2f s \n', toc);
 

@@ -1,6 +1,7 @@
-function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, E_edmd, E_koop]...
+function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, E_edmd, E_koop,...
+            cost_nom, cost_edmd, cost_koop]...
             = sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,Tsim,...
-            f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop_d,...
+            f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,...
             B_koop,C_koop)
 
     %Set up trajectory to track:
@@ -35,7 +36,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     z_koop(:,1) = phi_fun_v(traj_d(:,1));
 
     % Define Koopman controller
-    Q = eye(2); % Weight matrices
+    Q = 1000*eye(2); % Weight matrices
     R = 0.01;
     Tpred = 0.1; % Prediction horizon
     Np = round(Tpred / deltaT);
@@ -45,7 +46,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
 
     % Build Koopman MPC controller 
     MPC_edmd  = getMPC(A_edmd,B_edmd,C_edmd,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
-    MPC_koop  = getMPC(A_koop_d,B_koop,C_koop,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
+    MPC_koop  = getMPC(A_koop,B_koop,C_koop,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
     
     % Get Jacobian of the true dynamics (for local linearization MPC)
     x = sym('x',[2 1]); syms u;
@@ -70,7 +71,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         % Local linearization MPC
         Aloc = double(subs(Jx,[x;u],[x_nom(:,i);u_nom(:,i)])); % Get local linearization
         Bloc = double(subs(Ju,[x;u],[x_nom(:,i);u_nom(:,i)]));
-        Cloc = double(subs(f_ud_sym,[x;u],[x_nom(:,i);u_nom(:,i)])) - Aloc*x_nom(:,i) - Bloc*u_nom(:,i);
+        %Cloc = double(subs(f_ud_sym,[x;u],[x_nom(:,i);u_nom(:,i)])) - Aloc*x_nom(:,i) - Bloc*u_nom(:,i);
         [U_nom,~,optval] = solveMPCprob(Aloc,Bloc,eye(2),[],Q,R,Q,Np,-100, 100,[],[],x_nom(:,i),yr); % Get control input
         u_nom(:,i) = U_nom(1:m,1);
         if(optval == Inf) % Detect infeasibility
@@ -85,12 +86,11 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         x_edmd(:,i+1) = sim_timestep(deltaT, f_u, 0, x_edmd(:,i), u_edmd(:,i));
         
         % Koopman e-func MPC
-%         z_koop(:,i) = phi_fun_v(x_koop(:,i)); % Lift
-%         disp(sum(sum(isnan(z_koop(:,i)))));
-%         u_koop(:,i) = MPC_koop(z_koop(:,i),yr) + K_nom*x_koop(:,i); % Get control input
-%         x_koop(:,i+1) = sim_timestep(deltaT, f_u, 0, x_koop(:,i), u_koop(:,i));
+        z_koop(:,i) = phi_fun_v(x_koop(:,i)); % Lift
+        u_koop(:,i) = MPC_koop(z_koop(:,i),yr);% + K_nom*x_koop(:,i); % Get control input
+        x_koop(:,i+1) = sim_timestep(deltaT, f_u, 0, x_koop(:,i), u_koop(:,i));
         
-        disp([u_nom(:,i), u_edmd(:,i) u_koop(:,i)])
+        %disp([u_nom(:,i), u_edmd(:,i) u_koop(:,i)])
     end
 
     if(isempty(ind_inf))
@@ -105,4 +105,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     E_nom = norm(u_nom);
     E_edmd = norm(u_edmd);
     E_koop = norm(u_koop);
+    cost_nom = sum(diag(x_nom(:,2:end)'*Q*x_nom(:,2:end))) + sum(diag(u_nom'*R*u_nom));
+    cost_edmd = sum(diag(x_edmd(:,2:end)'*Q*x_edmd(:,2:end))) + sum(diag(u_edmd'*R*u_edmd));
+    cost_koop = sum(diag(x_koop(:,2:end)'*Q*x_koop(:,2:end))) + sum(diag(u_koop'*R*u_koop));
 end

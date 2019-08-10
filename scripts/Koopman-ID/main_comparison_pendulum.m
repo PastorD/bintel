@@ -14,7 +14,7 @@
 %implementation.
 
 clear all; close all; clc;
-addpath('./Resources'); addpath('./utils')
+addpath('./Resources'); addpath('./utils'); addpath('Resources/qpOASES-3.1.0/interfaces/matlab/');
 rng(2141444)
 
 %% **************** Model and simulation parameters ***********************
@@ -22,20 +22,19 @@ rng(2141444)
 m = 1; g = 9.81; l = 1;
 f_u =  @(t,x,u) [x(2,:); g/l*sin(x(1,:))+ u];
 n = 2; m = 1; %Number of states and control inputs
-Q = eye(2); R = 1; %LQR penalty matrices for states and control inputs
+Q = eye(2); R = 0.1; %LQR penalty matrices for states and control inputs
 
 %Simulation parameters:
 Ntime = 200;    %Length of each trajectory (# of time steps)
 Ntraj = 20;     %Number of trajectories
 deltaT = 0.01;  %Time step length of simulation
-X0_A = 2*rand(n,Ntraj)-1; %Sample initial points for each trajectory for learning A
-X0_A = 0.95*pi*X0_A./vecnorm(X0_A,2,1); %Normalize so initial points lie on unit circle
+X0_A = (2*pi*rand(n,Ntraj)-pi);
 Xf_A = zeros(n,Ntraj); %Terminal points for each trajectory for learning A
-X0_B = 0.6*(2*pi*rand(n,Ntraj)-pi); %Sample initial points for each trajectory for learning B
+X0_B = (2*pi*rand(n,Ntraj)-pi); %Sample initial points for each trajectory for learning B
 Xf_B = 0.6*(2*pi*rand(n,Ntraj)-pi); %Terminal points for each trajectory for learning B
 
 %E-DMD parameters:
-N_basis_edmd = 20; %Number of basis functions 
+N_basis_edmd = 36; %Number of basis functions 
 basis_function_edmd = 'rbf'; %Type of basis function
 rbf_type_edmd = 'thinplate'; %RBF type
 center_type_edmd = 'data'; %Centers of rbf ('data' - pick random points from data set, 'random' pick points uniformly at random
@@ -53,11 +52,11 @@ N_lambda = 10; %Number of candidate eigenvalues (when random lambdas are used)
 plot_basis_koop = false; %Plots the basis functions if true
 xlim = [-1, 1]; %Plot limits
 ylim = [-1, 1]; %Plot limits
-learn_type = 'single-step'; %Learn B-matrix with single step or multi-step prediction horizon
+learn_type = 'multi-step'; %Learn B-matrix with single step or multi-step prediction horizon
 
 %Test simulation parameters:
 Nsim = 5;
-Tsim = 1;
+Tsim = 2;
 plot_results = true;
 X0_sim = 2*rand(n,Nsim)-1;
 
@@ -70,39 +69,37 @@ disp('Starting data collection...'); tic
 
 % Collect data to learn autonomous dynamics:
 autonomous_learning = true;
-U_perturb = 0.5*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
+U_perturb = randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
 [Xstr, Xacc, Yacc, Ustr, Uacc, timestr]  = collect_data(n,m,Ntraj,...
                   Ntime,deltaT,X0_A, Xf_A ,K_nom,f_u,U_perturb, autonomous_learning);
 
 % Collect data to learn controlled dynamics:
 autonomous_learning = false;
-U_perturb_c = 0.5*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
+U_perturb_c = 4*rand(Ntime,Ntraj)-2; %Add normally distributed noise to nominal controller
 [Xstr_c, Xacc_c, Yacc_c, Ustr_c, Uacc_c, timestr_c] = collect_data(n,m,Ntraj,...
                 Ntime,deltaT,X0_B,Xf_B,K_nom,f_u,U_perturb_c, autonomous_learning);
 
 fprintf('Data collection done, execution time: %1.2f s \n', toc);
 %% *********************** Model Identification ***************************
            
-
 % Identify model using E-DMD to get eigenvalues and model to use for
 % comparison:
 disp('Starting EDMD...'); tic
-[A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,N_basis_edmd,basis_function_edmd,...
+[A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m, Ntraj, Ntime, N_basis_edmd,basis_function_edmd,...
     rbf_type_edmd, center_type_edmd, eps_rbf_edmd, plot_basis_edmd, xlim,...
-    ylim, Xacc, Yacc, Uacc);
+    ylim, Xacc, Yacc, Uacc, Xstr, A_nom, B_nom, K_nom, deltaT);
 fprintf('EDMD done, execution time: %1.2f s \n', toc);
 
-%Identify model using Koopman eigenfunctions:
-
-[A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id(n, m, Ntraj, Ntime, N_basis_koop,...
+[A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id_laplace(n, m, Ntraj, Ntime, N_basis_koop,...
     basis_function_koop, rbf_type_koop, center_type_koop, eps_rbf_koop, ...
-    N_lambda, lambda_type, A_edmd, A_nom, B_nom, K_nom, Xacc, Xstr, Xacc_c,...
+    N_lambda, lambda_type, A_edmd, A_nom, B_nom, K_nom, Xacc, Yacc, Xstr, Xacc_c,...
     Yacc_c, Uacc_c, Xstr_c, Ustr_c, timestr, deltaT, learn_type);
                     
 %% ************************ Analysis of Results ***************************
 
 [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
-    mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop] = ...
+    mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop,...
+    cost_nom, cost_edmd, cost_koop] = ...
     evaluate_model_performance(K_nom, A_edmd, B_edmd, C_edmd, A_koop, B_koop, ...
     C_koop, Nsim, X0_sim, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
  
@@ -110,6 +107,6 @@ fprintf('EDMD done, execution time: %1.2f s \n', toc);
  fprintf('Predicition performance: \nAverage MSE: \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nStandard Deviation MSE: \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
         mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std);
  fprintf('-----------------------------------------------------------------\n');
- fprintf('Closed loop performance (MPC): \nAverage MSE: \n - Nominal:   %1.5f \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nEnergy consumption proxy: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
-        mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop);
+ fprintf('Closed loop performance (MPC): \nAverage MSE: \n - Nominal:   %1.5f \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nEnergy consumption proxy: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f, \nAccumulated MPC cost: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
+        mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop, cost_nom, cost_edmd, cost_koop);
  fprintf('-----------------------------------------------------------------\n');
