@@ -1,5 +1,5 @@
 function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
-    N_basis, A_nom, B_nom, K_nom, Xstr, deltaT)
+    N_basis, A_nom, B_nom, K_nom, Xstr, Xf, deltaT)
 
     %Identify lifted state space model using approximate Koopman invariant
     %subspace
@@ -39,7 +39,7 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     
     A_c = A_nom + B_nom*K_nom;
     A_c_d = expm(A_c*deltaT); %Discrete time dynamics matrix
-    cent = rand(n,N_basis)*2*pi - pi;
+    cent = rand(n,50)*2*pi - pi;
     rbf_type = 'gauss';
     eps_rbf = 1;
     
@@ -51,9 +51,11 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     Y = [];
     Z_mplus1 = [];
     Z_m = [];
+    Xstr_shift = zeros(size(Xstr));
     for i = 1 : Ntraj
-       X_mplus1 = reshape(Xstr(:,i,2:end),n,Ntime);
-       X_m = reshape(Xstr(:,i,1:end-1),n,Ntime);
+       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
+       X_mplus1 = reshape(Xstr_shift(:,i,2:end),n,Ntime);
+       X_m = reshape(Xstr_shift(:,i,1:end-1),n,Ntime);
 
        % Set up Y matrix (targets), Y(:,i) = x_(i+1) - A_nom*x_i
        Y = [Y X_mplus1-A_c_d*X_m]; 
@@ -72,7 +74,7 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     N = size(Z_m,1);
     cvx_begin
         variable C(n,N);
-        minimize (norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro') + 0.01*norm(C,'fro'))
+        minimize (norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro') + 1*norm(C,'fro'))
         subject to
             {C*con1 == zeros(n)}; 
     cvx_end

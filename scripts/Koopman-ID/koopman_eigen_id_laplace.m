@@ -110,9 +110,9 @@ function [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id_laplace(n,m, Ntr
     Z_y = z_eigfun(Yacc);
     k=1;
     A_koop = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(Z_x,1)-n)];
-    %A_koop = [A_koop; (Z_x'\Z_y(n/2+1:n,:)')'];
-    A_state = lasso(Z_x',Z_y(n/2+1:n,:)','Lambda',1e-5)';
-    A_koop = [A_koop; A_state];
+    A_koop = [A_koop; (Z_x'\Z_y(n/2+1:n,:)')'];
+    %A_state = lasso(Z_x',Z_y(n/2+1:n,:)','Lambda',1e-4, 'Alpha', 0.8)';
+    %A_koop = [A_koop; A_state];
     A_koop = [A_koop; [zeros(length(lambd),n) diag(lambd)]];
 
     % Calculate projection of states onto eigenfunctions 
@@ -131,10 +131,16 @@ function [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id_laplace(n,m, Ntr
     A_koop(:,1:n) = A_koop(:,1:n)-B_koop*K_nom;
      
     % Evaluate training error:
-%     Ypred = zeros(size(Yacc_c));
-%     
-%     C_koop*(A_koop*phi_fun_v(Xacc_c)+B_koop*Uacc_c);
-%     disp(immse(Ypred,Yacc_c));
+%     Ypred_c = zeros(size(Xstr_c(:,:,2:end)));
+%     Zpred = phi_fun_v(Xstr_c(:,:,1));
+%     err = 0;
+%     for i = 1:Ntime
+%         Zpred = A_koop*Zpred+B_koop*Ustr_c(:,:,i);
+%         Ypred_c(:,:,i) = C_koop*Zpred;
+%         err = err + sum(sum((Ypred_c(:,:,i) - Xstr_c(:,:,i+1)).^2));
+%     end
+%     err = err/(Ntime*Ntraj);
+%     disp(err);
 end
 
 

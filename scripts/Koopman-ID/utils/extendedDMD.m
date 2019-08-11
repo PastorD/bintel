@@ -1,5 +1,5 @@
 function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_basis,basis_function,...
-    rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc, Xstr, A_nom, B_nom, K_nom, deltaT)
+    rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc, Xstr, Xf, A_nom, B_nom, K_nom, deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
     %Decomposition
     
@@ -57,8 +57,8 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
         case 'rbf'
             liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type,eps)] );
         case 'koopman_efunc'
-            [~, liftFun] = construct_eigfuncs(n, Ntraj, Ntime, N_basis, ...
-                A_nom, B_nom, K_nom, Xstr, deltaT);
+            [A_koop, liftFun] = construct_eigfuncs(n, Ntraj, Ntime, N_basis, ...
+                A_nom, B_nom, K_nom, Xstr, Xf, deltaT);
             liftFun = @(xx) [xx; liftFun(xx)];
     end
     Nlift = length(liftFun(zeros(n,1)));
@@ -80,7 +80,7 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
     C_edmd = M(Nlift+1:end,1:Nlift);
     
     % Add known structure (overwrite parts of the learned matrices):
-    A_edmd(n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_edmd,2)-n)];
+    A_edmd(1:n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_edmd,2)-n)];
     C_edmd = zeros(size(C_edmd));
     C_edmd(:,1:n) = eye(n);
 
@@ -93,4 +93,34 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
     % plot(eig(Alift),'*')
     % cplot(1,0,0)
     % axis equal
+    
+    % *************** Force known terms of A-matrix ***********************
+    if strcmp(basis_function, 'koopman_efunc')
+        %Set up regression for A and B:
+        N = length(liftFun(ones(n,1)));
+        X = [Xlift; Uacc];
+        Y = Yacc(n/2+1:n,:);
+        %X_mean = mean(X,2);
+        %X_std = std(X,0,2);
+        %X_std(find(X_std<1e-6)) = 1;
+        %X = (X-X_mean)./X_std;
+        %A_state = X'\Y';
+        %A_state = A_state.*X_std;
+        A_state = lasso(X',Y','Lambda',1e-6, 'Alpha', 0.8);
+        
+        A_edmd = zeros(N);
+        A_edmd(1:n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_edmd,2)-n)];
+        A_edmd(n/2+1:n,:) = A_state(1:N,:)'; 
+        A_edmd(n+1:end,n+1:end) = A_koop;
+        
+        Y_kin = Yacc(1:n/2,:) - A_edmd(1:n/2,:)*Xlift;
+        B_kin = Uacc'\Y_kin';
+        Ylift_mod= Ylift(n+1:end,:) - A_koop*Xlift(n+1:end,:);
+        B_mod = Uacc'\Ylift_mod';
+        B_edmd = [B_kin'; A_state(N+1:end,:); B_mod'];
+        
+        %Subtract effect of nominal controller from eigenfunctions:
+        A_edmd(n+1:end,1:n) = A_edmd(n+1:end,1:n)-B_mod'*K_nom;
+        
+    end
 end

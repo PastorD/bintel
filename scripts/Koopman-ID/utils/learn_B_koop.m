@@ -62,9 +62,10 @@ function [B_koop, phi_fun_v] = learn_B_koop(n, m, Ntraj, Ntime, phi_fun_v, A_koo
             end
             b = -b;
 
-            k = 10;
-            %B_koop = Q\b; % = vec(Blift)
-            B_koop = (Q'*Q + k*eye(size(Q,2)))\(Q'*b); %Regularize B-learning
+            k = 1e-3;
+            B_koop = Q\b; % = vec(Blift)
+            %B_koop = (Q'*Q + k*eye(size(Q,2)))\(Q'*b); %Regularize B-learning
+            %B_koop = lasso(Q,b,'Lambda',1e-2);
             B_koop = reshape(B_koop,size(A_koop,1),m); % Unvectorize
 
         case 'single-step'
@@ -83,21 +84,31 @@ function [B_koop, phi_fun_v] = learn_B_koop(n, m, Ntraj, Ntime, phi_fun_v, A_koo
             end
         case 'multi-step_mod'
             %Calculate residual after autonomous dynamics are subtracted
+%             Racc = [];
+%             Z_evol = zeros(length(phi_fun_v(zeros(n,1))),Ntime+1);
+%             for i = 1 : Ntraj
+%                 Z_evol(:,1) = phi_fun_v(reshape(Xstr_c(:,i,1),n,1));
+%                 Z_y = phi_fun_v(reshape(Xstr_c(:,i,2:end),n,Ntime));
+%                 for j = 2 : Ntime+1
+%                     Z_evol(:,j) = A_koop*Z_evol(:,j-1);
+%                 end
+%                 Racc = [Racc Z_evol(:,2:end)-Z_y]; 
+%             end
+%                     
+%             B_koop = (Uacc_c'\Racc')';
             Racc = [];
+            U_r_acc = [];
             Z_evol = zeros(length(phi_fun_v(zeros(n,1))),Ntime+1);
             for i = 1 : Ntraj
                 Z_evol(:,1) = phi_fun_v(reshape(Xstr_c(:,i,1),n,1));
-                Z_y = phi_fun_v(reshape(Xstr_c(:,i,2:end),n,Ntime));
                 for j = 2 : Ntime+1
                     Z_evol(:,j) = A_koop*Z_evol(:,j-1);
                 end
-                Racc = [Racc Z_evol(:,2:end)-Z_y]; 
+                Yres = C_koop*Z_evol(:,2:end)-reshape(Xstr_c(:,i,2:end),n,Ntime) ;
+                Racc = [Racc phi_fun_v(Yres)]; 
+                U_r_acc = [U_r_acc reshape(Ustr_c(:,i,:),m,Ntime)];
             end
                     
-            B_koop = (Uacc_c'\Racc')';
-            if sum(sum(isnan(B_koop))) > 0
-                disp('Warning: NAN-values in B-matrix, terminating.')
-                return
-            end
+            B_koop = -(U_r_acc'\Racc')';
     end
 end

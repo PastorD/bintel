@@ -52,7 +52,7 @@ N_lambda = 10; %Number of candidate eigenvalues (when random lambdas are used)
 plot_basis_koop = false; %Plots the basis functions if true
 xlim = [-1, 1]; %Plot limits
 ylim = [-1, 1]; %Plot limits
-learn_type = 'multi-step'; %Learn B-matrix with single step or multi-step prediction horizon
+learn_type = 'multi-step_mod'; %Learn B-matrix with single step or multi-step prediction horizon
 
 %Test simulation parameters:
 Nsim = 5;
@@ -71,7 +71,7 @@ disp('Starting data collection...'); tic
 autonomous_learning = true;
 U_perturb = randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
 [Xstr, Xacc, Yacc, Ustr, Uacc, timestr]  = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0_A, Xf_A ,K_nom,f_u,U_perturb, autonomous_learning);
+                  Ntime,deltaT,X0_B, Xf_B ,K_nom,f_u,U_perturb, autonomous_learning);
 
 % Collect data to learn controlled dynamics:
 autonomous_learning = false;
@@ -87,8 +87,13 @@ fprintf('Data collection done, execution time: %1.2f s \n', toc);
 disp('Starting EDMD...'); tic
 [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m, Ntraj, Ntime, N_basis_edmd,basis_function_edmd,...
     rbf_type_edmd, center_type_edmd, eps_rbf_edmd, plot_basis_edmd, xlim,...
-    ylim, Xacc, Yacc, Uacc, Xstr, A_nom, B_nom, K_nom, deltaT);
+    ylim, Xacc, Yacc, Uacc, Xstr, Xf_B, A_nom, B_nom, K_nom, deltaT);
 fprintf('EDMD done, execution time: %1.2f s \n', toc);
+
+% basis_function_koop = 'koopman_efunc';
+% [A_koop, B_koop, C_koop, phi_fun_v] = extendedDMD(n,m, Ntraj, Ntime, N_basis_edmd,basis_function_koop,...
+%     rbf_type_edmd, center_type_edmd, eps_rbf_edmd, plot_basis_edmd, xlim,...
+%     ylim, Xacc, Yacc, Uacc, Xstr, Xf_B, A_nom, B_nom, K_nom, deltaT);
 
 [A_koop, B_koop, C_koop, phi_fun_v] = koopman_eigen_id_laplace(n, m, Ntraj, Ntime, N_basis_koop,...
     basis_function_koop, rbf_type_koop, center_type_koop, eps_rbf_koop, ...
