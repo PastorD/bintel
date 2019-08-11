@@ -120,7 +120,7 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
         B_edmd = [B_kin'; A_state(N+1:end,:); B_mod'];
         
         %Subtract effect of nominal controller from eigenfunctions:
-        A_edmd(n+1:end,1:n) = A_edmd(n+1:end,1:n)-B_mod'*K_nom;
+        %A_edmd(n+1:end,1:n) = A_edmd(n+1:end,1:n)-B_mod'*K_nom;
         
     end
 end
