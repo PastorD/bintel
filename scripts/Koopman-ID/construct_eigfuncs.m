@@ -1,5 +1,5 @@
 function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
-    N_basis, A_nom, B_nom, K_nom, Xstr, Xf, deltaT)
+    N_basis, pow_eig_pairs, A_nom, B_nom, K_nom, Xstr, Xf, deltaT)
 
     %Identify lifted state space model using approximate Koopman invariant
     %subspace
@@ -39,7 +39,7 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     
     A_c = A_nom + B_nom*K_nom;
     A_c_d = expm(A_c*deltaT); %Discrete time dynamics matrix
-    cent = rand(n,50)*2*pi - pi;
+    cent = rand(n,N_basis)*2*pi - pi;
     rbf_type = 'gauss';
     eps_rbf = 1;
     
@@ -88,8 +88,7 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     [V_a,~] = eig(A_c_d');
 
     %Define powers (only implemented for n=2):
-    max_power = 5;
-    a = 0 : max_power;
+    a = 0 : pow_eig_pairs;
     [P,Q] = meshgrid(a,a);
     c=cat(2,P',Q');
     powers=reshape(c,[],2);

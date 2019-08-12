@@ -1,8 +1,8 @@
-function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
+function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_std, mse_koop_std,...
     mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop,...
     cost_nom, cost_edmd, cost_koop] = ...
     evaluate_model_performance(K_nom, A_edmd, B_edmd, C_edmd, A_koop, B_koop, ...
-    C_koop, Nsim, X0, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results)
+    C_koop, Nsim, X0, Xf, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results)
     
     n = size(C_koop,1);
     m = size(B_koop,2);
@@ -11,8 +11,9 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
     Ntime = Tsim/deltaT;
     
     %Prediction task:
-    [x,x_edmd,x_koop,mse_edmd_avg,mse_koop_avg,mse_edmd_std,mse_koop_std]...
-            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,f_u,liftFun,...
+    [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,...
+    mse_origin_std, mse_edmd_std,mse_koop_std]...
+            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,Xf,f_u,liftFun,...
             phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop);
     
     %Closed loop task:
@@ -25,29 +26,31 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
 
     %Plot results
     if plot_results
-        lw=4;
+        lw=2;
         
         afigure(1)
         h1 = subplot(2,2,1);
         hold on
         for i = 1 %Only plot first trajectory
-            plot([0:Ntime]*deltaT,reshape(x(1,i,:),Ntime+1,1),'linewidth',lw); hold on
-            plot([0:Ntime]*deltaT,reshape(x_edmd(1,i,:),Ntime+1,1), '--r','linewidth',lw)
-            plot([0:Ntime]*deltaT,reshape(x_koop(1,i,:),Ntime+1,1), '--g','linewidth',lw-1)
+            plot([0:Ntime]*deltaT,reshape(x(1,i,:),Ntime+1,1),':b','linewidth',lw); hold on
+            plot([0:Ntime]*deltaT,reshape(x_origin(1,i,:),Ntime+1,1), 'k','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_edmd(1,i,:),Ntime+1,1), 'r','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_koop(1,i,:),Ntime+1,1), 'g','linewidth',lw)
         end
         axis([0 Tsim min(x(1,1,:))-0.2 max(x(1,1,:))+0.2])
         title('Prediction comparison, 1st trajectory - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
         set(gca,'fontsize',20)
-        LEG = legend('True','EDMD','Koopman e-func','location','best');
+        LEG = legend('True','Linearization at 0', 'EDMD','Koopman e-func','location','best');
         set(LEG,'interpreter','latex')
         h1.Position = h1.Position + [0 0.1 0 -0.1]; %Modify size of 1st subplot
         
         h2 = subplot(2,2,2);
         hold on
         for i = 1 %Only plot first trajectory
-            plot([0:Ntime]*deltaT,reshape(x(2,i,:),Ntime+1,1),'linewidth',lw); hold on
-            plot([0:Ntime]*deltaT,reshape(x_edmd(2,i,:),Ntime+1,1), '--r','linewidth',lw)
-            plot([0:Ntime]*deltaT,reshape(x_koop(2,i,:),Ntime+1,1), '--g','linewidth',lw-1)
+            plot([0:Ntime]*deltaT,reshape(x(2,i,:),Ntime+1,1),':b','linewidth',lw); hold on
+            plot([0:Ntime]*deltaT,reshape(x_origin(2,i,:),Ntime+1,1), 'k','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_edmd(2,i,:),Ntime+1,1), 'r','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_koop(2,i,:),Ntime+1,1), 'g','linewidth',lw)
         end
         axis([0 Tsim min(x(2,1,:))-0.2 max(x(2,1,:))+0.2])
         title('Prediction comparison, 1st trajectory - $x_2$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');      
@@ -89,7 +92,7 @@ function [mse_edmd_avg, mse_koop_avg, mse_edmd_std, mse_koop_std,...
         %axis([0 Tsim min(x_edmd(1,1,:))-0.15 max(x_edmd(1,1,:))+0.15])
         title('Closed loop trajectory tracking - $x_1$','interpreter','latex'); xlabel('Time [s]','interpreter','latex');
         set(gca,'fontsize',20)
-        LEG = legend('Reference', 'Nominal controller','EDMD','Koopman e-func','location','southeast');
+        LEG = legend('Reference', 'Linearization at 0','EDMD','Koopman e-func','location','southeast');
         set(LEG,'interpreter','latex')
         h4.Position = h4.Position + [0 0 0 0.125]; %Modify size of 4th subplot
     end

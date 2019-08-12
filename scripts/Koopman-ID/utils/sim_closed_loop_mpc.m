@@ -36,9 +36,9 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     z_koop(:,1) = phi_fun_v(traj_d(:,1));
 
     % Define Koopman controller
-    Q = 1000*eye(2); % Weight matrices
+    Q = 5*eye(2); % Weight matrices
     R = 0.01;
-    Tpred = 0.1; % Prediction horizon
+    Tpred = Tsim/2;%0.1; % Prediction horizon
     Np = round(Tpred / deltaT);
     traj_d = [traj_d traj_d(:,end).*ones(n,Np)]; %Add extra points to trajectory to allow prediction horizon
     xlift_min = [];%[ymin ; nan(Nlift-1,1)]; % Constraints
@@ -86,11 +86,9 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         x_edmd(:,i+1) = sim_timestep(deltaT, f_u, 0, x_edmd(:,i), u_edmd(:,i));
         
         % Koopman e-func MPC
-        z_koop(:,i) = phi_fun_v(x_koop(:,i)); % Lift
-        u_koop(:,i) = MPC_koop(z_koop(:,i),yr);% + K_nom*x_koop(:,i); % Get control input
+        z_koop(:,i) = phi_fun_v(x_koop(:,i)); %Lift
+        u_koop(:,i) = MPC_koop(z_koop(:,i),yr);% Get control input
         x_koop(:,i+1) = sim_timestep(deltaT, f_u, 0, x_koop(:,i), u_koop(:,i));
-        
-        %disp([u_nom(:,i), u_edmd(:,i) u_koop(:,i)])
     end
 
     if(isempty(ind_inf))
@@ -105,7 +103,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     E_nom = norm(u_nom);
     E_edmd = norm(u_edmd);
     E_koop = norm(u_koop);
-    cost_nom = sum(diag(x_nom(:,2:end)'*Q*x_nom(:,2:end))) + sum(diag(u_nom'*R*u_nom));
-    cost_edmd = sum(diag(x_edmd(:,2:end)'*Q*x_edmd(:,2:end))) + sum(diag(u_edmd'*R*u_edmd));
-    cost_koop = sum(diag(x_koop(:,2:end)'*Q*x_koop(:,2:end))) + sum(diag(u_koop'*R*u_koop));
+    cost_nom = sum(diag((x_nom(:,2:end)-traj_d(:,2:end))'*Q*(x_nom(:,2:end)-traj_d(:,2:end)))) + sum(diag(u_nom'*R*u_nom));
+    cost_edmd = sum(diag((x_edmd(:,2:end)-traj_d(:,2:end))'*Q*(x_edmd(:,2:end)-traj_d(:,2:end)))) + sum(diag(u_edmd'*R*u_edmd));
+    cost_koop = sum(diag((x_koop(:,2:end)-traj_d(:,2:end))'*Q*(x_koop(:,2:end)-traj_d(:,2:end)))) + sum(diag(u_koop'*R*u_koop));
 end
