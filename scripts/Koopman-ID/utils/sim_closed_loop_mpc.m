@@ -2,7 +2,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
             cost_nom, cost_edmd, cost_koop]...
             = sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,Tsim,...
             f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,...
-            B_koop,C_koop)
+            B_koop,C_koop,Q,R)
 
     %Set up trajectory to track:
     t = 0 : deltaT : Tsim;
@@ -36,8 +36,6 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     z_koop(:,1) = phi_fun_v(traj_d(:,1));
 
     % Define Koopman controller
-    Q = 5*eye(2); % Weight matrices
-    R = 0.01;
     Tpred = Tsim/2;%0.1; % Prediction horizon
     Np = round(Tpred / deltaT);
     traj_d = [traj_d traj_d(:,end).*ones(n,Np)]; %Add extra points to trajectory to allow prediction horizon
@@ -69,8 +67,10 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         yr = traj_d(:,i:i+Np-1);
 
         % Local linearization MPC
-        Aloc = double(subs(Jx,[x;u],[x_nom(:,i);u_nom(:,i)])); % Get local linearization
-        Bloc = double(subs(Ju,[x;u],[x_nom(:,i);u_nom(:,i)]));
+        %Aloc = double(subs(Jx,[x;u],[x_nom(:,i);u_nom(:,i)])); % Get local linearization
+        %Bloc = double(subs(Ju,[x;u],[x_nom(:,i);u_nom(:,i)]));
+        Aloc = double(subs(Jx,[x;u],[[0 0]';0])); % Get local linearization
+        Bloc = double(subs(Ju,[x;u],[[0 0]';0]));
         %Cloc = double(subs(f_ud_sym,[x;u],[x_nom(:,i);u_nom(:,i)])) - Aloc*x_nom(:,i) - Bloc*u_nom(:,i);
         [U_nom,~,optval] = solveMPCprob(Aloc,Bloc,eye(2),[],Q,R,Q,Np,-100, 100,[],[],x_nom(:,i),yr); % Get control input
         u_nom(:,i) = U_nom(1:m,1);
