@@ -1,5 +1,5 @@
 function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0,Xf,K_nom,f_u,U_perturb, autonomous_learning)
+                  Ntime,deltaT,X0,Xf,K_nom,f_u,U_perturb)
     %Collect data from the "true" system with nominal controller plus
     %perturbation
     %Inputs:
@@ -35,13 +35,9 @@ function [Xstr, Xacc, Yacc, Ustr, Uacc, time_str] = collect_data(n,m,Ntraj,...
         Yacc(:,Ntraj*(i-1)+1:Ntraj*(i)) = Xnext;
         Xcurrent = Xnext;
         time_str(:,i+1) = i*deltaT*ones(Ntraj,1);
-        
-        if autonomous_learning
-            Ustr(:,:,i) = Ucurrent;
-            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent;
-        else
-            Ustr(:,:,i) = Ucurrent - K_nom*(Xcurrent-Xf);
-            Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent - K_nom*(Xcurrent-Xf);
-        end
+        Ustr(:,:,i) = Ucurrent;
+        Uacc(:,Ntraj*(i-1)+1:Ntraj*i) = Ucurrent;
     end
+    Ucurrent = K_nom*(Xcurrent-Xf)+U_perturb(i+1,:);
+    Ustr(:,:,i+1) = Ucurrent;
 end

@@ -9,6 +9,10 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
     [A_origin, B_origin, ~] = find_nominal_model_ctrl(n,m,f_u,eye(n),eye(m),[0; 0]);
     f_origin = @(t,x,u) A_origin*x + B_origin*u;
     
+    % Define KEEDMD model:
+    f_koop = @(t,x,u) A_koop*x + B_koop*u;
+    
+    
     x = zeros(n,Nsim,Ntime+1);
     x_origin = zeros(n,Nsim,Ntime+1);
     z_edmd = zeros(n_edmd,Nsim,Ntime+1);
@@ -22,7 +26,7 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
     % Simulate all systems and initial points
     for i = 1:Ntime
         %Controller:
-        u(:,:,i) = K_nom*(x(:,:,i)-Xf) + 2*rand()-1;
+        u(:,:,i) = K_nom*(x(:,:,i)-Xf) + 5*rand()-2.5;
         
         %True dynamics:
         x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), u(:,:,i));
@@ -34,7 +38,8 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
         z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*u(:,:,i);
 
         %Koopman eigenfunction predictor:
-        z_koop(:,:,i+1) = A_koop*z_koop(:,:,i) + B_koop*u(:,:,i);
+        %z_koop(:,:,i+1) = A_koop*z_koop(:,:,i) + B_koop*u(:,:,i);
+        z_koop(:,:,i+1) = sim_timestep(deltaT,f_koop,0,z_koop(:,:,i), u(:,:,i));
     end
     
     % Calculate corresponding predictions and MSE

@@ -45,8 +45,8 @@ eps_rbf_edmd = 1; %RBF width
 plot_basis_edmd = false; %Plots the basis functions if true
 
 %Koopman eigenfunction parameters:
-N_basis_diff = 50; %Number of RBFs to use for lifting when learning the diffeomorphism
-pow_eig_pairs = 5; %Highest power of eigenpairs to use when generating eigenfunctions for linearized system
+N_basis_diff = 100; %Number of RBFs to use for lifting when learning the diffeomorphism
+pow_eig_pairs = 2; %Highest power of eigenpairs to use when generating eigenfunctions for linearized system
 plot_basis_koop = false; %Plots the basis functions if true
 xlim = [-1, 1]; %Plot limits
 ylim = [-1, 1]; %Plot limits
@@ -66,9 +66,9 @@ disp('Starting data collection...'); tic
 [A_nom, B_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R,[0; 0]); %Linearization around 0.
 
 % Collect data to learn autonomous dynamics:
-U_perturb = 2*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
+U_perturb = 0.5*randn(Ntime+1,Ntraj); %Add normally distributed noise to nominal controller
 [Xstr, Xacc, Yacc, Ustr, Uacc, timestr]  = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0, Xf ,K_nom,f_u,U_perturb, true);
+                  Ntime,deltaT,X0, Xf ,K_nom,f_u,U_perturb);
 
 fprintf('Data collection done, execution time: %1.2f s \n', toc);
 
@@ -84,21 +84,14 @@ fprintf('EDMD done, execution time: %1.2f s \n', toc);
 
 disp('Starting KEEDMD...'); tic
 [A_koop, B_koop, C_koop, phi_fun_v] = KEEDMD(n,m,Ntraj, Ntime, N_basis_diff,...
-        pow_eig_pairs, Xacc, Yacc, Uacc, Xstr, Xf, A_nom, B_nom, K_nom, deltaT);
+        pow_eig_pairs, Xstr, Ustr, Xf, A_nom, B_nom, K_nom, deltaT);
 fprintf('KEEDMD done, execution time: %1.2f s \n', toc);
                     
 %% ************************ Analysis of Results ***************************
-
+disp('Starting analysis of results...'); tic
 [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_std, mse_koop_std,...
-    mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop,...
-    cost_nom, cost_edmd, cost_koop] = ...
-    evaluate_model_performance(K_nom, A_edmd, B_edmd, C_edmd, A_koop, B_koop, ...
-    C_koop, Nsim, X0_sim, Xf_sim, Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
+    cost_nom, cost_edmd, cost_koop] = evaluate_model_performance(K_nom, ...
+    A_edmd, B_edmd, C_edmd, A_koop, B_koop, C_koop, Nsim, X0_sim, Xf_sim, ...
+    Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
+fprintf('Analysis done, execution time: %1.2f s \n', toc);
  
- fprintf('-----------------------------------------------------------------\n');
- fprintf('Predicition performance: \nAverage MSE: \n -Linearization at origin:   %1.5f \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nStandard Deviation MSE: \n - Linearization at origin:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
-        mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_std, mse_koop_std);
- fprintf('-----------------------------------------------------------------\n');
- fprintf('Closed loop performance (MPC): \nAverage MSE: \n - Linearization at origin:   %1.5f \n - EDMD:   %1.5f \n - Koopman eigenfunctions: %1.5f \nEnergy consumption proxy: \n - Linearization at origin:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f, \nAccumulated MPC cost: \n - Nominal:  %1.5f \n - EDMD:  %1.5f \n - Koopman eigenfunctions: %1.5f \n', ...
-        mse_nom_track, mse_edmd_track, mse_koop_track, E_nom, E_edmd, E_koop, cost_nom, cost_edmd, cost_koop);
- fprintf('-----------------------------------------------------------------\n');

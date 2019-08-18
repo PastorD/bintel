@@ -1,5 +1,5 @@
-function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
-    N_basis, pow_eig_pairs, A_nom, B_nom, K_nom, Xstr, Xf, deltaT)
+function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
+                                                A_nom, B_nom, K_nom, X, X_dot)
 
     %Identify lifted state space model using approximate Koopman invariant
     %subspace
@@ -37,55 +37,39 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
     
     disp('Starting autonomous dynamics learning...'); tic
     
-    A_c = A_nom + B_nom*K_nom;
-    A_c_d = expm(A_c*deltaT); %Discrete time dynamics matrix
-    cent = rand(n,N_basis)*2*pi - pi;
+    A_cl = A_nom + B_nom*K_nom;
+    cent = 2*pi*rand(n,N_basis) - pi;
     rbf_type = 'gauss';
-    eps_rbf = 1;
-    
+    eps_rbf = 2;
+        
     % Set up nonlinear transformations and their gradients
-    zfun = @(xx) [xx'; rbf(xx',cent,rbf_type,eps_rbf)];
-    zfun_grad = @(xx) [eye(2); rbf_grad(xx',cent,rbf_type,eps_rbf)];
+    zfun = @(xx) [xx; rbf(xx,cent,rbf_type,eps_rbf)];
+    zfun_grad = @(xx) [eye(2); rbf_grad(xx,cent,rbf_type,eps_rbf)];
+    zfun_dot = @(xx, xx_dot) [xx_dot; rbf_dot(xx,xx_dot,cent,rbf_type,eps_rbf)];
     
-    % Prepare data matrices
-    Y = [];
-    Z_mplus1 = [];
-    Z_m = [];
-    Xstr_shift = zeros(size(Xstr));
-    for i = 1 : Ntraj
-       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
-       X_mplus1 = reshape(Xstr_shift(:,i,2:end),n,Ntime);
-       X_m = reshape(Xstr_shift(:,i,1:end-1),n,Ntime);
-
-       % Set up Y matrix (targets), Y(:,i) = x_(i+1) - A_nom*x_i
-       Y = [Y X_mplus1-A_c_d*X_m]; 
-
-       % Set up Z_mplus1 matrix (inputs), phi(x_(i+1))
-       Z_mplus1 = [Z_mplus1 zfun(X_mplus1')];
-
-       % Set up Z_m matrix (inputs), phi(x_i)
-       Z_m = [Z_m zfun(X_m')]; 
-    end
+   % Set up Z and Z_dot matrices:
+   Z = zfun(X);
+   Z_dot = zfun_dot(X,X_dot);
 
     %Set up constraint matrix
-    con1 = zfun_grad([0 0]);
-
+    con1 = zfun_grad([0; 0]);
+    
     disp('Solving optimization problem...')
-    N = size(Z_m,1);
-    cvx_begin
+    N = size(Z,1);
+    cvx_begin 
         variable C(n,N);
-        minimize (norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro') + 1*norm(C,'fro'))
+        minimize (norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro') + 1*norm(C,'fro'))
         subject to
             {C*con1 == zeros(n)}; 
     cvx_end
-    fprintf('Solved, optimal value excluding regularization: %.10f, MSE: %.10f\n', norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro'),immse(Y, A_c_d*C*Z_m - C*Z_mplus1))
+    fprintf('Solved, optimal value excluding regularization: %.10f, MSE: %.10f\n', norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro'),immse(X_dot+C*Z_dot, A_cl*(X+C*Z)))
     %fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
 
-    yfun = @(xx) xx + C*zfun(xx'); % Full learned diffeomorphism
+    yfun = @(xx) xx + C*zfun(xx); % Full learned diffeomorphism
     
     % Calculate eigenfunctions for linearized system
-    [~,D] = eig(A_c_d);
-    [V_a,~] = eig(A_c_d');
+    [~,D] = eig(A_cl);
+    [V_a,~] = eig(A_cl');
 
     %Define powers (only implemented for n=2):
     a = 0 : pow_eig_pairs;
@@ -102,6 +86,7 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, Ntraj, Ntime, ...
 
     % Construct eigenfunctions for nonlinear system
     z_eigfun = @(xx) phifun_mat(phifun, gfun(yfun(xx)));
+    %z_eigfun = @(xx) phifun(gfun(yfun(xx)));
     A_koop = diag(lambd);
 end
 

@@ -1,5 +1,5 @@
 function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,...
-        pow_eig_pairs, Xacc, Yacc, Uacc, Xstr, Xf, A_nom, B_nom, K_nom, deltaT)
+        pow_eig_pairs, Xstr, Ustr, Xf, A_nom, B_nom, K_nom, deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
     %Decomposition
     
@@ -23,38 +23,62 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
     %   B_edmd          - Actuation matrix in lifted space
     %   C_edmd          - Projection matrix from lifted space to outputs
 
-
-    [A_eigfuncs, liftFun] = construct_eigfuncs(n, Ntraj, Ntime, N_basis, ...
-                pow_eig_pairs, A_nom, B_nom, K_nom, Xstr, Xf, deltaT);
+    % ************************** Prepare data *****************************
+    Xstr_shift = zeros(size(Xstr)); %Shift dynamics such that origin is fixed point
+    X = [];
+    X_dot = [];
+    U = [];
+    for i = 1 : Ntraj
+       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
+       X = [X reshape(Xstr_shift(:,i,:),n,Ntime+1)];
+       X_dot = [X_dot num_diff(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)),deltaT)];
+       U = [U reshape(Ustr(:,i,:),m,Ntime+1)];
+    end
+    
+    % ******************** Construct eigenfunctions ***********************
+    
+    [A_eigfuncs, liftFun] = construct_eigfuncs(n, N_basis,pow_eig_pairs, ...
+                                            A_nom, B_nom, K_nom, X, X_dot);
+    
+    %Perform lifting
     liftFun = @(xx) [xx; liftFun(xx)];
-            
     Nlift = length(liftFun(zeros(n,1)));
-    Xlift = liftFun(Xacc);
-    Ylift = liftFun(Yacc);
+    Xlift = [];
+    Xlift_dot = [];
+    for i = 1 : Ntraj
+       Xlift_temp = liftFun(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)));
+       Xlift = [Xlift Xlift_temp];
+       Xlift_dot = [Xlift_dot num_diff(Xlift_temp,deltaT)];
+    end
+    
     %fprintf('Lifting DONE, time = %1.2f s \n', toc);
 
     % ********************** Build predictor *********************************
 
     %Set up regression for A and B:
-    X = [Xlift; Uacc];
-    Y = Yacc(n/2+1:n,:);
-    A_state = lasso(X',Y','Lambda',1e-4, 'Alpha', 0.8);
+    X_vel = [Xlift; U];
+    Y_vel = Xlift_dot(n/2+1:n,:);
+    A_vel = lasso(X_vel',Y_vel','Lambda',1e-1, 'Alpha', 0.8);
     
     %Perform regression and enforce known structure:
     A_koop = zeros(Nlift);
-    A_koop(1:n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_koop,2)-n)];
-    A_koop(n/2+1:n,:) = A_state(1:Nlift,:)'; 
+    A_koop(1:n/2,:) = [zeros(n/2) eye(n/2) zeros(n/2,size(A_koop,2)-n)];
+    A_koop(n/2+1:n,:) = A_vel(1:Nlift,:)'; 
     A_koop(n+1:end,n+1:end) = A_eigfuncs;
 
-    Y_kin = Yacc(1:n/2,:) - A_koop(1:n/2,:)*Xlift;
-    B_kin = Uacc'\Y_kin';
-    Ylift_mod= Ylift(n+1:end,:) - A_eigfuncs*Xlift(n+1:end,:);
-    B_mod = (Uacc-K_nom*Xacc)'\Ylift_mod';
-    B_koop = [B_kin'; A_state(Nlift+1:end,:); B_mod'];
+    Y_kin = X_dot(1:n/2,:) - A_koop(1:n/2,:)*Xlift;
+    X_kin = U;
+    B_kin = X_kin'\Y_kin';
+    
+    Y_eig = Xlift_dot(n+1:end,:) - A_eigfuncs*Xlift(n+1:end,:);
+    X_eig = U-K_nom*X;
+    B_eig = X_eig'\Y_eig';
+    
+    B_koop = [B_kin'; A_vel(Nlift+1:end,:); B_eig'];  
     
     C_koop = zeros(n,size(A_koop,1));
     C_koop(1:n,1:n) = eye(n);
     
     %Subtract effect of nominal controller from A:
-    A_koop(n+1:end,1:n) = A_koop(n+1:end,1:n)-B_mod'*K_nom;
+    A_koop(n+1:end,1:n) = A_koop(n+1:end,1:n)-B_eig'*K_nom;
 end

@@ -7,7 +7,7 @@
 % multiple centers can by done as evaluation of multiple points (the
 % centers in this case) on a single point (the center)
 
-function Y = rbf_grad( X,C, type, eps, k )
+function Y = rbf_dot(X,X_dot,C, type, eps, k )
     type = lower(type);
     if(~exist('eps','var') || isempty(eps))
         eps = 1;
@@ -19,7 +19,7 @@ function Y = rbf_grad( X,C, type, eps, k )
     N = size(X,2); %number of points
     n = size(X,1);
     Cbig = C;
-    Y = zeros(size(C,2),n);
+    Y = zeros(size(C,2),N);
     for i = 1:size(Cbig,2)
         C = Cbig(:,i);
         C = repmat( C,1, N );
@@ -47,7 +47,7 @@ function Y = rbf_grad( X,C, type, eps, k )
                 %y = r_squared.^(k/2).*log(sqrt(r_squared));
                 %y(isnan(y)) = 0;
             otherwise
-                error('RBF type not recognize')
+                error('RBF type not recognized')
         end
-        Y(i,:) = y';
+        Y(i,:) = sum(y.*X_dot,1);
     end

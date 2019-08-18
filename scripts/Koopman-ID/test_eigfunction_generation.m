@@ -13,108 +13,100 @@ Q = eye(2); R = 1; %LQR penalty matrices for states and control inputs
 Ntime = 200;    %Length of each trajectory (# of time steps)
 Ntraj = 10;     %Number of trajectories
 deltaT = 0.01;  %Time step length of simulation
-X0_A = 2*rand(n,Ntraj)-1; %Sample initial points for each trajectory for learning A
-X0_A = 0.95*pi*X0_A./vecnorm(X0_A,2,1); %Normalize so initial points lie on unit circle
-Xf_A = zeros(n,Ntraj); %Terminal points for each trajectory for learning A
-X0_B = 0.6*(2*pi*rand(n,Ntraj)-pi); %Sample initial points for each trajectory for learning B
-Xf_B = 0.6*(2*pi*rand(n,Ntraj)-pi); %Terminal points for each trajectory for learning B
+X0 = 2*rand(n,Ntraj)-1; %Sample initial points for each trajectory for learning A
+X0 = 0.95*pi*X0./vecnorm(X0,2,1); %Normalize so initial points lie on unit circle
+Xf = zeros(n,Ntraj); %Terminal points for each trajectory for learning A
 
 %% ************************** Data Collection *****************************
 disp('Starting data collection...'); tic
 
 % Calculate nominal model with Jacobian and find nominal control gains:
 
-[A_nom, B_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R);
+[A_nom, B_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R,[0;0]);
 
 % Collect data to learn autonomous dynamics:
 autonomous_learning = true;
-U_perturb = 0.0*randn(Ntime,Ntraj); %Add normally distributed noise to nominal controller
-[Xstr, Xacc, Yacc, Ustr, Uacc, timestr]  = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0_A, Xf_A ,K_nom,f_u,U_perturb, autonomous_learning);
+U_perturb = 0.0*randn(Ntime+1,Ntraj); %Add normally distributed noise to nominal controller
+[Xstr, Xacc, Yacc, Ustr, U, timestr]  = collect_data(n,m,Ntraj,...
+                  Ntime,deltaT,X0, Xf ,K_nom,f_u,U_perturb);
 
 fprintf('Data collection done, execution time: %1.2f s \n', toc);
 
 %% ************** Prepare data and learn diffeomorphism h *****************
-A_c = A_nom + B_nom*K_nom;
-A_c_d = expm(A_c*deltaT); %Discrete time dynamics matrix
-N_basis = 100;
-cent = rand(n,N_basis)*2*pi - pi;
-rbf_type = 'gauss';
-eps_rbf = 1;
-zfun = @(xx) [xx'; rbf(xx',cent,rbf_type,eps_rbf)];
-zfun_grad = @(xx) [eye(2); rbf_grad(xx',cent,rbf_type,eps_rbf)];
-% x = sym('x',[1,n]);
-% zfun_grad = zfun(x);
-Y = [];
-Z_mplus1 = [];
-Z_m = [];
-for i = 1 : Ntraj
-   X_mplus1 = reshape(Xstr(:,i,2:end),n,Ntime);
-   X_m = reshape(Xstr(:,i,1:end-1),n,Ntime);
+    Xstr_shift = zeros(size(Xstr)); %Shift dynamics such that origin is fixed point
+    X = [];
+    X_dot = [];
+    U = [];
+    for i = 1 : Ntraj
+       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
+       X = [X reshape(Xstr_shift(:,i,:),n,Ntime+1)];
+       X_dot = [X_dot num_diff(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)),deltaT)];
+       U = [U reshape(Ustr(:,i,:),m,Ntime+1)];
+    end
+
+    N_basis = 100;
+    A_cl = A_nom + B_nom*K_nom;
+    cent = 2*pi*rand(n,N_basis) - pi;
+    rbf_type = 'gauss';
+    eps_rbf = 2;
+        
+    % Set up nonlinear transformations and their gradients
+    zfun = @(xx) [xx; rbf(xx,cent,rbf_type,eps_rbf)];
+    zfun_grad = @(xx) [eye(2); rbf_grad(xx,cent,rbf_type,eps_rbf)];
+    zfun_dot = @(xx, xx_dot) [xx_dot; rbf_dot(xx,xx_dot,cent,rbf_type,eps_rbf)];
     
-   % Set up Y matrix (targets), Y(:,i) = x_(i+1) - A_nom*x_i
-   Y = [Y X_mplus1-A_c_d*X_m]; 
-   
-   % Set up Z_mplus1 matrix (inputs), phi(x_(i+1))
-   Z_mplus1 = [Z_mplus1 zfun(X_mplus1')];
-   
-   % Set up Z_m matrix (inputs), phi(x_i)
-   Z_m = [Z_m zfun(X_m')]; 
-end
+   % Set up Z and Z_dot matrices:
+   Z = zfun(X);
+   Z_dot = zfun_dot(X,X_dot);
 
-%Set up constraint matrix
-con1 = zfun_grad([0 0]);
+    %Set up constraint matrix
+    con1 = zfun_grad([0; 0]);
+    
+    disp('Solving optimization problem...')
+    N = size(Z,1);
+    cvx_begin 
+        variable C(n,N);
+        minimize (norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro') + 1*norm(C,'fro'))
+        subject to
+            {C*con1 == zeros(n)}; 
+    cvx_end
+    fprintf('Solved, optimal value excluding regularization: %.10f, MSE: %.10f\n', norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro'),immse(X_dot+C*Z_dot, A_cl*(X+C*Z)))
+    %fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
 
-disp('Solving optimization problem...')
-N = size(Z_m,1);
-cvx_begin
-    variable C(n,N);
-    minimize (norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro') + 0.01*norm(C,'fro'))
-    subject to
-        {C*con1 == zeros(n)}; 
-cvx_end
-fprintf('Solved, optimal value excluding regularization: %.10f, MSE: %.10f\n', norm(Y - (A_c_d*C*Z_m - C*Z_mplus1),'fro'),immse(Y, A_c_d*C*Z_m - C*Z_mplus1))
-fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
+    yfun = @(xx) xx + C*zfun(xx); % Full learned diffeomorphism
+    
+    % Calculate eigenfunctions for linearized system
+    [~,D] = eig(A_cl);
+    [V_a,~] = eig(A_cl');
 
-yfun = @(xx) xx + C*zfun(xx'); % Full learned diffeomorphism
-%% Calculate eigenfunctions for linearized system
-[V,D] = eig(A_c_d);
-[V_a,D_a] = eig(A_c_d');
+    %Define powers (only implemented for n=2):
+    pow_eig_pairs = 3;
+    a = 0 : pow_eig_pairs;
+    [P,Q] = meshgrid(a,a);
+    c=cat(2,P',Q');
+    powers=reshape(c,[],2);
 
-%Define powers (only implemented for n=2):
-max_power = 3;
-a = 0 : max_power;
-[P,Q] = meshgrid(a,a);
-c=cat(2,P',Q');
-powers=reshape(c,[],2);
+    linfunc = @(xx) (xx'*V_a)';
+    phifun = @(xx) (prod(linfunc(xx).^(powers')))';
+    lambd = prod(diag(D).^(powers'))';
 
-linfunc = @(xx) (xx'*V_a)';
-phifun = @(xx) (prod(linfunc(xx).^(powers')))';
-lambd = prod(diag(D).^(powers'))';
+    % Construct scaling function
+    gfun = @(xx) xx./pi; %Scale state space into unit cube
 
-%% Construct scaling function
-gfun = @(xx) xx./pi; %Scale state space into unit cube
-
-%% Construct eigenfunctions for nonlinear system
-phi_nonlin = @(xx) phifun(gfun(yfun(xx)));
-A_eig = diag(lambd);
-
+    % Construct eigenfunctions for nonlinear system
+    z_eigfun = @(xx) phifun_mat(phifun, gfun(yfun(xx)));
+    %z_eigfun = @(xx) phifun(gfun(yfun(xx)));
+    A_koop = diag(lambd);
 %% Check how well the evolution of the eigenfunctions are described by the eigenvalues on linearized system:
-X_test = zeros(n,Ntime+1);
-X_test(:,1) = Xstr(:,1,1);
-for i = 2 : Ntime+1
-    X_test(:,i) = A_c_d*X_test(:,i-1);
-end
+f_cl = @(t,x) A_cl*x;
+[t_test, X_test] = ode45(f_cl,0:deltaT:2,Xstr(:,1,1));
+X_test = X_test';
 
 N = size(lambd,1);
-Z_test = zeros(N,Ntime+1);
-Z_eig = zeros(N,Ntime+1);
-Z_test(:,1) = phifun(X_test(:,1));
-Z_eig(:,1) = phifun(X_test(:,1));
-for j = 2 : Ntime+1
-    Z_eig(:,j) = A_eig*Z_eig(:,j-1);
-    Z_test(:,j) = phifun(X_test(:,j));
-end
+Z_test = z_eigfun(X_test);
+f_eig = @(t,x) A_koop*x;
+[~,Z_eig] = ode45(f_eig,0:deltaT:2,Z_test(:,1));
+Z_eig = Z_eig';
 
 afigure
 t = 0 : deltaT : Ntime*deltaT;
@@ -137,7 +129,7 @@ Z_eig = zeros(N,Ntime+1);
 Z_test(:,1) = phi_nonlin(X_test(:,1));
 Z_eig(:,1) = phi_nonlin(X_test(:,1));
 for j = 2 : Ntime+1
-    Z_eig(:,j) = A_eig*Z_eig(:,j-1);
+    Z_eig(:,j) = A_koop*Z_eig(:,j-1);
     Z_test(:,j) = phi_nonlin(X_test(:,j));
 end
 
