@@ -1,17 +1,13 @@
 function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,...
     mse_origin_std, mse_edmd_std,mse_koop_std]...
             = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,Xf,f_u,liftFun,...
-            phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop)
+            phi_fun_v,A_nom,B_nom,C_nom,K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop)
         
     u = zeros(m,Nsim,Ntime);
     
-    % Find linearized model at the origin:
-    [A_origin, B_origin, ~] = find_nominal_model_ctrl(n,m,f_u,eye(n),eye(m),[0; 0]);
-    f_origin = @(t,x,u) A_origin*x + B_origin*u;
-    
-    % Define KEEDMD model:
+    % Define nominal and KEEDMD model:
+    f_nom = @(t,x,u) A_nom*x + B_nom*u;
     f_koop = @(t,x,u) A_koop*x + B_koop*u;
-    
     
     x = zeros(n,Nsim,Ntime+1);
     x_origin = zeros(n,Nsim,Ntime+1);
@@ -32,7 +28,7 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
         x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), u(:,:,i));
         
         %Linearization at origin:
-        x_origin(:,:,i+1) = sim_timestep(deltaT,f_origin,0,x_origin(:,:,i), u(:,:,i));
+        x_origin(:,:,i+1) = sim_timestep(deltaT,f_nom,0,x_origin(:,:,i), u(:,:,i));
         
         %EDMD predictor:
         z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*u(:,:,i);

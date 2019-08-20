@@ -76,8 +76,8 @@ fprintf('Data collection done, execution time: %1.2f s \n', toc);
     yfun = @(xx) xx + C*zfun(xx); % Full learned diffeomorphism
     
     % Calculate eigenfunctions for linearized system
-    [~,D] = eig(A_cl);
-    [V_a,~] = eig(A_cl');
+    [V_a,D] = eig(A_cl);
+    [W_a,~] = eig(A_cl');
 
     %Define powers (only implemented for n=2):
     pow_eig_pairs = 3;
@@ -86,9 +86,10 @@ fprintf('Data collection done, execution time: %1.2f s \n', toc);
     c=cat(2,P',Q');
     powers=reshape(c,[],2);
 
-    linfunc = @(xx) (xx'*V_a)';
+    linfunc = @(xx) (xx'*W_a)'./diag(V_a'*W_a);
     phifun = @(xx) (prod(linfunc(xx).^(powers')))';
-    lambd = prod(diag(D).^(powers'))';
+    lambd = prod(exp(diag(D)).^(powers'))';
+    lambd = log(lambd);
 
     % Construct scaling function
     gfun = @(xx) xx./pi; %Scale state space into unit cube
@@ -99,12 +100,13 @@ fprintf('Data collection done, execution time: %1.2f s \n', toc);
     A_koop = diag(lambd);
 %% Check how well the evolution of the eigenfunctions are described by the eigenvalues on linearized system:
 f_cl = @(t,x) A_cl*x;
-[t_test, X_test] = ode45(f_cl,0:deltaT:2,Xstr(:,1,1));
+x0 = [1;1];
+[t_test, X_test] = ode45(f_cl,0:deltaT:2,x0);
 X_test = X_test';
 
 N = size(lambd,1);
-Z_test = z_eigfun(X_test);
-f_eig = @(t,x) A_koop*x;
+Z_test = phifun_mat(phifun,X_test);
+f_eig = @(t,z) A_koop*z;
 [~,Z_eig] = ode45(f_eig,0:deltaT:2,Z_test(:,1));
 Z_eig = Z_eig';
 
@@ -124,14 +126,9 @@ end
 %% Check how well the evolution of the eigenfunctions are described by the eigenvalues:
 X_test = reshape(Xstr(:,1,:),n,Ntime+1);
 N = size(lambd,1);
-Z_test = zeros(N,Ntime+1);
-Z_eig = zeros(N,Ntime+1);
-Z_test(:,1) = phi_nonlin(X_test(:,1));
-Z_eig(:,1) = phi_nonlin(X_test(:,1));
-for j = 2 : Ntime+1
-    Z_eig(:,j) = A_koop*Z_eig(:,j-1);
-    Z_test(:,j) = phi_nonlin(X_test(:,j));
-end
+Z_test = z_eigfun(X_test);
+[~,Z_eig] = ode45(f_eig,0:deltaT:2,Z_test(:,1));
+Z_eig = Z_eig';
 
 afigure
 t = 0 : deltaT : Ntime*deltaT;
@@ -144,93 +141,3 @@ for i = 1 : N
         legend('Eigval evolution', 'True')
     end
 end
-    
-%% Predict evolution of nonlinear system
-
-
-
-%% Old code: (Delete when verified not needed)
-% lin_pred_acc = zeros(size(Xacc,1),Ntime*Ntraj);
-% Y_res_acc = zeros(size(Xacc,1),Ntime*Ntraj);
-% t = deltaT:deltaT:Ntime*deltaT;
-% 
-% afigure
-% for i = 1 : Ntraj
-%     
-%     lin_pred = A_nom*reshape(Xstr(:,i,1:end-1),size(Xacc,1),Ntime);
-%     lin_pred_acc(:,(i-1)*Ntime+1:i*Ntime) = lin_pred;
-%     Y_res = reshape(Xstr(:,i,2:end),size(Xacc,1),Ntime)-lin_pred;
-%     Y_res_acc(:,(i-1)*Ntime+1:i*Ntime) = Y_res;
-%     
-% %     subplot(2,Ntraj/2,i)     
-% %     plot(t, lin_pred(1,:), t, reshape(Xstr(1,i,2:end),1,Ntime),...
-% %         t, lin_pred(2,:), t, reshape(Xstr(2,i,2:end),1,Ntime));
-% %     xlabel('Time (sec)')
-% %     ylabel('State value')
-% %     fprintf('Error %i: %.4f\n', i, norm(lin_pred-reshape(Xstr(:,i,2:end),size(Xacc,1),Ntime)));
-% end
-% 
-% %% Test eigenfunction generation
-% 
-% center_type = 'random';
-% N = Ntraj*Ntime;
-% N_basis = 40;
-% 
-% switch center_type 
-%     case 'random'
-%         cent = rand(n,N_basis)*2*pi - pi;
-%     case 'data'
-%         cent = datasample(Xacc',N_basis)'+0.05*(rand(n,N_basis)*2-1);
-% end
-% 
-% rbf_type = 'gauss';
-% eps_rbf = 1;
-% zfun = @(xx) [xx'; rbf(xx',cent,rbf_type,eps_rbf)];
-% X = zfun(Xacc');
-% Y = zfun(Yacc');
-% D_norm = diag(vecnorm(X'));
-% X = D_norm*X;
-% Y = D_norm*Y;
-% 
-% to_scale = 'Scale';
-% to_center = 'Ignore';
-% k_mode = -1;
-% tol = N_basis*eps;
-% nobal = 'Ignore';
-% n_ref = 0;
-% ref_select = 1;
-% target = [0 0]'; %Not used because ref_select not equal ot 2
-% overwrite = 'OverWrite';
-% file_save = 'NoSave';
-% 
-% % [Z, Lambda, rez, RQ_ref, RSI, Z_ref, rez_ref, U, AxU_k] = ...
-% %     XY_DDMD_R4( X, Y, to_scale, to_center, k_mode, tol, nobal, n_ref,...
-% %     ref_select, target, overwrite, file_save);
-% 
-% A = Y/X;
-% error = norm(A*X-Y)
-% [V,D] = eig(A');
-% rel_inds = find(diag(abs(D)) > 0.1);
-% V_red = V(:,rel_inds);
-% D_red = D(rel_inds,rel_inds);
-% 
-% z_eigfun = @(xx) (zfun(xx)'*V_red)';
-% A_koop = D_red; %Discrete time autonomous dynamics;
-% Zacc = z_eigfun(Yacc');
-% 
-% %Compare z with its linear evolution
-% z = z_eigfun(Xacc(:,1)');
-% for i = 1 : Ntime
-%     z = [z A_koop*z(:,end)];
-% end
-% 
-% %%
-% t = deltaT : deltaT : Ntime*deltaT;
-% n_plot = 15;
-% afigure
-% for i = 1 : n_plot
-%     subplot(n_plot,1,i)
-%     plot(t,Zacc(i,1:end),t,z(i,2:end))
-%     legend('True', 'Linear evolution')
-% end
-%     

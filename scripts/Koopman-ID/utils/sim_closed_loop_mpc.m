@@ -1,7 +1,7 @@
 function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, E_edmd, E_koop,...
             cost_nom, cost_edmd, cost_koop]...
             = sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,Tsim,...
-            f_u,liftFun,phi_fun_v, K_nom,A_edmd,B_edmd,C_edmd,A_koop,...
+            f_u,liftFun,phi_fun_v,A_nom,B_nom,C_nom,K_nom,A_edmd,B_edmd,C_edmd,A_koop,...
             B_koop,C_koop,Q,R)
 
     %Set up trajectory to track:
@@ -35,28 +35,18 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
     z_edmd(:,1) = liftFun(traj_d(:,1));
     z_koop(:,1) = phi_fun_v(traj_d(:,1));
 
-    % Define Koopman controller
-    Tpred = Tsim/2;%0.1; % Prediction horizon
+    % Define MPC parameters:
+    Tpred = Tsim;%0.1; % Prediction horizon
     Np = round(Tpred / deltaT);
     traj_d = [traj_d traj_d(:,end).*ones(n,Np)]; %Add extra points to trajectory to allow prediction horizon
     xlift_min = [];%[ymin ; nan(Nlift-1,1)]; % Constraints
     xlift_max = [];%[ymax ; nan(Nlift-1,1)];
 
     % Build Koopman MPC controller 
+    MPC_nom  = getMPC(A_nom,B_nom,C_nom,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
     MPC_edmd  = getMPC(A_edmd,B_edmd,C_edmd,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
     MPC_koop  = getMPC(A_koop,B_koop,C_koop,0,Q,R,Q,Np,-100, 100, xlift_min, xlift_max,'qpoases');
     
-    % Get Jacobian of the true dynamics (for local linearization MPC)
-    x = sym('x',[2 1]); syms u;
-    f_ud_sym = sim_timestep(deltaT, f_u, 0, x, u);
-    Jx = jacobian(f_ud_sym,x);
-    Ju = jacobian(f_ud_sym,u);
-
-    %Save indices of infeasible MPC-problems (Should never happen with no
-    %state constraints)
-    wasinfeas= 0;
-    ind_inf = [];
-
     % Closed-loop simultion start
     for i = 1:Ntime_track
         if(mod(i,10) == 0)
@@ -67,17 +57,7 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         yr = traj_d(:,i:i+Np-1);
 
         % Local linearization MPC
-        %Aloc = double(subs(Jx,[x;u],[x_nom(:,i);u_nom(:,i)])); % Get local linearization
-        %Bloc = double(subs(Ju,[x;u],[x_nom(:,i);u_nom(:,i)]));
-        Aloc = double(subs(Jx,[x;u],[[0 0]';0])); % Get local linearization
-        Bloc = double(subs(Ju,[x;u],[[0 0]';0]));
-        %Cloc = double(subs(f_ud_sym,[x;u],[x_nom(:,i);u_nom(:,i)])) - Aloc*x_nom(:,i) - Bloc*u_nom(:,i);
-        [U_nom,~,optval] = solveMPCprob(Aloc,Bloc,eye(2),[],Q,R,Q,Np,-100, 100,[],[],x_nom(:,i),yr); % Get control input
-        u_nom(:,i) = U_nom(1:m,1);
-        if(optval == Inf) % Detect infeasibility
-            ind_inf = [ind_inf i];
-            wasinfeas = 1;
-        end
+        u_nom(:,i) = MPC_nom(x_nom(:,i),yr);
         x_nom(:,i+1) = sim_timestep(deltaT, f_u, 0, x_nom(:,i), u_nom(:,i)); % Update true state
 
         % EDMD MPC
@@ -89,10 +69,6 @@ function [x_nom,x_edmd,x_koop,mse_nom,mse_edmd,mse_koop, t_plot, traj_d, E_nom, 
         z_koop(:,i) = phi_fun_v(x_koop(:,i)); %Lift
         u_koop(:,i) = MPC_koop(z_koop(:,i),yr);% Get control input
         x_koop(:,i+1) = sim_timestep(deltaT, f_u, 0, x_koop(:,i), u_koop(:,i));
-    end
-
-    if(isempty(ind_inf))
-        ind_inf = Ntime_track;
     end
     
     % Calculate corresponding predictions and MSE

@@ -46,7 +46,7 @@ plot_basis_edmd = false; %Plots the basis functions if true
 
 %Koopman eigenfunction parameters:
 N_basis_diff = 100; %Number of RBFs to use for lifting when learning the diffeomorphism
-pow_eig_pairs = 2; %Highest power of eigenpairs to use when generating eigenfunctions for linearized system
+pow_eig_pairs = 5; %Highest power of eigenpairs to use when generating eigenfunctions for linearized system
 plot_basis_koop = false; %Plots the basis functions if true
 xlim = [-1, 1]; %Plot limits
 ylim = [-1, 1]; %Plot limits
@@ -63,7 +63,7 @@ disp('Starting data collection...'); tic
 
 % Calculate nominal model with Jacobian and find nominal control gains:
 
-[A_nom, B_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R,[0; 0]); %Linearization around 0.
+[A_nom, B_nom, C_nom, K_nom] = find_nominal_model_ctrl(n,m,f_u,Q,R,[0; 0]); %Linearization around 0.
 
 % Collect data to learn autonomous dynamics:
 U_perturb = 0.5*randn(Ntime+1,Ntraj); %Add normally distributed noise to nominal controller
@@ -90,7 +90,7 @@ fprintf('KEEDMD done, execution time: %1.2f s \n', toc);
 %% ************************ Analysis of Results ***************************
 disp('Starting analysis of results...'); tic
 [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_std, mse_koop_std,...
-    cost_nom, cost_edmd, cost_koop] = evaluate_model_performance(K_nom, ...
+    cost_nom, cost_edmd, cost_koop] = evaluate_model_performance(A_nom, B_nom, C_nom, K_nom, ...
     A_edmd, B_edmd, C_edmd, A_koop, B_koop, C_koop, Nsim, X0_sim, Xf_sim, ...
     Ntraj, Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results);
 fprintf('Analysis done, execution time: %1.2f s \n', toc);

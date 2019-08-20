@@ -40,20 +40,20 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
     A_cl = A_nom + B_nom*K_nom;
     cent = 2*pi*rand(n,N_basis) - pi;
     rbf_type = 'gauss';
-    eps_rbf = 2;
+    eps_rbf = 1;
         
     % Set up nonlinear transformations and their gradients
     zfun = @(xx) [xx; rbf(xx,cent,rbf_type,eps_rbf)];
     zfun_grad = @(xx) [eye(2); rbf_grad(xx,cent,rbf_type,eps_rbf)];
     zfun_dot = @(xx, xx_dot) [xx_dot; rbf_dot(xx,xx_dot,cent,rbf_type,eps_rbf)];
     
-   % Set up Z and Z_dot matrices:
-   Z = zfun(X);
-   Z_dot = zfun_dot(X,X_dot);
+    % Set up Z and Z_dot matrices:
+    Z = zfun(X);
+    Z_dot = zfun_dot(X,X_dot);
 
     %Set up constraint matrix
     con1 = zfun_grad([0; 0]);
-    
+
     disp('Solving optimization problem...')
     N = size(Z,1);
     cvx_begin 
@@ -66,10 +66,10 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
     %fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
 
     yfun = @(xx) xx + C*zfun(xx); % Full learned diffeomorphism
-    
+
     % Calculate eigenfunctions for linearized system
-    [~,D] = eig(A_cl);
-    [V_a,~] = eig(A_cl');
+    [V_a,D] = eig(A_cl);
+    [W_a,~] = eig(A_cl');
 
     %Define powers (only implemented for n=2):
     a = 0 : pow_eig_pairs;
@@ -77,16 +77,16 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
     c=cat(2,P',Q');
     powers=reshape(c,[],2);
 
-    linfunc = @(xx) (xx'*V_a)';
+    linfunc = @(xx) (xx'*W_a)'./diag(V_a'*W_a);
     phifun = @(xx) (prod(linfunc(xx).^(powers')))';
-    lambd = prod(diag(D).^(powers'))';
+    lambd = prod(exp(diag(D)).^(powers'))';
+    lambd = log(lambd);
 
     % Construct scaling function
     gfun = @(xx) xx./pi; %Scale state space into unit cube
 
     % Construct eigenfunctions for nonlinear system
-    z_eigfun = @(xx) phifun_mat(phifun, gfun(yfun(xx)));
-    %z_eigfun = @(xx) phifun(gfun(yfun(xx)));
+    z_eigfun = @(xx) phifun_mat(phifun, gfun(yfun(xx))); 
     A_koop = diag(lambd);
 end
 
