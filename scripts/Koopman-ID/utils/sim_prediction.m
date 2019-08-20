@@ -7,6 +7,7 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
     
     % Define nominal and KEEDMD model:
     f_nom = @(t,x,u) A_nom*x + B_nom*u;
+    f_edmd = @(t,x,u) A_edmd*x + B_edmd*u;
     f_koop = @(t,x,u) A_koop*x + B_koop*u;
     
     x = zeros(n,Nsim,Ntime+1);
@@ -31,10 +32,9 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
         x_origin(:,:,i+1) = sim_timestep(deltaT,f_nom,0,x_origin(:,:,i), u(:,:,i));
         
         %EDMD predictor:
-        z_edmd(:,:,i+1) = A_edmd*z_edmd(:,:,i) + B_edmd*u(:,:,i);
+        z_edmd(:,:,i+1) = sim_timestep(deltaT,f_edmd,0,z_edmd(:,:,i), u(:,:,i));
 
         %Koopman eigenfunction predictor:
-        %z_koop(:,:,i+1) = A_koop*z_koop(:,:,i) + B_koop*u(:,:,i);
         z_koop(:,:,i+1) = sim_timestep(deltaT,f_koop,0,z_koop(:,:,i), u(:,:,i));
     end
     

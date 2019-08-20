@@ -1,5 +1,5 @@
 function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_basis,basis_function,...
-    rbf_type, center_type, eps, plot_basis, xlim, ylim, Xacc, Yacc, Uacc)
+    rbf_type, center_type, eps, Xstr, Ustr, Xf,deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
     %Decomposition
     
@@ -24,62 +24,48 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
     %   C_edmd          - Projection matrix from lifted space to outputs
 
     
+    % ************************** Prepare data *****************************
+    Xstr_shift = zeros(size(Xstr)); %Shift dynamics such that origin is fixed point
+    X = [];
+    X_dot = [];
+    U = [];
+    for i = 1 : Ntraj
+       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
+       X = [X reshape(Xstr_shift(:,i,:),n,Ntime+1)];
+       X_dot = [X_dot num_diff(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)),deltaT)];
+       U = [U reshape(Ustr(:,i,:),m,Ntime+1)];
+    end
+    
+    % ******************************* Lift ***********************************
+    % Find RBF Centers
     switch center_type 
         case 'random'
             cent = rand(n,N_basis)*2 - 1;
         case 'data'
-            cent = datasample(Xacc',N_basis)'+0.05*(rand(n,N_basis)*2-1);
+            cent = datasample(X',N_basis)'+0.05*(rand(n,N_basis)*2-1);
     end
-
-    % ********************** Plot basis functions *************************
-    if plot_basis
-         [X,Y] = meshgrid(-xlim(1):0.1:xlim(2),ylim(1):0.1:ylim(2));
-         x_flat = reshape(X,[1,size(X,1)*size(X,2)]);
-         y_flat = reshape(Y,[1,size(X,1)*size(X,2)]);
-         xy_flat = [x_flat;y_flat];
-
-        afigure
-        hold on
-        for i=1:1
-            rbf_flat = rbf( xy_flat,cent(:,i), rbf_type, eps_rbf);
-            rbf_pack = reshape(rbf_flat,[size(X,1),size(X,2)]);
-            surf(X,Y,rbf_pack)
-        end
-        alpha 0.2
-        xlabel('x')
-        ylabel('y')
-    end
-
-    % ******************************* Lift ***********************************
-
-    %disp('Starting LIFT GENERATION')
+    
     switch basis_function
         case 'rbf'
-            liftFun = @(xx)( [xx;rbf(xx,cent,rbf_type,eps)] );
+            liftFun = @(xx)( [ones(1,size(xx,2)); xx;rbf(xx,cent,rbf_type,eps)]);
     end
 
     Nlift = length(liftFun(zeros(n,1)));
-    Xlift = liftFun(Xacc);
-    Ylift = liftFun(Yacc);
-    %fprintf('Lifting DONE, time = %1.2f s \n', toc);
-
+    Xlift = [];
+    Xlift_dot = [];
+    for i = 1 : Ntraj
+       Xlift_temp = liftFun(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)));
+       Xlift = [Xlift Xlift_temp];
+       Xlift_dot = [Xlift_dot num_diff(Xlift_temp,deltaT)];
+    end
     % ********************** Build predictor *********************************
 
-    %disp('Starting REGRESSION')
-    %tic
-    W = [Ylift ; Xacc];
-    V = [Xlift; Uacc];
+    W = [Xlift_dot ; X];
+    V = [Xlift; U];
     VVt = V*V';
     WVt = W*V';
     M = WVt * pinv(VVt); % Matrix [A B; C 0]
     A_edmd= M(1:Nlift,1:Nlift);
     B_edmd = M(1:Nlift,Nlift+1:end);
     C_edmd = M(Nlift+1:end,1:Nlift);
-    
-    % Add known structure (overwrite parts of the learned matrices):
-    %A_edmd(1:n/2,:) = [eye(n/2) deltaT*eye(n/2) zeros(n/2,size(A_edmd,2)-n)];
-    %C_edmd = zeros(size(C_edmd));
-    %C_edmd(:,1:n) = eye(n);
-
-    %fprintf('Regression done, time = %1.2f s \n', toc);
 end

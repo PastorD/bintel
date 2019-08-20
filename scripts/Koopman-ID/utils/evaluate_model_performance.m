@@ -26,6 +26,13 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
     B_nom_d = discrete_model_nom.B;
     C_nom_d = discrete_model_nom.C;
     
+    %Discretize EDMD system:
+    continuous_model_edmd = ss(A_edmd, B_edmd, C_edmd, 0);
+    discrete_model_edmd = c2d(continuous_model_edmd,deltaT);
+    A_edmd_d = discrete_model_edmd.A;
+    B_edmd_d = discrete_model_edmd.B;
+    C_edmd_d = discrete_model_edmd.C;
+    
     %Discretize KEEDMD system:
     continuous_model_koop = ss(A_koop, B_koop, C_koop, 0);
     discrete_model_koop = c2d(continuous_model_koop,deltaT);
@@ -40,9 +47,8 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
             mse_koop_track{i},t_plot,traj_d, E_nom{i}, E_edmd{i}, E_koop{i},...
             cost_nom{i}, cost_edmd{i}, cost_koop{i}] = ...
             sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,...
-            Ntime,deltaT,Tsim,f_u,liftFun,phi_fun_v,A_nom,B_nom,C_nom,K_nom,A_edmd,B_edmd,...
-            C_edmd,A_koop_d,B_koop_d,C_koop_d,Q,R);
-
+            Ntime,deltaT,Tsim,f_u,liftFun,phi_fun_v,A_nom_d,B_nom_d,C_nom_d,K_nom,A_edmd_d,B_edmd_d,...
+            C_edmd_d,A_koop_d,B_koop_d,C_koop_d,Q,R);
     end
 
     %Plot results

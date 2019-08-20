@@ -36,7 +36,6 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
     end
     
     % ******************** Construct eigenfunctions ***********************
-    
     [A_eigfuncs, liftFun] = construct_eigfuncs(n, N_basis,pow_eig_pairs, ...
                                             A_nom, B_nom, K_nom, X, X_dot);
     
@@ -50,15 +49,13 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
        Xlift = [Xlift Xlift_temp];
        Xlift_dot = [Xlift_dot num_diff(Xlift_temp,deltaT)];
     end
-    
-    %fprintf('Lifting DONE, time = %1.2f s \n', toc);
 
     % ********************** Build predictor *********************************
 
     %Set up regression for A and B:
     X_vel = [Xlift; U];
     Y_vel = Xlift_dot(n/2+1:n,:);
-    A_vel = lasso(X_vel',Y_vel','Lambda',1e-1, 'Alpha', 0.8);
+    A_vel = lasso(X_vel',Y_vel','Lambda',1e-3, 'Alpha', 0.8);
     
     %Perform regression and enforce known structure:
     A_koop = zeros(Nlift);
