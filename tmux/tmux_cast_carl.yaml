@@ -1,0 +1,17 @@
+session_name: bintel_cast_session
+suppress_history: false
+windows:
+  - window_name: bintel_cast
+    layout: tiled
+    shell_command_before:
+    - export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=192.168.1.102
+    panes:
+      - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack.launch
+      - shell_command:
+        - sleep 5
+        - source bash/increase_rates.sh
+        - rostopic echo /mavros/state
+      - sleep 5; rostopic echo /mavros/local_position/pose 
+      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+      - python scripts/test_trajectory_tracking.py \
+      - ~/Downloads/QGroundControl.AppImage 
