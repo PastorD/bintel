@@ -4,6 +4,13 @@ This repository contains the code to use the Burdick Lab Intel Drone. Please don
 
 All possible set of commands are listed in the scripts folder. Use it as a reference or execute a file using bash.
 
+# Conventions
+
+file name: 
++ main: it is a callable file
++ test: callable file only for testing
++ _learn: fits data 
+
 # Setup
 
 - Turn on the radio (if you forget to turn on the radio first, you have to press the turn it on while holding the bind button. A mayor tone indicates success while a minor tone (sad tone) indicates failure. Try again if it fails)
@@ -72,9 +79,11 @@ OPTION 1
 + Change to off-board mode in the radio. If you change to off-board mode before publishing it would reject the mode
 
 OPTION 2
+
 Run the python file
+
 ```console
-$ python  	mavros_offboard_posctl_test.py
+$ python mavros_offboard_posctl_test.py
 ```
 The waypoints are written in the file.
 
@@ -157,6 +166,21 @@ See the tmux file 'tmux_sim_sitl.sh' for details. To run the tmux files you need
   $ tmuxp load bash/tmux_stil.yaml
 ```
 The yaml file describes all commands to run a sitl session.
+
+You might need a controller to set up some commands. Simply connect a standard Xbox-style controller and configure QGroundcontrol as follows:
+![joystick_sitl](screenshots/joystick_sitl.png) 
++ MODE 2
++ A: arm
++ B: disarm
++ BACK: disarm
++ X: stabilized mode
++ Y: position mode
++ RB: offboard mode
++ LB: acro mode  
+
+
+STIL Actions:
++ 
 
 ### Squid SITL
 
