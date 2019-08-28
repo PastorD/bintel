@@ -38,13 +38,16 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
     disp('Starting autonomous dynamics learning...'); tic
     
     A_cl = A_nom + B_nom*K_nom;
-    cent = 2*pi*rand(n,N_basis) - pi;
+    cent = [5*rand(1,N_basis)-2.5;...
+        2*pi/3*rand(1,N_basis)-pi/3;...
+        4*rand(1,N_basis)-2;...
+        4*rand(1,N_basis)-2];
     rbf_type = 'gauss';
     eps_rbf = 1;
         
     % Set up nonlinear transformations and their gradients
     zfun = @(xx) [xx; rbf(xx,cent,rbf_type,eps_rbf)];
-    zfun_grad = @(xx) [eye(2); rbf_grad(xx,cent,rbf_type,eps_rbf)];
+    zfun_grad = @(xx) [eye(n); rbf_grad(xx,cent,rbf_type,eps_rbf)];
     zfun_dot = @(xx, xx_dot) [xx_dot; rbf_dot(xx,xx_dot,cent,rbf_type,eps_rbf)];
     
     % Set up Z and Z_dot matrices:
@@ -52,38 +55,45 @@ function [A_koop, z_eigfun] = construct_eigfuncs(n, N_basis, pow_eig_pairs,...
     Z_dot = zfun_dot(X,X_dot);
 
     %Set up constraint matrix
-    con1 = zfun_grad([0; 0]);
+    con1 = zfun_grad(zeros(n,1));
 
     disp('Solving optimization problem...')
     N = size(Z,1);
     cvx_begin 
         variable C(n,N);
-        minimize (norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro') + 1*norm(C,'fro'))
+        minimize (norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro') + 1e-2*norm(C,'fro')/N*n)
         subject to
             {C*con1 == zeros(n)}; 
     cvx_end
     fprintf('Solved, optimal value excluding regularization: %.10f, MSE: %.10f\n', norm(X_dot + C*Z_dot - A_cl*(X+C*Z),'fro'),immse(X_dot+C*Z_dot, A_cl*(X+C*Z)))
-    %fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
+    fprintf('Constraint violation: %.4f \n', sum(sum(abs(C*con1))))
 
-    yfun = @(xx) xx + C*zfun(xx); % Full learned diffeomorphism
-
+    yfun = @(xx) xx + [zeros(1,size(xx,2));...
+       C(2,:)*zfun(xx);...
+       zeros(1,size(xx,2));...
+       C(4,:)*zfun(xx)]; % Full learned diffeomorphism
+%    yfun = @(xx) xx + C*zfun(xx);
+    
+    
     % Calculate eigenfunctions for linearized system
     [V_a,D] = eig(A_cl);
     [W_a,~] = eig(A_cl');
 
     %Define powers (only implemented for n=2):
     a = 0 : pow_eig_pairs;
-    [P,Q] = meshgrid(a,a);
-    c=cat(2,P',Q');
-    powers=reshape(c,[],2);
+    combs = combnk(a,n);
+    powers = [];
+    for i = 1 : size(combs,1)
+        powers = [powers; perms(combs(i,:))];
+    end
 
-    linfunc = @(xx) (xx'*W_a)'./diag(V_a'*W_a);
+    linfunc = @(xx) (xx'*W_a)';%./diag(V_a'*W_a);
     phifun = @(xx) (prod(linfunc(xx).^(powers')))';
     lambd = prod(exp(diag(D)).^(powers'))';
     lambd = log(lambd);
 
     % Construct scaling function
-    gfun = @(xx) xx./pi; %Scale state space into unit cube
+    gfun = @(xx) xx./[5 4 2*pi/3 4]'; %Scale state space into unit cube
 
     % Construct eigenfunctions for nonlinear system
     z_eigfun = @(xx) phifun_mat(phifun, gfun(yfun(xx))); 

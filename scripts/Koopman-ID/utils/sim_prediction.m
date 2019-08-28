@@ -1,6 +1,6 @@
 function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,...
     mse_origin_std, mse_edmd_std,mse_koop_std]...
-            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,Xf,f_u,liftFun,...
+            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,q_traj,f_u,liftFun,...
             phi_fun_v,A_nom,B_nom,C_nom,K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop)
         
     u = zeros(m,Nsim,Ntime);
@@ -15,6 +15,7 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
     z_edmd = zeros(n_edmd,Nsim,Ntime+1);
     z_koop = zeros(n_koop,Nsim,Ntime+1);
     
+    X0 = q_traj(:,:,1);
     x(:,:,1) = X0;
     x_origin(:,:,1) = X0;
     z_edmd(:,:,1) = liftFun(X0);
@@ -23,7 +24,7 @@ function [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,.
     % Simulate all systems and initial points
     for i = 1:Ntime
         %Controller:
-        u(:,:,i) = K_nom*(x(:,:,i)-Xf) + 5*rand()-2.5;
+        u(:,:,i) = K_nom*(x(:,:,i)-q_traj(:,:,i)) + 5*rand()-2.5;
         
         %True dynamics:
         x(:,:,i+1) = sim_timestep(deltaT,f_u,0,x(:,:,i), u(:,:,i));

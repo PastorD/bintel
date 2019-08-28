@@ -1,5 +1,5 @@
 function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,...
-        pow_eig_pairs, Xstr, Ustr, Xf, A_nom, B_nom, K_nom, deltaT)
+        pow_eig_pairs, Xstr, Ustr, qf, A_nom, B_nom, K_nom, deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
     %Decomposition
     
@@ -29,10 +29,10 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
     X_dot = [];
     U = [];
     for i = 1 : Ntraj
-       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
-       X = [X reshape(Xstr_shift(:,i,:),n,Ntime+1)];
+       Xstr_shift(:,i,:) = Xstr(:,i,:)-qf(:,i);
+       X = [X reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3))];
        X_dot = [X_dot num_diff(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)),deltaT)];
-       U = [U reshape(Ustr(:,i,:),m,Ntime+1)];
+       U = [U reshape(Ustr(:,i,:),size(Ustr,1),size(Ustr,3))];
     end
     
     % ******************** Construct eigenfunctions ***********************
@@ -55,12 +55,13 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
     %Set up regression for A and B:
     X_vel = [Xlift; U];
     Y_vel = Xlift_dot(n/2+1:n,:);
-    A_vel = lasso(X_vel',Y_vel','Lambda',1e-3, 'Alpha', 0.8);
+    A_vel_x = lasso(X_vel',Y_vel(1,:)','Lambda',1e-3, 'Alpha', 0.5);
+    A_vel_th = lasso(X_vel',Y_vel(2,:)','Lambda',1e-3, 'Alpha', 0.5);
     
     %Perform regression and enforce known structure:
     A_koop = zeros(Nlift);
     A_koop(1:n/2,:) = [zeros(n/2) eye(n/2) zeros(n/2,size(A_koop,2)-n)];
-    A_koop(n/2+1:n,:) = A_vel(1:Nlift,:)'; 
+    A_koop(n/2+1:n,:) = [A_vel_x(1:Nlift,:)'; A_vel_th(1:Nlift,:)']; 
     A_koop(n+1:end,n+1:end) = A_eigfuncs;
 
     Y_kin = X_dot(1:n/2,:) - A_koop(1:n/2,:)*Xlift;
@@ -71,7 +72,7 @@ function [A_koop, B_koop, C_koop, liftFun] = KEEDMD(n,m,Ntraj, Ntime, N_basis,..
     X_eig = U-K_nom*X;
     B_eig = X_eig'\Y_eig';
     
-    B_koop = [B_kin'; A_vel(Nlift+1:end,:); B_eig'];  
+    B_koop = [B_kin'; A_vel_x(Nlift+1:end,:); A_vel_th(Nlift+1:end,:); B_eig'];  
     
     C_koop = zeros(n,size(A_koop,1));
     C_koop(1:n,1:n) = eye(n);

@@ -1,6 +1,6 @@
 function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_std, mse_koop_std,...
     cost_nom, cost_edmd, cost_koop] = evaluate_model_performance(A_nom, B_nom, C_nom, K_nom, ...
-    A_edmd, B_edmd, C_edmd, A_koop, B_koop, C_koop, Nsim, X0, Xf, Ntraj, ...
+    A_edmd, B_edmd, C_edmd, A_koop, B_koop, C_koop, Nsim, q_traj_sim, q_traj_track, Ntraj, ...
     Xstr, Tsim, deltaT, f_u, liftFun, phi_fun_v, plot_results)
     
     n = size(C_koop,1);
@@ -12,7 +12,7 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
     %Prediction task:
     [x,x_origin, x_edmd,x_koop, mse_origin_avg, mse_edmd_avg,mse_koop_avg,...
     mse_origin_std, mse_edmd_std,mse_koop_std]...
-            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,X0,Xf,f_u,liftFun,...
+            = sim_prediction(n,m,n_edmd,n_koop,Nsim,Ntime,deltaT,q_traj_sim,f_u,liftFun,...
             phi_fun_v,A_nom,B_nom,C_nom,K_nom,A_edmd,B_edmd,C_edmd,A_koop,B_koop,C_koop);
     
     %Closed loop task:
@@ -44,16 +44,17 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
         Q = q(i)*eye(n);
         R = r(i)*eye(m);
         [x_track{i},x_edmd_track{i},x_koop_track{i},mse_nom_track{i}, mse_edmd_track{i},...
-            mse_koop_track{i},t_plot,traj_d, E_nom{i}, E_edmd{i}, E_koop{i},...
+            mse_koop_track{i},traj_d, E_nom{i}, E_edmd{i}, E_koop{i},...
             cost_nom{i}, cost_edmd{i}, cost_koop{i}] = ...
             sim_closed_loop_mpc(n,m,n_edmd,n_koop,Nsim,...
             Ntime,deltaT,Tsim,f_u,liftFun,phi_fun_v,A_nom_d,B_nom_d,C_nom_d,K_nom,A_edmd_d,B_edmd_d,...
-            C_edmd_d,A_koop_d,B_koop_d,C_koop_d,Q,R);
+            C_edmd_d,A_koop_d,B_koop_d,C_koop_d,Q,R,q_traj_track);
     end
 
     %Plot results
     if plot_results
         lw=2;
+        t_plot = 0 : deltaT : Tsim;
         font_size = 16;
         set(gcf,'units','pixel')
         
@@ -80,49 +81,26 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
         h2 = subplot(3,2,3);
         hold on
         for i = 1 %Only plot first trajectory
-            plot([0:Ntime]*deltaT,reshape(x(2,i,:),Ntime+1,1),':b','linewidth',lw); hold on
-            plot([0:Ntime]*deltaT,reshape(x_origin(2,i,:),Ntime+1,1), 'k','linewidth',lw)
-            plot([0:Ntime]*deltaT,reshape(x_edmd(2,i,:),Ntime+1,1), 'r','linewidth',lw)
-            plot([0:Ntime]*deltaT,reshape(x_koop(2,i,:),Ntime+1,1), 'g','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x(3,i,:),Ntime+1,1),':b','linewidth',lw); hold on
+            plot([0:Ntime]*deltaT,reshape(x_origin(3,i,:),Ntime+1,1), 'k','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_edmd(3,i,:),Ntime+1,1), 'r','linewidth',lw)
+            plot([0:Ntime]*deltaT,reshape(x_koop(3,i,:),Ntime+1,1), 'g','linewidth',lw)
         end
-        axis([0 Tsim min(x(2,1,:))-0.2 max(x(2,1,:))+0.2])
+        axis([0 Tsim min(x(3,1,:))-0.2 max(x(3,1,:))+0.2])
         %title('Prediction comparison, 1st trajectory - $x_2$','interpreter','latex'); 
         xlabel('Time [s]','interpreter','latex');      
-        ylabel('$x_2$','interpreter','latex');
+        ylabel('$x_3$','interpreter','latex');
         set(gca,'fontsize',font_size)
         %LEG = legend('True','EDMD','Koopman e-func','location','southwest');
         set(LEG,'interpreter','latex')
         %h2.Position = h2.Position + [0 0.1 0 -0.1]; %Modify size of 1st subplot
         
-        % Plot trajectories Learning
-%         h3 = subplot(2,2,3);
-%         hold on
-%         for i=1:Ntraj
-%            scatter(Xstr(1,i,1),Xstr(2,i,1),'+')
-%            p(i) = plot(squeeze(Xstr(1,i,:)),squeeze(Xstr(2,i,:)),':k','linewidth',1);
-%            %alpha(p(i),0.2)   
-%         end
-%         for i = 1 : Nsim
-%             plot(reshape(x(1,i,:),Ntime+1,1),reshape(x(2,i,:),Ntime+1,1),'-k')
-%             plot(reshape(x_edmd(1,i,:),Ntime+1,1),reshape(x_edmd(2,i,:),Ntime+1,1),'-r')
-%             plot(reshape(x_koop(1,i,:),Ntime+1,1),reshape(x_koop(2,i,:),Ntime+1,1),'-g')
-%         end
-%         %scatter(cent(1,:),cent(2,:),'o')
-%         %axis equal
-%         xaxis([-5 5])
-%         yaxis([-5 5])
-%         xlabel('x')
-%         xlabel('y')
-%         %legend('True','EDMD','Koopman e-func')
-%         title('Training and simulated trajectories','interpreter','latex');
-%         h3.Position = h3.Position + [0 0 0 0.125]; %Modify size of 3rd subplot
-
         
         %Closed loop plot:
-        h4 = subplot(3,2,[2, 4]);
+        h4 = subplot(3,2,2);
         plot(t_plot,traj_d(1,:),'-b','linewidth',lw); hold on
-        lin_typ = {'-', '--', '-.'};
-        for i = 1 : length(q)
+        lin_typ = {'--', '-', '-.'};
+        for i = 2% : length(q)
             plot(t_plot,x_track{i}(1,:),strcat(lin_typ{i},'k'),'linewidth',lw); hold on
             plot(t_plot,x_edmd_track{i}(1,:),strcat(lin_typ{i},'r'),'linewidth',lw); hold on
             plot(t_plot,x_koop_track{i}(1,:),strcat(lin_typ{i},'g'),'linewidth',lw); hold on
@@ -132,12 +110,31 @@ function [mse_origin_avg, mse_edmd_avg, mse_koop_avg, mse_origin_std, mse_edmd_s
         xlabel('Time [s]','interpreter','latex');
         ylabel('$x_1$','interpreter','latex');
         set(gca,'fontsize',font_size)
-        LEG = legend({'Reference', ...
-            strcat('Lin at 0$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('EDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),...
-            strcat('Lin at 0$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('EDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),...
-            strcat('Lin at 0$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('EDMD$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(3)/r(3)),'}$')},...
-            'location','southeast','NumColumns',2);
-        set(LEG,'Interpreter','latex')
+%         LEG = legend({'Reference', ...
+%             strcat('Lin at 0$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('EDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),...
+%             strcat('Lin at 0$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('EDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),...
+%             strcat('Lin at 0$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('EDMD$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(3)/r(3)),'}$')},...
+%             'location','southeast','NumColumns',2);
+%         set(LEG,'Interpreter','latex')
+        %h4.Position = h4.Position + [0 0 0 0.125]; %Modify size of 4th subplot
+        
+        h4 = subplot(3,2,4);
+        plot(t_plot,traj_d(3,:),'-b','linewidth',lw); hold on
+        for i = 2% : length(q)
+            plot(t_plot,x_track{i}(3,:),strcat(lin_typ{i},'k'),'linewidth',lw); hold on
+            plot(t_plot,x_edmd_track{i}(3,:),strcat(lin_typ{i},'r'),'linewidth',lw); hold on
+            plot(t_plot,x_koop_track{i}(3,:),strcat(lin_typ{i},'g'),'linewidth',lw); hold on
+        end
+            %axis([0 Tsim min(x_edmd(1,1,:))-0.15 max(x_edmd(1,1,:))+0.15])
+        xlabel('Time [s]','interpreter','latex');
+        ylabel('$x_3$','interpreter','latex');
+        set(gca,'fontsize',font_size)
+%         LEG = legend({'Reference', ...
+%             strcat('Lin at 0$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('EDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(1)/r(1)),'}$'),...
+%             strcat('Lin at 0$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('EDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(2)/r(2)),'}$'),...
+%             strcat('Lin at 0$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('EDMD$_{q/r=',num2str(q(3)/r(3)),'}$'),strcat('KEEDMD$_{q/r=',num2str(q(3)/r(3)),'}$')},...
+%             'location','southeast','NumColumns',2);
+%         set(LEG,'Interpreter','latex')
         %h4.Position = h4.Position + [0 0 0 0.125]; %Modify size of 4th subplot
         set(gcf, 'Position',  [0, 0, 1200, 600]) %Modify size of figure window
         

@@ -1,5 +1,5 @@
 function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_basis,basis_function,...
-    rbf_type, center_type, eps, Xstr, Ustr, Xf,deltaT)
+    rbf_type, center_type, eps, Xstr, Ustr,Xf,deltaT)
     %Identify lifted state space model using Extended Dynamic Mode
     %Decomposition
     
@@ -30,10 +30,10 @@ function [A_edmd, B_edmd, C_edmd, liftFun] = extendedDMD(n,m,Ntraj, Ntime, N_bas
     X_dot = [];
     U = [];
     for i = 1 : Ntraj
-       Xstr_shift(:,i,:) = Xstr(:,i,:) - Xf(:,i);
-       X = [X reshape(Xstr_shift(:,i,:),n,Ntime+1)];
+       Xstr_shift(:,i,:) = Xstr(:,i,:)-Xf(:,i);
+       X = [X reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3))];
        X_dot = [X_dot num_diff(reshape(Xstr_shift(:,i,:),size(Xstr_shift,1),size(Xstr_shift,3)),deltaT)];
-       U = [U reshape(Ustr(:,i,:),m,Ntime+1)];
+       U = [U reshape(Ustr(:,i,:),size(Ustr,1),size(Ustr,3))];
     end
     
     % ******************************* Lift ***********************************

@@ -1,5 +1,5 @@
 function [Xstr, Ustr, time_str] = collect_data(n,m,Ntraj,...
-                  Ntime,deltaT,X0,Xf,K_nom,f_u,U_perturb)
+                  Ntime,deltaT,X0,Xf,K_nom,f_u,U_perturb,qtraj)
     %Collect data from the "true" system with nominal controller plus
     %perturbation
     %Inputs:
@@ -14,14 +14,14 @@ function [Xstr, Ustr, time_str] = collect_data(n,m,Ntraj,...
     %              point from each trajectory
 
 
-    Xstr = zeros(n,Ntraj,Ntime+1); % *str is structure
-    Ustr = zeros(m,Ntraj,Ntime); 
-    time_str = zeros(Ntraj,Ntime+1);
+    Xstr = zeros(n,Ntraj,Ntime); % *str is structure
+    Ustr = zeros(m,Ntraj,Ntime-1); 
+    time_str = zeros(Ntraj,Ntime);
     
     Xcurrent = X0;
     Xstr(:,:,1) = X0;
-    for i = 1:Ntime
-        Ucurrent = K_nom*(Xcurrent-Xf)+U_perturb(i,:);
+    for i = 1:Ntime-1
+        Ucurrent = K_nom*(Xcurrent-qtraj(:,:,i))+U_perturb(i,:);
         Ustr(:,:,i) = Ucurrent;
         
         Xnext = sim_timestep(deltaT, f_u, 0, Xcurrent, Ucurrent);
@@ -30,6 +30,6 @@ function [Xstr, Ustr, time_str] = collect_data(n,m,Ntraj,...
         
         time_str(:,i+1) = i*deltaT*ones(Ntraj,1);
     end
-    Ucurrent = K_nom*(Xcurrent-Xf)+U_perturb(i+1,:);
+    Ucurrent = K_nom*(Xcurrent-qtraj(:,:,i+1))+U_perturb(i+1,:);
     Ustr(:,:,i+1) = Ucurrent;
 end
