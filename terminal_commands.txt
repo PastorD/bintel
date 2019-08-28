@@ -1,7 +1,0 @@
-rosrun mavros mavros_node _fcu_url:=tcp://127.0.0.1:5760 _system_id:=2 
-roslaunch vrpn_client_ros sample.launch server:=192.168.1.2
-rosbag record --split --size=1900 /scan /vrpn_client_node/bintel/pose /mavros/imu/data /mavros/rc/out  /camera/depth/image /camera/depth/camera_info /camera/depth/points /tf
-roslaunch realsense_camera r200_nodelet_rgbd.launch  
-
-
-
