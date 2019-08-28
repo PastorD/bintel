@@ -35,7 +35,7 @@ class test_trajectory_tracking():
         
         # Initialize robot
         bintel = Robot()
-        bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
+        #bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
         go_waypoint = MavrosGOTOWaypoint()
         print("Moving to initial point...")
         go_waypoint.gopoint(self.p_init)

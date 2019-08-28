@@ -42,9 +42,9 @@ class Robot():
         self.use_learned_model = False
 
         if self.is_simulation:
-            self.model_file_name = 'scripts/sim_model.yaml'
+            self.model_file_name = 'scripts/old/sim_model.yaml'
         else:
-            self.model_file_name = 'scripts/sindy_model.yaml'
+            self.model_file_name = 'scripts/old/sindy_model.yaml'
 
         self.p = namedtuple("p", "x y z")
         self.q = namedtuple("q", "w x y z")
