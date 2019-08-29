@@ -45,7 +45,7 @@ class MavrosGOTOWaypoint():
         self.waypoint_marker.color.a = 0.6
         
 
-    def gopoint(self,p_desired,waypoint_ball=0.05):
+    def gopoint(self,p_desired,waypoint_ball=0.1):
 
         self.waypoint.pose.position.x = p_desired[0]
         self.waypoint.pose.position.y = p_desired[1]

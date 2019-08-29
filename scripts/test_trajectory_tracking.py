@@ -24,7 +24,7 @@ class test_trajectory_tracking():
         # Read mission file
         config_file = 'scripts/mission.yaml'
         mission = self.read_mission(config_file)       
-        mission_folder = 'dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        mission_folder = 'data/dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         os.mkdir(mission_folder)
         shutil.copy(config_file,mission_folder)
 
@@ -37,7 +37,7 @@ class test_trajectory_tracking():
         bintel = Robot()
         #bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
         go_waypoint = MavrosGOTOWaypoint()
-        print("Moving to initial point...")
+        print("Moving to initial point...{}".format(self.p_init))
         go_waypoint.gopoint(self.p_init)
         
 
