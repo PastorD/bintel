@@ -1,7 +1,10 @@
+#%% Initial Data
+
 import osqp
 import numpy as np
 import scipy as sp
 import scipy.sparse as sparse
+import matplotlib.pyplot as plt
 
 # Discrete time model of a quadcopter
 Ad = sparse.csc_matrix([
@@ -34,22 +37,28 @@ Bd = sparse.csc_matrix([
 [nx, nu] = Bd.shape
 
 # Constraints
-u0 = 10.5916
-umin = np.array([9.6, 9.6, 9.6, 9.6]) - u0
-umax = np.array([13., 13., 13., 13.]) - u0
+u0 = 10.5916 # Hover Thrust
+umin = np.ones(nu)*9.6 - u0
+umax = np.ones(nu)*11.0 - u0
 xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-1.,
                  -np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
 xmax = np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, np.inf,
                   np.inf, np.inf, np.inf, np.inf, np.inf, np.inf])
 
+# Sizes
+ns = 12
+nu = 4
+
 # Objective function
 Q = sparse.diags([0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
 QN = Q
-R = 0.1*sparse.eye(4)
+R = 0.1*sparse.eye(nu)
+
+#%% 
 
 # Initial and reference states
-x0 = np.zeros(12)
-xr = np.array([0.,0.,1.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+x0 = np.zeros(ns)
+xr = np.array([0.,0.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 
 # Prediction horizon
 N = 10
@@ -83,7 +92,13 @@ prob = osqp.OSQP()
 prob.setup(P, q, A, l, u, warm_start=True)
 
 # Simulate in closed loop
-nsim = 15
+nsim = 40
+
+# Store data Init
+xst = np.zeros((ns,nsim))
+ust = np.zeros((nu,nsim))
+
+
 for i in range(nsim):
     # Solve
     res = prob.solve()
@@ -96,7 +111,31 @@ for i in range(nsim):
     ctrl = res.x[-N*nu:-(N-1)*nu]
     x0 = Ad.dot(x0) + Bd.dot(ctrl)
 
+    # Store Data
+    xst[:,i] = x0
+    ust[:,i] = ctrl
+
     # Update initial state
     l[:nx] = -x0
     u[:nx] = -x0
     prob.update(l=l, u=u)
+
+#%% Plots
+for i in range(ns):
+  plt.plot(range(nsim),xst[i,:],label=str(i))
+plt.xlabel('Time(s)')
+plt.grid()
+plt.legend()
+plt.show()    
+
+
+for i in range(nu):
+  plt.plot(range(nsim),ust[i,:],label=str(i))
+plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
+plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', linewidth=1.5, color='black')
+plt.xlabel('Time(s)')
+plt.grid()
+plt.legend()
+plt.show()  
+
+#%%
