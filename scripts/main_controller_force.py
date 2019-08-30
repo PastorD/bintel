@@ -11,6 +11,7 @@ import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
+import rosbag
 
 # Project
 import position_controller_MPC
@@ -54,6 +55,8 @@ class Robot():
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
+
+
     def gotopoint(self, p_init, p_final, tduration, file_csv=""):
         """
         Go to p_final
@@ -67,10 +70,10 @@ class Robot():
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
 
-        self.t0 = rospy.get_time()
 
+        self.t0 = rospy.get_time()
         while not rospy.is_shutdown() and np.linalg.norm(
-                np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.025:
+                np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.1:
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)

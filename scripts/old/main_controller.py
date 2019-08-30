@@ -8,7 +8,7 @@ import numpy as np
 import exceptions
 import math
 import yaml
-
+import subprocess, shlex
 
 # ROS 
 import rospy
@@ -120,6 +120,10 @@ class Robot():
         self.q_d.x, self.q_d.y, self.q_d.z, self.q_d.w = q_d
         self.omg_d.x, self.omg_d.y, self.omg_d.z = omg_d
         
+        # Save ROSBAG
+        #command = "rosbag record -o constant_force /mavros/setpoint_raw/attitude /mavros/imu/data /mavros/local_position/pose /mavros/local_position/velocity /bintel/desired_force"
+        #command = shlex.split(command)
+        #rosbag_proc = subprocess.Popen(command)
 
         while (not rospy.is_shutdown() \
                and self.inside_boundary()):
@@ -127,7 +131,8 @@ class Robot():
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
             self.pub_traj.publish(self.traj_msg)
-            #self.desired_path_pub.publish(self.desired_path)
+            
+            
             if not self.file == "":
                 self.save_csv()
             self.create_force_msg(stamp=rospy.Time.now())
@@ -135,6 +140,8 @@ class Robot():
 
             self.rate.sleep()
 
+        #rosbag_proc.send_signal(subprocess.signal.SIGINT)
+        #rospy.sleep(5.)
 
     def load_config(self,config_file):
         with open(config_file, 'r') as f:
