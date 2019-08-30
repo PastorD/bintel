@@ -3,3 +3,4 @@
 *.pyc
 idea/
 *.m~
+scripts/.ipynb_checkpoints/*
