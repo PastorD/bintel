@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+# Python general
 import yaml
 from collections import namedtuple
 import csv
@@ -9,11 +10,12 @@ import os
 from datetime import datetime
 import shutil
 
-
+# ROS
 import rospy
 from geometry_msgs.msg import PoseStamped
 import rosbag
 
+# Project
 from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land

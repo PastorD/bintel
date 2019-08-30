@@ -5,6 +5,7 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
+import time
 
 # Discrete time model of a quadcopter
 Ad = sparse.csc_matrix([
@@ -61,7 +62,7 @@ x0 = np.zeros(ns)
 xr = np.array([0.,0.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 
 # Prediction horizon
-N = 10
+N = 30
 
 # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
 # - quadratic objective
@@ -92,13 +93,13 @@ prob = osqp.OSQP()
 prob.setup(P, q, A, l, u, warm_start=True)
 
 # Simulate in closed loop
-nsim = 40
+nsim = 100
 
 # Store data Init
 xst = np.zeros((ns,nsim))
 ust = np.zeros((nu,nsim))
 
-
+t1 = time.clock()
 for i in range(nsim):
     # Solve
     res = prob.solve()
@@ -120,6 +121,7 @@ for i in range(nsim):
     u[:nx] = -x0
     prob.update(l=l, u=u)
 
+print(time.clock()-t1)
 #%% Plots
 for i in range(ns):
   plt.plot(range(nsim),xst[i,:],label=str(i))
@@ -127,6 +129,7 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 plt.show()    
+plt.savefig('sim_mcp_quad_pos.png')
 
 
 for i in range(nu):
@@ -137,5 +140,6 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 plt.show()  
+plt.savefig('sim_mcp_quad_u.png')
 
 #%%

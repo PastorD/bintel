@@ -3,7 +3,6 @@
 # Python Common
 from yaml import load
 from collections import namedtuple
-import position_controller_FL
 import numpy as np
 import exceptions
 import math
@@ -13,11 +12,8 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
 
-
-# Initialize trajeftory
-
 # Project
-
+import position_controller_MPC
 
 class Robot():
     """
@@ -52,7 +48,7 @@ class Robot():
 
         self.model = self.load_model(self.model_file_name)
         self.init_ROS()
-        self.controller = position_controller_FL.PositionController(model=self.model, rate=self.main_loop_rate,
+        self.controller = position_controller_MPC.PositionController(model=self.model, rate=self.main_loop_rate,
                                                                     use_learned_model=self.use_learned_model)
         self.msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
@@ -108,7 +104,6 @@ class Robot():
 
         self.rate = rospy.Rate(self.main_loop_rate)
 
-        # - Subscribe to local position
         self.local_pose = PoseStamped()
         self.velocity = TwistStamped()
         self.rc_out = RCOut()
@@ -132,12 +127,11 @@ class Robot():
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
         a_d = namedtuple("a_d", "x y z")
-        p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-                                                   self.p_final)
-        a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-                                                    self.p_final)
-        # print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
+        # p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
+        # v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
+        #                                            self.p_final)
+        # a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
+        #                                             self.p_final)
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
@@ -181,66 +175,7 @@ class Robot():
         self.force_msg.vector.y = self.f_d.y
         self.force_msg.vector.z = self.f_d.z
 
-    def exp_traj(self, t, t0, tf, x0, xf):
-        """ Exponential trajectory generator. See Giri Subramanian's thesis for details.
-        :param t: Current time
-        :param t0: Initial time
-        :param tf: End time
-        :param x0: Initial position
-        :param x1: Final position
-        :return: x at the current time
-        """
-        tn = (t - t0) / (tf - t0)
-        if t >= tf:
-            y = xf
-        else:
-            try:
-                y = x0 + (xf - x0) * tn * math.exp(1 - tn)
-            except exceptions.ZeroDivisionError:
-                y = xf
-        return y
-
-    def exp_traj3(self, t, t0, tf, x0, x1):
-        """Return coordinate along 3D exponential trajectory by generating a 1D exponential trajectory along each dimension"""
-        return (self.exp_traj(t, t0, tf, x0[0], x1[0]), self.exp_traj(t, t0, tf, x0[1], x1[1]),
-                self.exp_traj(t, t0, tf, x0[2], x1[2]))
-
-    def exp_traj_dt(self, t, t0, tf, x0, xf):
-        """Derivative of exponential trajectory """
-        tn = (t - t0) / (tf - t0)
-        tndot = 1 / (tf - t0).to_sec()
-        if t >= tf:
-            dydt = 0
-        else:
-            try:
-                dydt = (xf - x0) * tndot * (math.exp(1 - tn) - tn * math.exp(1 - tn))
-            except exceptions.ZeroDivisionError:
-                dydt = 0
-        return dydt
-
-    def exp_traj3_dt(self, t, t0, tf, x0, x1):
-        """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_dt(t, t0, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_dt(t, t0, tf, x0[2], x1[2]))
-
-    def exp_traj_ddt(self, t, t0, tf, x0, xf):
-        """Derivative of exponential trajectory """
-        tn = (t - t0) / (tf - t0)
-        tndot = 1 / (tf - t0).to_sec()
-        if t >= tf:
-            ddydt = 0
-        else:
-            try:
-                ddydt = (xf - x0) * tndot ** 2 * (tn * math.exp(1 - tn) - 2 * math.exp(1 - tn))
-            except exceptions.ZeroDivisionError:
-                ddydt = 0
-        return ddydt
-
-    def exp_traj3_ddt(self, t, t0, tf, x0, x1):
-        """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
-
+    ## Trajectory for initial MPC iteration
     def smooth_setp(self, t, t0, tf, x0, xf):
         tn = (t - t0) / (tf - t0)
 
@@ -288,7 +223,7 @@ class Robot():
 if __name__ == '__main__':
     try:
         p_init = np.array([0.0, 0.0, 0.0])
-        p_final = np.array([0.0, 2.0, 5.0])
+        p_final = np.array([0.0, 2.0, 4.0])
         drone = Robot()
         drone.gotopoint(p_init=p_init, p_final=p_final, tduration=5.)
     except rospy.ROSInterruptException:

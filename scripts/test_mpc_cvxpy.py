@@ -1,8 +1,10 @@
-from cvxpy import *
+import cvxpy 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
+import time
+import timeit
 
 # Discrete time model of a quadcopter
 Ad = sparse.csc_matrix([
@@ -60,35 +62,36 @@ nu = 4
 N = 30
 
 # Define problem
-u = Variable((nu, N))
-x = Variable((nx, N+1))
-x_init = Parameter(nx)
+u = cvxpy.Variable((nu, N))
+x = cvxpy.Variable((nx, N+1))
+x_init = cvxpy.Parameter(nx)
 objective = 0
 constraints = [x[:,0] == x_init]
 for k in range(N):
-    objective += quad_form(x[:,k] - xr, Q) + quad_form(u[:,k], R)
+    objective += cvxpy.quad_form(x[:,k] - xr, Q) + cvxpy.quad_form(u[:,k], R)
     constraints += [x[:,k+1] == Ad*x[:,k] + Bd*u[:,k]]
     constraints += [xmin <= x[:,k], x[:,k] <= xmax]
     constraints += [umin <= u[:,k], u[:,k] <= umax]
-objective += quad_form(x[:,N] - xr, QN)
-prob = Problem(Minimize(objective), constraints)
+objective += cvxpy.quad_form(x[:,N] - xr, QN)
+prob = cvxpy.Problem(cvxpy.Minimize(objective), constraints)
 
 # Simulate in closed loop
-nsim = 15
+nsim = 100
 
 # Store data Init
 xst = np.zeros((ns,nsim))
 ust = np.zeros((nu,nsim))
 
-
+t1 = time.clock()
 for i in range(nsim):
     x_init.value = x0
-    prob.solve(solver=OSQP, warm_start=True)
+    prob.solve(solver=cvxpy.OSQP, warm_start=True)
     x0 = Ad.dot(x0) + Bd.dot(u[:,0].value)
 
     # Store Data
     xst[:,i] = x0
     ust[:,i] = u[:,0].value
+print(time.clock()-t1)
 
 
 for i in range(ns):
