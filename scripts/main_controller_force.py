@@ -127,11 +127,9 @@ class Robot():
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
         a_d = namedtuple("a_d", "x y z")
-        # p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        # v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-        #                                            self.p_final)
-        # a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-        #                                             self.p_final)
+        p_d.x, p_d.y, p_d.z = self.p_final
+        v_d.x, v_d.y, v_d.z = np.array([0.0,0.0,0.0])
+       
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
