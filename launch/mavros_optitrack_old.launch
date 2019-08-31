@@ -11,6 +11,9 @@
 		file="$(find bintel_ros)/launch/vrpn_optitrack_positioning.launch">
 		<arg name="server" value="192.168.1.2"/>
 	</include>
+	<include 
+		file="$(find mavros)/launch/px4.launch">
+	</include>
 	<node
 		pkg = "topic_tools"
 		name= "position_relay2"
