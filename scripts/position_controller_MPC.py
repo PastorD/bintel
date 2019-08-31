@@ -5,6 +5,7 @@ from collections import namedtuple
 import exceptions
 import control
 import timeit
+import matplotlib.pyplot as plt
 
 import math
 import numpy as np
@@ -28,7 +29,9 @@ class PositionController():
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        kb = 11.9
+        g_constant = 9.8 # gravity
+        self.u_hover = 0.567 # Hover Thrust
+        kb = 1/(self.u_hover/g_constant) #17.28 #11.9
         self.u_hover = 0.567 # Hover Thrust
         self.model.nom_model.hover_throttle = self.u_hover
 
@@ -60,10 +63,10 @@ class PositionController():
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.3-self.u_hover
+        umin = np.ones(nu)*0.1-self.u_hover
         umax = np.ones(nu)*0.9-self.u_hover
         xmin = np.array([-3,-3,0,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 3.0,3.0,4.0,0.5,0.5,np.inf])
+        xmax = np.array([ 3.0,3.0,6.0,1,1,4])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
@@ -72,7 +75,7 @@ class PositionController():
         # Objective function
         Q = sparse.diags([4., 4., 10., 2., 2., 1.])
         QN = Q
-        R = 20.5*sparse.eye(nu)
+        R = 2.5*sparse.eye(nu)
 
         # Initial and reference states
         x0 = np.array([0.0,0.0,1.0,0.0,0.0,0.0])
@@ -130,7 +133,7 @@ class PositionController():
         #e = np.concatenate((e_p, e_v)).reshape(-1, 1)
         f_d = namedtuple("f_d", "x y z")
 
-        x0 = np.array([p.x,p.y,p.z,v.x,p.y,p.z])
+        x0 = np.array([p.x,p.y,p.z,v.x,v.y,v.z])
 
         nx = 6
         nu = 3
@@ -151,7 +154,7 @@ class PositionController():
         [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
         ##
-
+        # self.plot_MPC(_osqp_result)
         
         ##
 
@@ -163,6 +166,30 @@ class PositionController():
         f_d_achievable.z = f_d_achievable.z + self.u_hover #self.model.nom_model.hover_throttle
 
         return f_d_achievable
+
+    def plot_MPC(self, _osqp_result):
+        # Unpack OSQP results
+        z = _osqp_result.x
+        f_z = _osqp_result.x[-N*nu:-(N-1)*nu]
+
+
+        # Plot 
+        plt.plot(range(nsim),f_z,label='f_z')
+        plt.xlabel('Time(s)')
+        plt.grid()
+        plt.legend()
+        plt.show()    
+        plt.savefig('mpc_debugging_u.png')
+
+
+        plt.plot(range(nsim),f_z,label='f_z')
+        plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
+        plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', linewidth=1.5, color='black')
+        plt.xlabel('Time(s)')
+        plt.grid()
+        plt.legend()
+        plt.show()  
+        plt.savefig('mpc_debugging_x.png')
     
     def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
