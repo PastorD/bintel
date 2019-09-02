@@ -256,7 +256,7 @@ class Robot():
         ## Set the header
         self.msg.header.stamp = stamp
         self.msg.header.frame_id = '/world'
-
+        self.msg.type_mask = 7
         ## Set message content
         self.msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
         self.msg.body_rate = Vector3(x=self.omg_d.x, y=self.omg_d.y, z=self.omg_d.z)

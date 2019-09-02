@@ -6,13 +6,12 @@
 		args="_fcu_url:=tcp://127.0.0.1:5760
 		      _system_id:=2"
 		output="screen"
-	/>
+        >
+                 <rosparam command="load" file="$(find bintel_ros)/launch/px4_config.yaml" />
+	</node>
 	<include 
-		file="$(find bintel_ros)/launch/vrpn_optitrack_positioning.launch">
+		file="$(find bintel_ros)/launch/optitrack_only.launch">
 		<arg name="server" value="192.168.1.2"/>
-	</include>
-	<include 
-		file="$(find mavros)/launch/px4.launch">
 	</include>
 	<node
 		pkg = "topic_tools"

@@ -13,8 +13,8 @@ from dynamics.goto_land import land
 class test_trajectory_tracking():
     def __init__(self):
 
-        self.force_d_low = np.array([0.0, 0.0, 0.65])
-        self.force_d_high = np.array([0.0, 0.0, 0.75])
+        self.force_d_low = np.array([0.0, 0.0, 0.66])
+        self.force_d_high = np.array([0.0, 0.0, 0.67])
         self.duration_low = 2.
         self.duration_high = 1.
         self.n_waypoints = 3
