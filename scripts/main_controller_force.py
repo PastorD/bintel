@@ -51,7 +51,7 @@ class Robot():
         self.init_ROS()
         self.controller = position_controller_MPC.PositionController(model=self.model, rate=self.main_loop_rate,
                                                                     use_learned_model=self.use_learned_model)
-        self.msg = AttitudeTarget()
+        self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
@@ -149,13 +149,14 @@ class Robot():
 
     def create_attitude_msg(self, stamp):
         ## Set the header
-        self.msg.header.stamp = stamp
-        self.msg.header.frame_id = '/world'
+        self.attitude_target_msg.header.stamp = stamp
+        self.attitude_target_msg.header.frame_id = '/world'
+        self.attitude_target_msg.type_mask = AttitudeTarget.IGNORE_ROLL_RATE | AttitudeTarget.IGNORE_PITCH_RATE | \
+                                             AttitudeTarget.IGNORE_YAW_RATE 
 
         ## Set message content
-        self.msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
-        self.msg.body_rate = Vector3(x=self.omg_d.x, y=self.omg_d.y, z=self.omg_d.z)
-        self.msg.thrust = self.T_d
+        self.attitude_target_msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
+        self.attitude_target_msg.thrust = self.T_d
 
     def create_trajectory_msg(self, x, y, z, stamp):
         ## Set the header

@@ -103,7 +103,7 @@ class Robot():
 
             self.rate.sleep()
 
-    def constant_force(self,force,file_csv=""):
+    def constant_force(self,force,tduration,file_csv=""):
         """
         Publish a constant force
         """
@@ -124,9 +124,9 @@ class Robot():
         #command = "rosbag record -o constant_force /mavros/setpoint_raw/attitude /mavros/imu/data /mavros/local_position/pose /mavros/local_position/velocity /bintel/desired_force"
         #command = shlex.split(command)
         #rosbag_proc = subprocess.Popen(command)
-
+        self.t0 = rospy.get_time()
         while (not rospy.is_shutdown() \
-               and self.inside_boundary()):
+               and self.inside_boundary() and (rospy.get_time()-self.t0)<tduration):
 
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.msg)
