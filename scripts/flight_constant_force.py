@@ -13,11 +13,11 @@ from dynamics.goto_land import land
 class test_trajectory_tracking():
     def __init__(self):
 
-        self.force_d_low = np.array([0.0, 0.0, 0.95])
-        self.force_d_high = np.array([0.0, 0.0, 0.95])
-        self.duration_low = 3.
+        self.force_d_low = np.array([0.0, 0.0, 0.65])
+        self.force_d_high = np.array([0.0, 0.0, 0.75])
+        self.duration_low = 2.
         self.duration_high = 1.
-        self.n_waypoints = 2
+        self.n_waypoints = 3
         self.train_nominal_model = False
 
         # Initialize robot
@@ -25,7 +25,7 @@ class test_trajectory_tracking():
         go_waypoint = MavrosGOTOWaypoint()
 
         print("Moving to initial point...")
-        p_init = np.array([0., 0., 1.4])
+        p_init = np.array([0., 0., 1.2])
         #p_final = np.array([0., 0., 1.])
         go_waypoint.gopoint(np.array(p_init))
         force_d = namedtuple("force_d", "x y z") #Variable used to publish desired force commands
