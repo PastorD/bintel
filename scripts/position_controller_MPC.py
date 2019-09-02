@@ -56,9 +56,9 @@ class PositionController():
         self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
         self._osqp_Bd = Bc*self.dt
 
-        self.setup_OSQP()
+        self.setup_OSQP([0.,0.,3])
 
-    def setup_OSQP(self):
+    def setup_OSQP(self,final_point):
 
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
@@ -66,23 +66,23 @@ class PositionController():
         umin = np.ones(nu)*0.1-self.u_hover
         umax = np.ones(nu)*0.9-self.u_hover
         xmin = np.array([-3,-3,0,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 3.0,3.0,6.0,1,1,4])
+        xmax = np.array([ 5.0,5.0,10.0,3.,3.,4.])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
         nu = 3 # f_x, f_y, f_z
 
         # Objective function
-        Q = sparse.diags([4., 4., 10., 2., 2., 1.])
+        Q = sparse.diags([10., 10., 10., 1., 1., 1.])
         QN = Q
-        R = 2.5*sparse.eye(nu)
+        R = 3.5*sparse.eye(nu)
 
         # Initial and reference states
         x0 = np.array([0.0,0.0,1.0,0.0,0.0,0.0])
-        xr = np.array([0.,0.,2.0,0.,0.,0.0])
+        xr = np.array([0.,4.,8.0,0.,0.,0.0])
 
         # Prediction horizon
-        N = int(self.rate*5.0)
+        N = int(self.rate*7.0)
         self._osqp_N = N
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
@@ -112,7 +112,7 @@ class PositionController():
 
         # Setup workspace
         self.prob.setup(P, q, A, self._osqp_l, self._osqp_u, warm_start=True)
-
+        self.first = True
         
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
@@ -154,12 +154,14 @@ class PositionController():
         [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
         ##
-        # self.plot_MPC(_osqp_result)
+        if self.first:
+            self.plot_MPC(_osqp_result)
+            self.first = False
         
         ##
 
-        f_d.x = 0.0
-        f_d.y = 0.0
+        #f_d.x = 0.0
+        #f_d.y = 0.0
 
         # Project f_d into space of achievable force
         f_d_achievable = f_d #self.project_force_achievable (f_d)
@@ -169,27 +171,30 @@ class PositionController():
 
     def plot_MPC(self, _osqp_result):
         # Unpack OSQP results
-        z = _osqp_result.x
-        f_z = _osqp_result.x[-N*nu:-(N-1)*nu]
 
+        ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
+        nu = 3 # f_x, f_y, f_z
+        N = self._osqp_N
+
+        osqp_sim_state = np.reshape( _osqp_result.x[:(N+1)*ns], (N+1,ns))
+        osqp_sim_forces = np.reshape( _osqp_result.x[-N*nu:], (N,nu))
 
         # Plot 
-        plt.plot(range(nsim),f_z,label='f_z')
+        plt.plot(range(N+1),osqp_sim_state)
         plt.xlabel('Time(s)')
         plt.grid()
-        plt.legend()
+        plt.legend(['x','y','z','v_x','v_y','v_ddz'])
         plt.show()    
-        plt.savefig('mpc_debugging_u.png')
+        plt.savefig('mpc_debugging_z.png')
 
-
-        plt.plot(range(nsim),f_z,label='f_z')
-        plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
-        plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', linewidth=1.5, color='black')
+        plt.plot(range(N),osqp_sim_forces)
+        #plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
+        #plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', linewidth=1.5, color='black')
         plt.xlabel('Time(s)')
         plt.grid()
-        plt.legend()
+        plt.legend(['fx','fy','fz'])
         plt.show()  
-        plt.savefig('mpc_debugging_x.png')
+        plt.savefig('mpc_debugging_fz.png')
     
     def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
