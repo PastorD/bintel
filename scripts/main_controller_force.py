@@ -23,7 +23,7 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
 
-    def __init__(self):
+    def __init__(self, rate):
         self.is_simulation = True
         self.use_learned_model = False
 
@@ -45,7 +45,7 @@ class Robot():
         self.omg_d = namedtuple("omg_d", "x y z")
         self.f_d = namedtuple("f_d", "x y z")  # Variable used to publish desired force commands
 
-        self.main_loop_rate = 80
+        self.main_loop_rate = rate
 
         self.model = self.load_model(self.model_file_name)
         self.init_ROS()

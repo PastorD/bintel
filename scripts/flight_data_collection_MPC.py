@@ -21,9 +21,10 @@ class test_trajectory_tracking():
         self.duration_high = 8.
         self.n_waypoints = 1
         self.train_nominal_model = False
+        self.controller_rate = 80
 
         # Initialize robot
-        bintel = Robot()
+        bintel = Robot(controller_rate)
         go_waypoint = MavrosGOTOWaypoint()
 
         print("Moving to initial point...")

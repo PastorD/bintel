@@ -18,9 +18,8 @@ import osqp
 import tf
 import rospy
 
-
-
 class PositionController():
+
     def __init__(self, model, rate, use_learned_model):
         self.model = model
         self.rate = rate
@@ -79,7 +78,12 @@ class PositionController():
 
         # Initial and reference states
         x0 = np.array([0.0,0.0,1.0,0.0,0.0,0.0])
-        xr = np.array([0.,0.,0.13,0.,0.,-0.1])
+        xr = np.array([final_point[0],
+                       final_point[1],
+                       final_point[2],
+                       0.,
+                       0.,
+                       -0.1])
 
         # Prediction horizon
         N = int(self.rate*3.0)
@@ -139,8 +143,8 @@ class PositionController():
         nu = 3
 
         ## Solve MPC Instance
-        self._osqp_l[:6] = -x0
-        self._osqp_u[:6] = -x0
+        self._osqp_l[:nx] = -x0
+        self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
         _osqp_result = self.prob.solve()
 
