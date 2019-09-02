@@ -45,7 +45,7 @@ class Robot():
         self.omg_d = namedtuple("omg_d", "x y z")
         self.f_d = namedtuple("f_d", "x y z")  # Variable used to publish desired force commands
 
-        self.main_loop_rate = 60
+        self.main_loop_rate = 80
 
         self.model = self.load_model(self.model_file_name)
         self.init_ROS()
@@ -72,16 +72,16 @@ class Robot():
 
 
         self.t0 = rospy.get_time()
-        while not rospy.is_shutdown() and np.linalg.norm(
-                np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.1:
+        while not rospy.is_shutdown(): # and np.linalg.norm(
+                #np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.1:
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
-            self.pub_sp.publish(self.msg)
-            self.pub_traj.publish(self.traj_msg)
-            if not self.file == "":
-                self.save_csv()
-            self.create_force_msg(stamp=rospy.Time.now())
-            self.pub_force.publish(self.force_msg)
+            self.pub_sp.publish(self.attitude_target_msg)
+            #self.pub_traj.publish(self.traj_msg)
+            #if not self.file == "":
+            #    self.save_csv()
+            #self.create_force_msg(stamp=rospy.Time.now())
+            #self.pub_force.publish(self.force_msg)
             self.rate.sleep()
 
     def load_model(self, model_file_name):
@@ -151,8 +151,8 @@ class Robot():
         ## Set the header
         self.attitude_target_msg.header.stamp = stamp
         self.attitude_target_msg.header.frame_id = '/world'
-        self.attitude_target_msg.type_mask = AttitudeTarget.IGNORE_ROLL_RATE | AttitudeTarget.IGNORE_PITCH_RATE | \
-                                             AttitudeTarget.IGNORE_YAW_RATE 
+        self.attitude_target_msg.type_mask = 7 #AttitudeTarget.IGNORE_ROLL_RATE | AttitudeTarget.IGNORE_PITCH_RATE | \
+                                               #AttitudeTarget.IGNORE_YAW_RATE 
 
         ## Set message content
         self.attitude_target_msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)

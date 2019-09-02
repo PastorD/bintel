@@ -30,9 +30,9 @@ class PositionController():
         self.max_pitch_roll = math.pi/3        
 
         g_constant = 9.8 # gravity
-        self.u_hover = 0.567 # Hover Thrust
+        self.u_hover = 0.66 # Hover Thrust
         kb = 1/(self.u_hover/g_constant) #17.28 #11.9
-        self.u_hover = 0.567 # Hover Thrust
+        #self.u_hover = 0.567 # Hover Thrust
         self.model.nom_model.hover_throttle = self.u_hover
 
         ##  Set the MPC Problem
@@ -63,9 +63,9 @@ class PositionController():
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.1-self.u_hover
-        umax = np.ones(nu)*0.9-self.u_hover
-        xmin = np.array([-3,-3,0,-np.inf,-np.inf,-np.inf])
+        umin = np.ones(nu)*0.2-self.u_hover
+        umax = np.ones(nu)*0.95-self.u_hover
+        xmin = np.array([-3,-3,0.1,-np.inf,-np.inf,-np.inf])
         xmax = np.array([ 5.0,5.0,10.0,3.,3.,4.])
 
         # Sizes
@@ -73,16 +73,16 @@ class PositionController():
         nu = 3 # f_x, f_y, f_z
 
         # Objective function
-        Q = sparse.diags([10., 10., 10., 1., 1., 1.])
+        Q = sparse.diags([2., 2., 10., 1., 1., 1.])
         QN = Q
-        R = 3.5*sparse.eye(nu)
+        R = 5.0*sparse.eye(nu)
 
         # Initial and reference states
         x0 = np.array([0.0,0.0,1.0,0.0,0.0,0.0])
-        xr = np.array([0.,4.,8.0,0.,0.,0.0])
+        xr = np.array([0.,0.,0.13,0.,0.,-0.1])
 
         # Prediction horizon
-        N = int(self.rate*7.0)
+        N = int(self.rate*3.0)
         self._osqp_N = N
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
@@ -154,9 +154,9 @@ class PositionController():
         [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
         ##
-        if self.first:
-            self.plot_MPC(_osqp_result)
-            self.first = False
+        #if self.first:
+        #    self.plot_MPC(_osqp_result)
+        #    self.first = False
         
         ##
 

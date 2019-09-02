@@ -15,11 +15,11 @@ from dynamics.goto_land import land
 class test_trajectory_tracking():
     def __init__(self):
 
-        self.p_low = np.array([0.0, 0.0, 0.5])
-        self.p_high = np.array([0.0, 0.0, 2])
+        self.p_low = np.array([0.0, 0.0,  2.])
+        self.p_high = np.array([0.0, 0.0, 2.])
         self.duration_low = 1.
         self.duration_high = 8.
-        self.n_waypoints = 3
+        self.n_waypoints = 1
         self.train_nominal_model = False
 
         # Initialize robot
@@ -27,8 +27,8 @@ class test_trajectory_tracking():
         go_waypoint = MavrosGOTOWaypoint()
 
         print("Moving to initial point...")
-        p_init = np.array([0., 0., 5.])
-        p_final = np.array([0., 0., 1.])
+        p_init = np.array([0., 0., 1.8])
+        p_final = np.array([0., 0., 2.])
         go_waypoint.gopoint(np.array(p_init))
         for experiment in range(self.n_waypoints):
             p_init = np.copy(p_final)
@@ -41,7 +41,7 @@ class test_trajectory_tracking():
                 x = 0.
                 y = 0.
 
-            p_final = np.array([x, y, z])
+            #p_final = np.array([x, y, z])
             print("Waypoint ", experiment, ": ", p_final, ", duration: ", t)
             bintel.gotopoint(p_init, p_final, t)
 
