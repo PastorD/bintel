@@ -7,16 +7,16 @@
 		      _system_id:=2"
 		output="screen"
         >
-                 <rosparam command="load" file="$(find bintel_ros)/launch/px4_config.yaml" />
+        <rosparam command="load" file="$(find bintel_ros)/launch/px4_config.yaml" />
 	</node>
 	<include 
 		file="$(find bintel_ros)/launch/optitrack_only.launch">
 		<arg name="server" value="192.168.1.2"/>
 	</include>
-	<node
+<!-- 	<node
 		pkg = "topic_tools"
 		name= "position_relay2"
 		type = "relay"
 		args="/vrpn_client_node/bintel/pose /mavros/vision_pose/pose"
-	/>
+	/> -->
 </launch>
