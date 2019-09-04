@@ -69,7 +69,7 @@ class Robot():
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
-
+        self.controller.setup_OSQP(p_final)
 
         self.t0 = rospy.get_time()
         while not rospy.is_shutdown(): # and np.linalg.norm(

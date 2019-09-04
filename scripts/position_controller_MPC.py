@@ -30,7 +30,7 @@ class PositionController():
 
         g_constant = 9.8 # gravity
         self.u_hover = 0.66 # Hover Thrust
-        kb = 1/(self.u_hover/g_constant) #17.28 #11.9
+        kb = 30#1/(self.u_hover/g_constant) #17.28 #11.9
         #self.u_hover = 0.567 # Hover Thrust
         self.model.nom_model.hover_throttle = self.u_hover
 
@@ -64,8 +64,8 @@ class PositionController():
         
         umin = np.ones(nu)*0.2-self.u_hover
         umax = np.ones(nu)*0.95-self.u_hover
-        xmin = np.array([-3,-3,0.1,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 5.0,5.0,10.0,3.,3.,4.])
+        xmin = np.array([-5,-5,0.1,-np.inf,-np.inf,-np.inf])
+        xmax = np.array([ 5.0,5.0,15.0,3.,15.,15.])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
