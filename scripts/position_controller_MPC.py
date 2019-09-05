@@ -30,7 +30,7 @@ class PositionController():
 
         g_constant = 9.8 # gravity
         self.u_hover = 0.66 # Hover Thrust
-        kb = 30#1/(self.u_hover/g_constant) #17.28 #11.9
+        kb = 7#1/(self.u_hover/g_constant) #17.28 #11.9
         #self.u_hover = 0.567 # Hover Thrust
         self.model.nom_model.hover_throttle = self.u_hover
 
@@ -65,7 +65,7 @@ class PositionController():
         umin = np.ones(nu)*0.2-self.u_hover
         umax = np.ones(nu)*0.95-self.u_hover
         xmin = np.array([-5,-5,0.1,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 5.0,5.0,15.0,3.,15.,15.])
+        xmax = np.array([ 5.0,5.0,15.0,3.,15.,2.])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
@@ -83,10 +83,10 @@ class PositionController():
                        final_point[2],
                        0.,
                        0.,
-                       -0.1])
+                       0])
 
         # Prediction horizon
-        N = int(self.rate*3.0)
+        N = int(self.rate*4.0)
         self._osqp_N = N
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
@@ -103,9 +103,17 @@ class PositionController():
         leq = np.hstack([-x0, np.zeros(N*nx)])
         ueq = leq
         # - input and state constraints
+        nf = 1 # do not add the first nf points to the constraints
+        xminf = -np.ones(nx)*np.inf
+        xmaxf = +np.ones(nx)*np.inf
+
         Aineq = sparse.eye((N+1)*nx + N*nu)
-        lineq = np.hstack([np.kron(np.ones(N+1), xmin), np.kron(np.ones(N), umin)])
-        uineq = np.hstack([np.kron(np.ones(N+1), xmax), np.kron(np.ones(N), umax)])
+        #lineq = np.hstack([np.kron(np.ones(N+1), xmin), np.kron(np.ones(N), umin)])
+        #uineq = np.hstack([np.kron(np.ones(N+1), xmax), np.kron(np.ones(N), umax)])
+        
+
+        lineq = np.hstack([np.kron(np.ones(nf), xminf), np.kron(np.ones(N+1-nf), xmin), np.kron(np.ones(N), umin)])
+        uineq = np.hstack([np.kron(np.ones(nf), xmaxf), np.kron(np.ones(N+1-nf), xmax), np.kron(np.ones(N), umax)])
         # - OSQP constraints
         A = sparse.vstack([Aeq, Aineq]).tocsc()
         self._osqp_l = np.hstack([leq, lineq])
@@ -146,26 +154,23 @@ class PositionController():
         self._osqp_l[:nx] = -x0
         self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
+        
         _osqp_result = self.prob.solve()
-
-        # Check solver status
-        if _osqp_result.info.status != 'solved':
-            raise ValueError('OSQP did not solve the problem!')
 
         N = self._osqp_N
 
         # Apply first control input to the plant
         [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
-        ##
         #if self.first:
-        #    self.plot_MPC(_osqp_result)
+        #self.plot_MPC(_osqp_result)
         #    self.first = False
-        
-        ##
 
-        #f_d.x = 0.0
-        #f_d.y = 0.0
+        # Check solver status
+        if _osqp_result.info.status != 'solved':
+            print(f_d.z)
+            #[f_d.x, f_d.y, f_d.z] = np.array([0.,0.,self.u_hover])
+            raise ValueError('OSQP did not solve the problem!')
 
         # Project f_d into space of achievable force
         f_d_achievable = f_d #self.project_force_achievable (f_d)
@@ -188,8 +193,9 @@ class PositionController():
         plt.xlabel('Time(s)')
         plt.grid()
         plt.legend(['x','y','z','v_x','v_y','v_ddz'])
+        plt.savefig('mpc_debugging_z_2.png')
         plt.show()    
-        plt.savefig('mpc_debugging_z.png')
+        
 
         plt.plot(range(N),osqp_sim_forces)
         #plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
@@ -197,8 +203,9 @@ class PositionController():
         plt.xlabel('Time(s)')
         plt.grid()
         plt.legend(['fx','fy','fz'])
+        plt.savefig('mpc_debugging_fz_2.png')
         plt.show()  
-        plt.savefig('mpc_debugging_fz.png')
+        
     
     def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
