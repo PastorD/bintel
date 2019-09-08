@@ -12,6 +12,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
 import rosbag
+import time
 
 # Project
 import position_controller_MPC
@@ -55,6 +56,9 @@ class Robot():
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
+        self.ns = 2
+        self.nu = 1
+
 
 
     def gotopoint(self, p_init, p_final, tduration, file_csv=""):
@@ -70,25 +74,31 @@ class Robot():
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
         self.controller.setup_OSQP(p_final)
-        self.X_agg = np.empty((1,2))
-
+        self.X_agg = np.empty((1+self.ns+self.nu,1))
+        converged = False
+        time_after_converged = 2
+        self.init_time = time.time()
+        time_converged = self.init_time+6 
+        
 
         self.t0 = rospy.get_time()
-        while not rospy.is_shutdown(): # and np.linalg.norm(
-                #np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.1:
+        while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
+            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.1 and not converged):
+                converged = True
+                time_converged = time.time()
+
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.attitude_target_msg)
             #self.pub_traj.publish(self.traj_msg)
-            #if not self.file == "":
-            #    self.save_csv()
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
             self.append_dat_traj()
             self.rate.sleep()
 
     def append_dat_traj(self):
-        self.X_agg = append(self.X_agg, [self.p.z,self.v.z], axis=0)
+        passed_time = time.time()-self.init_time
+        self.X_agg = np.hstack([self.X_agg, [[passed_time],[self.p.z],[self.v.z],[self.f_d.z]]])
 
 
     def load_model(self, model_file_name):

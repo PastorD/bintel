@@ -29,8 +29,8 @@ class PositionController():
         self.max_pitch_roll = math.pi/3        
 
         g_constant = 9.8 # gravity
-        self.u_hover = 0.66 # Hover Thrust
-        kb = 7#1/(self.u_hover/g_constant) #17.28 #11.9
+        self.u_hover = 0.567 # Hover Thrust
+        kb = 11#1/(self.u_hover/g_constant) #17.28 #11.9
         #self.u_hover = 0.567 # Hover Thrust
         self.model.nom_model.hover_throttle = self.u_hover
 
@@ -62,10 +62,10 @@ class PositionController():
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.2-self.u_hover
-        umax = np.ones(nu)*0.95-self.u_hover
+        umin = np.ones(nu)*0.4-self.u_hover
+        umax = np.ones(nu)*0.8-self.u_hover
         xmin = np.array([-5,-5,0.1,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 5.0,5.0,15.0,3.,15.,2.])
+        xmax = np.array([ 5.0,5.0,15.0,3.,15.,10.])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
