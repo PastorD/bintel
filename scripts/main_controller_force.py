@@ -70,6 +70,8 @@ class Robot():
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
         self.controller.setup_OSQP(p_final)
+        self.X_agg = np.empty((1,2))
+
 
         self.t0 = rospy.get_time()
         while not rospy.is_shutdown(): # and np.linalg.norm(
@@ -82,7 +84,12 @@ class Robot():
             #    self.save_csv()
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
+            self.append_dat_traj()
             self.rate.sleep()
+
+    def append_dat_traj(self):
+        self.X_agg = append(self.X_agg, [self.p.z,self.v.z], axis=0)
+
 
     def load_model(self, model_file_name):
         with open(model_file_name, 'r') as stream:
