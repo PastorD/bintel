@@ -54,8 +54,8 @@ class RL_lander():
             self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
             self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.1
         else:
-            self.p_init.x, self.p_init.y, self.p_init.z = 0., 0., 1.5
-            self.p_final.x, self.p_final.y, self.p_final.z = 0., 0., 0.25
+            self.p_init.x, self.p_init.y, self.p_init.z = 0.1, -0.65, 1.5
+            self.p_final.x, self.p_final.y, self.p_final.z = 0.1, -0.65, 1.
 
         self.v_d.x, self.v_d.y, self.v_d.z = 0., 0., 0.
         self.T_d = 0.0
@@ -260,10 +260,9 @@ class RL_lander():
         self.waypoint.pose.position.y = self.p_init.y
         self.waypoint.pose.position.z = self.p_init.z
 
-        while not rospy.is_shutdown() and np.linalg.norm(
+        while not rospy.is_shutdown() and (np.linalg.norm(
                 np.array([self.p_init.x - self.p.x,
-                          self.p_init.y - self.p.y,
-                          self.p_init.z - self.p.z])) > 0.1: # or \
+                          self.p_init.y - self.p.y])) > 0.2 or abs(self.p_init.z - self.p.z > 0.05)): # or \
                           #rospy.Duration.from_sec(rospy.get_time() - self.t_last_rl_msg.to_sec()).to_sec() > 0.05):
             result_mode = change_mode(0, "OFFBOARD")
             self.pub_posmsg.publish(self.waypoint)
@@ -288,7 +287,7 @@ class RL_lander():
             vel_sub = message_filters.Subscriber('/mavros/local_position/velocity_body', TwistStamped)
         else:
             #rospy.Subscriber('/mavros/local_position/velocity', TwistStamped, self._read_velocity)
-            vel_sub = message_filters.Subscriber('/mavros/local_position/velocity', TwistStamped)
+            vel_sub = message_filters.Subscriber('/mavros/local_position/velocity_body', TwistStamped)
 
         ts = message_filters.TimeSynchronizer([pos_sub, vel_sub], 1)
         ts.registerCallback(self._read_pos_vel)
@@ -338,7 +337,7 @@ class RL_lander():
     def create_attitude_msg(self, stamp):
         ## Set the header
         self.msg.header.stamp = stamp
-        self.msg.header.frame_id = '/world'
+        self.msg.header.frame_id = 'map'
 
         ## Set message content
         self.msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
