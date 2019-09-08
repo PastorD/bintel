@@ -1,3 +1,6 @@
 [submodule "MilanKordaCodes/Koopman_continuous_spectrum"]
 	path = MilanKordaCodes/Koopman_continuous_spectrum
 	url = https://github.com/arbabiha/Koopman_continuous_spectrum
+[submodule "scripts/keedmd_code"]
+	path = scripts/keedmd_code
+	url = git@github.com:Cafolkes/keedmd.git

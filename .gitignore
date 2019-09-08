@@ -4,3 +4,5 @@
 idea/
 *.m~
 scripts/.ipynb_checkpoints/*
+.vscode/.ropeproject/objectdb
+.vscode/.ropeproject/config.py
