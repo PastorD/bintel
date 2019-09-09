@@ -25,7 +25,7 @@ import time
 import position_controller_MPC
 
 # KEEDMD
-from scripts.keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, RBF, Edmd, Keedmd, plot_trajectory_ep
+from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, RBF, Edmd, Keedmd, plot_trajectory_ep
 from scripts.keedmd_code.core.handlers import droneHandler
 
 #TODO: Import mpc controller
