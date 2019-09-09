@@ -40,9 +40,9 @@ Bd = sparse.csc_matrix([
 u0 = 10.5916
 umin = np.array([9.6, 9.6, 9.6, 9.6]) - u0
 umax = np.array([13., 13., 13., 13.]) - u0
-xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-1.,
+xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-0.5,
                  -np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
-xmax = np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, np.inf,
+xmax = np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, 0.5,
                   np.inf, np.inf, np.inf, np.inf, np.inf, np.inf])
 
 # Objective function
@@ -52,7 +52,7 @@ R = 0.1*sparse.eye(4)
 
 # Initial and reference states
 x0 = np.zeros(12)
-xr = np.array([0.,0.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+xr = np.array([0.,1.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 
 # Sizes
 ns = 12
