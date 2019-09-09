@@ -4,7 +4,6 @@
 from yaml import load
 from collections import namedtuple
 import numpy as np
-import exceptions
 import math
 
 # ROS
@@ -24,7 +23,7 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
 
-    def __init__(self, rate):
+    def __init__(self, rate, n, m):
         self.is_simulation = True
         self.use_learned_model = False
 
@@ -50,18 +49,18 @@ class Robot():
 
         self.model = self.load_model(self.model_file_name)
         self.init_ROS()
-        self.controller = position_controller_MPC.PositionController(model=self.model, rate=self.main_loop_rate,
+        self.controller = position_controller_MPC.PositionController(u_hover=0.5, gravity=9.81, rate=self.main_loop_rate,
                                                                     use_learned_model=self.use_learned_model)
         self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
-        self.ns = 2
-        self.nu = 1
+        self.n = n
+        self.m = m
 
 
 
-    def gotopoint(self, p_init, p_final, tduration, file_csv=""):
+    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None):
         """
         Go to p_final
         """
@@ -73,12 +72,19 @@ class Robot():
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
-        self.controller.setup_OSQP(p_final)
-        self.X_agg = np.empty((1+self.ns+self.nu,1))
+        self.X = np.empty((self.n,1))
+        self.U = np.empty((self.m,1))
+        self.Upert = np.empty((self.m,1))
+        self.t = np.empty((1,1))
         converged = False
         time_after_converged = 2
         self.init_time = time.time()
-        time_converged = self.init_time+6 
+        time_converged = self.init_time+6
+
+        if controller is None:
+            self.controller.setup_OSQP(p_final)
+        else:
+            self.controller = controller
         
 
         self.t0 = rospy.get_time()
@@ -96,10 +102,16 @@ class Robot():
             self.append_dat_traj()
             self.rate.sleep()
 
-    def append_dat_traj(self):
-        passed_time = time.time()-self.init_time
-        self.X_agg = np.hstack([self.X_agg, [[passed_time],[self.p.z],[self.v.z],[self.f_d.z]]])
+        return self.X, self.p_final, self.U, self.Upert, self.t
 
+    def append_dat_traj(self):
+        print("data mats: ", self.X.shape, self.U.shape, self.Upert.shape, self.t.shape)
+        print("inputs: ", self.p.z, self.v.z, self.f_d.z)
+        passed_time = time.time()-self.init_time
+        self.X = np.append(self.X, np.array([[self.p.z], [self.v.z]]), axis=1)
+        self.U = np.append(self.U, np.array([[self.f_d.z]]), axis=1)
+        self.Upert = np.append(self.Upert, np.array([[self.controller.get_last_perturbation()]]), axis=1)
+        self.t = np.append(self.t, np.array([[passed_time]]), axis=1)
 
     def load_model(self, model_file_name):
         with open(model_file_name, 'r') as stream:

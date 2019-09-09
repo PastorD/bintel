@@ -2,25 +2,19 @@
 
 # Python General
 from collections import namedtuple
-import exceptions
-import control
-import timeit
 import matplotlib.pyplot as plt
 
 import math
 import numpy as np
-import scipy as sp
-import scipy.io as sio
 import scipy.sparse as sparse
 import osqp
 
 # ROS
 import tf
-import rospy
 
 class PositionController():
 
-    def __init__(self, model, rate, use_learned_model):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, model=None):
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
@@ -28,11 +22,12 @@ class PositionController():
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        g_constant = 9.8 # gravity
-        self.u_hover = 0.567 # Hover Thrust
-        kb = 11#1/(self.u_hover/g_constant) #17.28 #11.9
+        self.g = gravity
+        self.u_hover = u_hover
+        kb = self.g/self.u_hover #11.9
         #self.u_hover = 0.567 # Hover Thrust
-        self.model.nom_model.hover_throttle = self.u_hover
+        if model is not None:
+            self.model.nom_model.hover_throttle = self.u_hover
 
         ##  Set the MPC Problem
         # Discrete time model of a quadcopter
