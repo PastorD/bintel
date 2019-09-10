@@ -55,7 +55,7 @@ nu = 4
 # Objective function
 Q = sparse.diags([0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
 QN = Q
-R = sparse.eye(nu)
+R = 0.1*sparse.eye(nu)
 
 #%% 
 
@@ -69,11 +69,11 @@ def block_diag(M,n):
   return sparse.block_diag([M for i in range(n)])
 
 # Prediction horizon
-N = 100
+N = 10
 
 # Initial and reference states
-x0 = np.zeros(ns)
-xr = np.array([0.,0.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+x0 = np.array([0.,0.,20.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+xr = np.array([0.,0.,10.,0.,0.,0.,0.,0.,0.,0.,0.,0.]) #np.array([0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 xrtrj = np.kron(np.ones(N), xr.reshape(xr.shape[0],-1))
 
 # Plot Ad and Bd
@@ -140,6 +140,45 @@ for i in range(N-1):
 #a = sparse.csc_matrix(a)
 
 
+#! Check x=ax0+bu
+# Generate fake data
+""" x0 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+x00 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+# Store data Init
+nsim = 100
+xst = np.zeros((ns,nsim))
+ust = np.zeros((nu,nsim))
+
+# Simulate in closed loop
+
+for i in range(nsim):
+    # Fake pd controller
+    ctrl = np.array([-0.1*x0[2],-0.1*x0[1],0.1*x0[2],-0.1*x0[3]])
+    x0 = Ad.dot(x0) + Bd.dot(ctrl)
+
+    # Store Data
+    xst[:,i] = x0
+    ust[:,i] = ctrl
+
+x_dense = np.reshape(a @ x00 + B @ ust.flatten('F'),(N,ns)).T
+
+for i in range(1):
+    plt.plot(range(nsim),xst[i,:],label="sim "+str(i))
+    plt.plot(range(nsim),x_dense[i,:],label="ax+bu "+str(i))
+plt.xlabel('Time(s)')
+plt.grid()
+plt.legend()
+plt.show()    
+
+
+for i in range(nu):
+    plt.plot(range(nsim),ust[i,:],label=str(i))
+plt.xlabel('Time(s)')
+plt.grid()
+plt.legend()
+plt.show()   """
+
+
 #plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
 """ plt.matshow(a.toarray(), cmap=cm.jet) 
 plt.title("a")
@@ -151,17 +190,17 @@ P = Rbd + B.T @ Qbd @ B
 # - linear objective
 xrQB  = B.T @ np.kron(np.ones(N), Q.dot(xr))
 x0_1 = x0.reshape(x0.shape[0],-1)
-x0aQb = ( (x0_1.T)@(a.T)@(Qbd)@(B) ).squeeze()
-
+x0aQb = B.T @ Qbd @ a @ x0 #B.T @ np.kron(np.ones(N), Q @ a @ x0) #( (x0_1.T)@(a.T)@(Qbd)@(B) ).squeeze()
+xr_N_flat = np.tile(xr,N)
 """ plt.figure()
 plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
 plt.matshow(xrQB,  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("xrQB")
 plt.show() """
 
-q = np.zeros((N*nu))#np.hstack([x0aQb - xrQB]) #np.reshape( x0aQb - xrQB ,(N*nu,)) #,order='F')
+q = x0aQb - xrQB #np.hstack([x0aQb - xrQB]) #np.reshape( x0aQb - xrQB ,(N*nu,)) #,order='F')
 
-# - input and state constraints
+#* - input and state constraints
 Aineq_u = sparse.eye(N*nu)
 Aineq_x   = B
 l = [] #np.hstack([np.kron(np.ones(N), xmin)-a.dot(x0), np.kron(np.ones(N), umin)])
@@ -244,12 +283,14 @@ for i in range(nsim):
     ust[:,i] = ctrl
 
     # Update initial state
-    #l[:nx] = -x0
-    q = 
+    x0aQb = x0aQb = B.T @ Qbd @ a @ x0
+    q = x0aQb  - xrQB
     prob.update(q=q)
 
 print(time.clock()-t1)
 #%% Plots
+
+plt.figure()
 for i in range(ns):
   plt.plot(range(nsim),xst[i,:],label=str(i))
 plt.xlabel('Time(s)')
@@ -258,7 +299,7 @@ plt.legend()
 plt.show()    
 plt.savefig('sim_mcp_quad_pos_dense.png')
 
-
+plt.figure()
 for i in range(nu):
   plt.plot(range(nsim),ust[i,:],label=str(i))
 plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
@@ -267,6 +308,6 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 plt.show()  
-plt.savefig('sim_mcp_quad_u.png')
+plt.savefig('sim_mcp_quad_u_dense.png')
 
 #%%

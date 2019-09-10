@@ -47,25 +47,37 @@ ns = 12
 nu = 4
 
 # Constraints
-umin = np.linspace(-20,-10,nu)
-umax = np.linspace(+10,+20,nu)
-xmin = np.linspace(-10,-1,ns)
-xmax = np.linspace(+1,+10,ns)
+u0 = 10.5916 # Hover Thrust
+umin = np.ones(nu)*9.6 - u0
+umax = np.ones(nu)*11.0 - u0
+xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-1.,
+                 -np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
+xmax = np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, np.inf,
+                  np.inf, np.inf, np.inf, np.inf, np.inf, np.inf])
+
+
+umin = np.ones(nu)*-100 - u0
+umax = np.ones(nu)*100.0 - u0
+xmin = 100*np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-1.,
+                 -np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
+xmax = 100*np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, np.inf,
+                  np.inf, np.inf, np.inf, np.inf, np.inf, np.inf])
 
 
 # Objective function
-Q = sparse.diags(range(ns))#[0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
+# Objective function
+Q = sparse.diags([0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
 QN = Q
-R = sparse.eye(nu)
+R = 0.1*sparse.eye(nu)
 
 #%% 
 
 # Initial and reference states
-x0 = np.zeros(ns)
-xr = np.array(range(ns))#[0.,0.,4.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+x0 = np.array([0.,0.,20.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+xr = np.zeros(ns)#np.linspace(0,10,ns) #np.array([0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 
 # Prediction horizon
-N = 100
+N = 10
 
 # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
 # - quadratic objective
@@ -93,7 +105,7 @@ u = np.hstack([ueq, uineq])
 fig = plt.figure()
 fig.suptitle("QP Matrices to solve MP in sparse form. N={}, ns={}, nu={}".format(N,ns,nu),fontsize=20)
 plt.subplot(2,4,1,xlabel="Ns*(N+1)", ylabel="Ns*(N+1)")
-plt.imshow(Ax.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
+plt.spy(Ax)# ,  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("Ax, the A part to the equality constraint")
 plt.subplot(2,4,2,xlabel="Ns*(N+1)", ylabel="Nu*N")
 plt.imshow(Bu.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
@@ -123,7 +135,7 @@ plt.plot(q)
 plt.title("q")
 plt.grid()
 plt.savefig("Sparse MPC.png")
-plt.show()
+#plt.show()
 
 
 
@@ -164,15 +176,17 @@ for i in range(nsim):
 
 print(time.clock()-t1)
 #%% Plots
+plt.figure()
 for i in range(ns):
   plt.plot(range(nsim),xst[i,:],label=str(i))
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.show()    
+#plt.show()    
 plt.savefig('sim_mcp_quad_pos.png')
 
 
+plt.figure()
 for i in range(nu):
   plt.plot(range(nsim),ust[i,:],label=str(i))
 plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
@@ -180,7 +194,7 @@ plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', l
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.show()  
+#plt.show()  
 plt.savefig('sim_mcp_quad_u.png')
 
 #%%
