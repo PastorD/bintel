@@ -20,17 +20,17 @@ from keedmd_code.core.handlers import Handler
 # %% ===============================================   SET PARAMETERS    ===============================================
 # Define system parameters
 n, m = 2, 1  # Number of states and actuators
-upper_bounds = array([3.0, 2.])  # State constraints
-lower_bounds = array([0.1, -2.])  # State constraints
+upper_bounds = array([3.0, 3.])  # State constraints
+lower_bounds = array([0.0, -3.])  # State constraints
 
 # Define nominal model and nominal controller:
 simulation = True
 if simulation:
     hover_thrust = 0.567
-    K = array([[3.16, 3.22]])
+    K = array([[0.8670, 0.9248]])
 else:
     hover_thrust = 0.65  #TODO: Update with correct bintel thrust
-    K = array([3.16, 3.23])  #TODO: Solve lqr in Matlab with bintel thrust
+    K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
 B_nom = array([[0.], [1./m]])  # Nominal model of the true system around the origin
@@ -40,8 +40,8 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 1
 controller_rate = 80
-p_init = np.array([0., 0., 2.])
-p_final = np.array([0., 0., 0.5])
+p_init = np.array([0., 0., 2.25])
+p_final = np.array([0., 0., 0.25])
 pert_noise = 0.05
 Nep = 5
 w = linspace(0,1,Nep)
@@ -99,19 +99,23 @@ class DroneHandler(Handler):
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
 
         q_final = array([p_final[2], 0.]).reshape((self.n,1))
-        X_shift = X - q_final
-        Xd = np.tile(q_final,(1,X_shift.shape[1]))
+        Xd = np.tile(q_final,(1,X.shape[1]))
         Unom = U-Upert
 
-        # Clip beginning of dataset until certain altitude is reached
-        #TODO:
-        #Calculate clip criteria
-        #Clip all matrices
-        #Reallign time so that initial time is zero
+        # Trim beginning and end of dataset until certain altitude is reached and duration has passed
+        start_altitude = 2.  # Start altitude in meters  #TODO: Tune for experiment
+        max_dur = 1.  # Max duration in seconds  #TODO: Tune for experiment
+        first_ind = np.argwhere(X[0,1:] < start_altitude)[0][0]+1  #First data point is just initializing and excluded
+        t = t[:, first_ind:]
+        t -= t[:,0]
 
-        # Clip end according to some criteria
-        #TODO:
-        # Necessary? Already implemented that it stays around a given time after hitting target, can adjust that time instead?
+        end_ind = np.argwhere(t[0,:] > max_dur)[0][0]
+
+        X = X[:, first_ind:first_ind+end_ind]
+        Xd = Xd[:, first_ind:first_ind+end_ind]
+        U = U[:, first_ind:first_ind+end_ind]
+        Unom = Unom[:, first_ind:first_ind+end_ind]
+        t = t[:,:end_ind]
 
         # Filter out data points that are likely stemming from impacts with the ground
         #TODO:
@@ -148,7 +152,7 @@ bintel = Robot(controller_rate, n, m)
 go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
 initial_controller = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
-                                                                    use_learned_model=False)
+                                                                    p_final=p_final, use_learned_model=False)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
 eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
@@ -169,6 +173,8 @@ for ep in range(Nep):
         if n_waypoints > 1:
             raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
     print("diff fit ", X.shape, t.shape, Xd.shape)
+    land()  # Land while fitting models
+    print("Fitting diffeomorphism...")
     eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
@@ -176,15 +182,16 @@ for ep in range(Nep):
                                                  batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
     eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
     keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l2=l2_keedmd,episodic=True)
+    print("Before aggregation: ", X.shape, Xd.shape, U.shape, Unom.shape, t.shape)
     handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
     keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
     keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)
-    mpc_ep = position_controller_MPC.PositionController(model=None, rate=controller_rate,
-                                                                    use_learned_model=False)  #TODO: Import and generate new MPC controller
+    mpc_ep = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
+                                                                    p_final=p_final, use_learned_model=False)  #TODO: Import and generate new MPC controller
     handler.aggregate_ctrl(mpc_ep)
-    initialize_NN = False  # Warm start NN after first episode
+    initialize_NN = False  # Warm s tart NN after first episode
 
-    #TODO: What does the drone to between episodes?
+
 
     #TODO: Fix plotting with fixed point instead of trajectory (?)
     # Plot experiment and report performance:

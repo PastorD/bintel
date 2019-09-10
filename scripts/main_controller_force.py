@@ -10,7 +10,6 @@ import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
-import rosbag
 import time
 
 # Project
@@ -27,10 +26,10 @@ class Robot():
         self.is_simulation = True
         self.use_learned_model = False
 
-        if self.is_simulation:
-            self.model_file_name = 'scripts/sindy_model_force.yaml'
-        else:
-            self.model_file_name = 'scripts/sindy_model.yaml'
+ #       if self.is_simulation:
+ #           self.model_file_name = 'scripts/sindy_model_force.yaml'
+ #       else:
+ #           self.model_file_name = 'scripts/sindy_model.yaml'
 
         self.p = namedtuple("p", "x y z")
         self.q = namedtuple("q", "w x y z")
@@ -47,10 +46,10 @@ class Robot():
 
         self.main_loop_rate = rate
 
-        self.model = self.load_model(self.model_file_name)
+        self.model = None #self.load_model(self.model_file_name)
         self.init_ROS()
         self.controller = position_controller_MPC.PositionController(u_hover=0.5, gravity=9.81, rate=self.main_loop_rate,
-                                                                    use_learned_model=self.use_learned_model)
+                                                                    p_final=np.array([0., 0., 1.]), use_learned_model=self.use_learned_model)
         self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()

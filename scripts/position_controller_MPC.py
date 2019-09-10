@@ -10,11 +10,11 @@ import scipy.sparse as sparse
 import osqp
 
 # ROS
-import tf
+#import tf
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, model=None):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, model=None):
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
@@ -50,7 +50,7 @@ class PositionController():
         self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
         self._osqp_Bd = Bc*self.dt
 
-        self.setup_OSQP([0.,0.,3])
+        self.setup_OSQP(p_final)
 
     def setup_OSQP(self,final_point):
 
@@ -230,7 +230,7 @@ class PositionController():
             f_d_ach.y = f_d.y*s
             f_d_ach.z = f_d.z*s
 
-        except exceptions.ZeroDivisionError:
+        except ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
             f_d_ach.x = f_d.x
@@ -243,15 +243,19 @@ class PositionController():
         return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
 
     def get_attitude(self, f_d, yaw_d):
-        q_worldToYawed = tf.transformations.quaternion_from_euler(0,0,yaw_d, axes='rxyz')
+        #import tf
+        from scipy.spatial.transform import Rotation as R
+        r_worldToYawed = R.from_euler('XYZ', [[0, 0, yaw_d]])  #"XYZ" refers to intrinsic xyz, "xyz" refers to extrinsic xyz
         rotation_axis = tuple(np.cross((0,0,1), np.array([f_d.x, f_d.y, f_d.z])))
         if np.allclose(rotation_axis, (0.0, 0.0, 0.0)):
             unit_rotation_axis = rotation_axis
         else:
-            unit_rotation_axis = tf.transformations.unit_vector(rotation_axis)
+            unit_rotation_axis = rotation_axis/np.linalg.norm(rotation_axis)
         rotation_angle = math.asin(np.linalg.norm(rotation_axis))
-        q_yawedToBody = tf.transformations.quaternion_about_axis(rotation_angle, unit_rotation_axis)
+        r_yawedToBody = R.from_rotvec(rotation_angle*unit_rotation_axis)
 
-        q_d = tf.transformations.quaternion_multiply(q_worldToYawed, q_yawedToBody)
-
-        return q_d
+        r_d = r_worldToYawed * r_yawedToBody
+        q_d_raw = r_d.as_quat()
+        q_d = namedtuple("q_d", "w x y z")
+        q_d.x, q_d.y, q_d.z, q_d.w = q_d_raw[0,0], q_d_raw[0,1], q_d_raw[0,2], q_d_raw[0,3]
+        return q_d.x, q_d.y, q_d.z, q_d.w
