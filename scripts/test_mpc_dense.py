@@ -55,7 +55,7 @@ nu = 4
 # Objective function
 Q = sparse.diags([0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
 QN = Q
-R = 0.05*sparse.eye(nu)
+R = 0.1*sparse.eye(nu)
 
 #%% 
 
@@ -73,7 +73,7 @@ N = 10
 
 #* Initial and reference states
 x0 = np.array([0.,0.,20.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
-xr = np.array([0.,0.,10.,0.,0.,0.,0.,0.,0.,0.,0.,0.]) #np.array([0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+xr = np.array([0.,0.,10.,0.,0.,0.,0.,0.,0.,0.,0.,0.]) 
 xrtrj = np.kron(np.ones(N), xr.reshape(xr.shape[0],-1))
 
 #* Plot Ad and Bd
@@ -121,12 +121,12 @@ for i in range(N-1):
 
 #! Check x=ax0+bu
 # Generate fake data
-check_ab = True
+check_ab = False
 if check_ab:
     x0 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
     x00 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
     # Store data Init
-    nsim = 100
+    nsim = 10
     xst = np.zeros((ns,nsim))
     ust = np.zeros((nu,nsim))
 
@@ -141,15 +141,16 @@ if check_ab:
         xst[:,i] = x0
         ust[:,i] = ctrl
 
-    x_dense = np.reshape(a @ x00 + B @ ust.flatten('F'),(N,ns)).T
+    x_dense = np.reshape(a @ x00 + B @ (ust.flatten('F')),(N,ns)).T
 
+    plt.figure()
     for i in range(1):
         plt.plot(range(nsim),xst[i,:],label="sim "+str(i))
         plt.plot(range(nsim),x_dense[i,:],label="ax+bu "+str(i))
     plt.xlabel('Time(s)')
     plt.grid()
     plt.legend()
-      
+    plt.show()
 
 
     for i in range(nu):
@@ -162,11 +163,14 @@ if check_ab:
 
 P = Rbd + B.T @ Qbd @ B
 # - linear objective
-xrQB  = B.T @ np.kron(np.ones(N), Q.dot(xr))
+xr_N_flat = np.tile(xr,N)
+#xrQB  = B.T @ Qbd @ xr_N_flat #np.kron(np.ones(N), Q.dot(xr))
+xrQB  = B.T @ np.reshape(Q.dot(xrtrj),(N*nx,),order='F')
+#xrQB  = B.T @ Qbd @ xr_N_flat #np.kron(np.ones(N), Q.dot(xr))
+
 x0_1 = x0.reshape(x0.shape[0],-1)
 x0aQb = B.T @ Qbd @ a @ x0
 BTQbda =  B.T @ Qbd @ a
-xr_N_flat = np.tile(xr,N)
 
 
 q = x0aQb - xrQB 
