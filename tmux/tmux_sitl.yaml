@@ -1,0 +1,20 @@
+session_name: bintel_sitl_session
+suppress_history: false
+windows:
+  - window_name: bintel_sitl
+    layout: tiled
+    shell_command_before:
+    - roscd bintel_ros
+    panes:
+      - shell_command:
+        - cd ~/src/Firmware
+        - make px4_sitl_default gazebo
+      - roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+      - shell_command:
+        - sleep 5
+        - source bash/increase_rates.sh
+        - rostopic echo /mavros/state
+      - sleep 5; rostopic echo /mavros/local_position/pose 
+      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+      - python scripts/flight_data_collection_MPC.py \
+      - ~/Downloads/QGroundControl.AppImage 

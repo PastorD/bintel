@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+# Python general
 import yaml
 from collections import namedtuple
 import csv
@@ -9,11 +10,12 @@ import os
 from datetime import datetime
 import shutil
 
-
+# ROS
 import rospy
 from geometry_msgs.msg import PoseStamped
 import rosbag
 
+# Project
 from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
@@ -24,7 +26,7 @@ class test_trajectory_tracking():
         # Read mission file
         config_file = 'scripts/mission.yaml'
         mission = self.read_mission(config_file)       
-        mission_folder = 'dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        mission_folder = 'data/dataexp'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         os.mkdir(mission_folder)
         shutil.copy(config_file,mission_folder)
 
@@ -35,9 +37,9 @@ class test_trajectory_tracking():
         
         # Initialize robot
         bintel = Robot()
-        bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
+        #bintel.plot_desired_traj(self.p_init, self.p_final, self.duration)
         go_waypoint = MavrosGOTOWaypoint()
-        print("Moving to initial point...")
+        print("Moving to initial point...{}".format(self.p_init))
         go_waypoint.gopoint(self.p_init)
         
 

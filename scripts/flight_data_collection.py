@@ -1,19 +1,10 @@
 #!/usr/bin/env python
 
-import yaml
-from collections import namedtuple
-import csv
-import matplotlib.pyplot as plt
 import numpy as np
-import os
-from datetime import datetime
-import shutil
 
 import rospy
-from geometry_msgs.msg import PoseStamped
-import rosbag
 
-from main_controller import Robot
+from old.main_controller import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 

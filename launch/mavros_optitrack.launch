@@ -8,7 +8,7 @@
 		output="screen"
 	/>
 	<include 
-		file="$(find bintel_ros)/launch/vrpn_optitrack_positioning.launch">
+		file="$(find bintel_ros)/launch/optitrack_only.launch">
 		<arg name="server" value="192.168.1.2"/>
 	</include>
 	<node

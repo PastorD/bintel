@@ -1,0 +1,18 @@
+session_name: bintel_cast_session # Run this script at CAST with bintel. Check that 1) it turns on at the origin, 2) Optitrack is working well
+suppress_history: false
+windows:
+  - window_name: bintel_cast
+    layout: tiled
+    shell_command_before:
+    - roscd bintel_ros; export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=http://192.168.1.123 
+    panes:
+      - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack.launch
+      - shell_command:
+        - sleep 5
+        - ssh bintel@192.168.1.61
+        - source bash/increase_rates.sh
+        - rostopic echo /mavros/state
+      - sleep 5; rostopic echo /mavros/local_position/pose 
+      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+      - python scripts/flight_data_collection_MPC.py
+      - ~/Downloads/QGroundControl.AppImage 

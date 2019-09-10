@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 import rospy
-from std_msgs.msg import String
+#from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
 from mavros_msgs.srv import SetMode
 from visualization_msgs.msg import Marker
-import roslib
-import tf
 import mavros
 from mavros import command
 import numpy as np
@@ -45,7 +43,7 @@ class MavrosGOTOWaypoint():
         self.waypoint_marker.color.a = 0.6
         
 
-    def gopoint(self,p_desired,waypoint_ball=0.05):
+    def gopoint(self,p_desired,waypoint_ball=0.1):
 
         self.waypoint.pose.position.x = p_desired[0]
         self.waypoint.pose.position.y = p_desired[1]
@@ -61,6 +59,7 @@ class MavrosGOTOWaypoint():
             np.array([self.waypoint.pose.position.x-self.local_pose.pose.position.x,
                           self.waypoint.pose.position.y-self.local_pose.pose.position.y,
                           self.waypoint.pose.position.z-self.local_pose.pose.position.z])) > waypoint_ball:
+
             result_mode = self.change_mode(0,"OFFBOARD")
             self.pub_sp.publish(self.waypoint)
             self.rate.sleep()

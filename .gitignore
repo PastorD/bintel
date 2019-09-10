@@ -2,3 +2,8 @@
 .vscode/c_cpp_properties.json
 *.pyc
 idea/
+*.m~
+scripts/.ipynb_checkpoints/*
+.vscode/.ropeproject/objectdb
+.vscode/.ropeproject/config.py
+.vscode/launch.json

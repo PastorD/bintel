@@ -4,12 +4,7 @@ import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
 from mavros_msgs.srv import SetMode
-from visualization_msgs.msg import Marker
-import roslib
-import tf
 import mavros
-from mavros import command
-import numpy as np
 
 
 class land():

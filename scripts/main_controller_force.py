@@ -1,28 +1,19 @@
 #!/usr/bin/env python
 
 # Python Common
-import argparse
-from yaml import load, dump
+from yaml import load
 from collections import namedtuple
-import position_controller_FL
 import numpy as np
-import exceptions
 import math
 
 # ROS
 import rospy
-import roslib
 from geometry_msgs.msg import PoseStamped, Quaternion, Vector3, Vector3Stamped, TwistStamped
 from mavros_msgs.msg import AttitudeTarget, RCOut
-from visualization_msgs.msg import Marker
-
-# Initialize trajeftory
-from dynamics import goto_optitrack
+import time
 
 # Project
-from learn_full_model import learnFullModel
-from learn_nominal_model import learnNominalModel
-
+import position_controller_MPC
 
 class Robot():
     """
@@ -31,14 +22,14 @@ class Robot():
     It contains a model, a controller and its ROS auxiliar data.
     """
 
-    def __init__(self):
+    def __init__(self, rate, n, m):
         self.is_simulation = True
         self.use_learned_model = False
 
-        if self.is_simulation:
-            self.model_file_name = 'scripts/sindy_model_force.yaml'
-        else:
-            self.model_file_name = 'scripts/sindy_model.yaml'
+ #       if self.is_simulation:
+ #           self.model_file_name = 'scripts/sindy_model_force.yaml'
+ #       else:
+ #           self.model_file_name = 'scripts/sindy_model.yaml'
 
         self.p = namedtuple("p", "x y z")
         self.q = namedtuple("q", "w x y z")
@@ -53,17 +44,22 @@ class Robot():
         self.omg_d = namedtuple("omg_d", "x y z")
         self.f_d = namedtuple("f_d", "x y z")  # Variable used to publish desired force commands
 
-        self.main_loop_rate = 60
+        self.main_loop_rate = rate
 
-        self.model = self.load_model(self.model_file_name)
+        self.model = None #self.load_model(self.model_file_name)
         self.init_ROS()
-        self.controller = position_controller_FL.PositionController(model=self.model, rate=self.main_loop_rate,
-                                                                    use_learned_model=self.use_learned_model)
-        self.msg = AttitudeTarget()
+        self.controller = position_controller_MPC.PositionController(u_hover=0.5, gravity=9.81, rate=self.main_loop_rate,
+                                                                    p_final=np.array([0., 0., 1.]), use_learned_model=self.use_learned_model)
+        self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
 
-    def gotopoint(self, p_init, p_final, tduration, file_csv=""):
+        self.n = n
+        self.m = m
+
+
+
+    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None):
         """
         Go to p_final
         """
@@ -75,20 +71,46 @@ class Robot():
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
+        self.X = np.empty((self.n,1))
+        self.U = np.empty((self.m,1))
+        self.Upert = np.empty((self.m,1))
+        self.t = np.empty((1,1))
+        converged = False
+        time_after_converged = 2
+        self.init_time = time.time()
+        time_converged = self.init_time+6
+
+        if controller is None:
+            self.controller.setup_OSQP(p_final)
+        else:
+            self.controller = controller
+        
 
         self.t0 = rospy.get_time()
+        while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
+            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.1 and not converged):
+                converged = True
+                time_converged = time.time()
 
-        while not rospy.is_shutdown() and np.linalg.norm(
-                np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) > 0.025:
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
-            self.pub_sp.publish(self.msg)
-            self.pub_traj.publish(self.traj_msg)
-            if not self.file == "":
-                self.save_csv()
-            self.create_force_msg(stamp=rospy.Time.now())
-            self.pub_force.publish(self.force_msg)
+            self.pub_sp.publish(self.attitude_target_msg)
+            #self.pub_traj.publish(self.traj_msg)
+            #self.create_force_msg(stamp=rospy.Time.now())
+            #self.pub_force.publish(self.force_msg)
+            self.append_dat_traj()
             self.rate.sleep()
+
+        return self.X, self.p_final, self.U, self.Upert, self.t
+
+    def append_dat_traj(self):
+        print("data mats: ", self.X.shape, self.U.shape, self.Upert.shape, self.t.shape)
+        print("inputs: ", self.p.z, self.v.z, self.f_d.z)
+        passed_time = time.time()-self.init_time
+        self.X = np.append(self.X, np.array([[self.p.z], [self.v.z]]), axis=1)
+        self.U = np.append(self.U, np.array([[self.f_d.z]]), axis=1)
+        self.Upert = np.append(self.Upert, np.array([[self.controller.get_last_perturbation()]]), axis=1)
+        self.t = np.append(self.t, np.array([[passed_time]]), axis=1)
 
     def load_model(self, model_file_name):
         with open(model_file_name, 'r') as stream:
@@ -113,7 +135,6 @@ class Robot():
 
         self.rate = rospy.Rate(self.main_loop_rate)
 
-        # - Subscribe to local position
         self.local_pose = PoseStamped()
         self.velocity = TwistStamped()
         self.rc_out = RCOut()
@@ -137,12 +158,9 @@ class Robot():
         p_d = namedtuple("p_d", "x y z")
         v_d = namedtuple("v_d", "x y z")
         a_d = namedtuple("a_d", "x y z")
-        p_d.x, p_d.y, p_d.z = self.smooth_setp3(self.t_last_msg, self.t_init, self.t_final, self.p_init, self.p_final)
-        v_d.x, v_d.y, v_d.z = self.smooth_setp3_dt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-                                                   self.p_final)
-        a_d.x, a_d.y, a_d.z = self.smooth_setp3_ddt(self.t_last_msg, self.t_init, self.t_final, self.p_init,
-                                                    self.p_final)
-        # print('p,v,a x: {:.2f}, {:.2f}, {:.2f}, at {:.2f}'.format(p_d.y,v_d.y,a_d.y,(self.t_last_msg-self.t_init)/(self.t_final-self.t_init)))
+        p_d.x, p_d.y, p_d.z = self.p_final
+        v_d.x, v_d.y, v_d.z = np.array([0.0,0.0,0.0])
+       
         yaw_d = 0.0
         dyaw_d = 0.0
         ddyaw_d = 0.0
@@ -159,13 +177,14 @@ class Robot():
 
     def create_attitude_msg(self, stamp):
         ## Set the header
-        self.msg.header.stamp = stamp
-        self.msg.header.frame_id = '/world'
+        self.attitude_target_msg.header.stamp = stamp
+        self.attitude_target_msg.header.frame_id = '/world'
+        self.attitude_target_msg.type_mask = 7 #AttitudeTarget.IGNORE_ROLL_RATE | AttitudeTarget.IGNORE_PITCH_RATE | \
+                                               #AttitudeTarget.IGNORE_YAW_RATE 
 
         ## Set message content
-        self.msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
-        self.msg.body_rate = Vector3(x=self.omg_d.x, y=self.omg_d.y, z=self.omg_d.z)
-        self.msg.thrust = self.T_d
+        self.attitude_target_msg.orientation = Quaternion(x=self.q_d.x, y=self.q_d.y, z=self.q_d.z, w=self.q_d.w)
+        self.attitude_target_msg.thrust = self.T_d
 
     def create_trajectory_msg(self, x, y, z, stamp):
         ## Set the header
@@ -186,66 +205,7 @@ class Robot():
         self.force_msg.vector.y = self.f_d.y
         self.force_msg.vector.z = self.f_d.z
 
-    def exp_traj(self, t, t0, tf, x0, xf):
-        """ Exponential trajectory generator. See Giri Subramanian's thesis for details.
-        :param t: Current time
-        :param t0: Initial time
-        :param tf: End time
-        :param x0: Initial position
-        :param x1: Final position
-        :return: x at the current time
-        """
-        tn = (t - t0) / (tf - t0)
-        if t >= tf:
-            y = xf
-        else:
-            try:
-                y = x0 + (xf - x0) * tn * math.exp(1 - tn)
-            except exceptions.ZeroDivisionError:
-                y = xf
-        return y
-
-    def exp_traj3(self, t, t0, tf, x0, x1):
-        """Return coordinate along 3D exponential trajectory by generating a 1D exponential trajectory along each dimension"""
-        return (self.exp_traj(t, t0, tf, x0[0], x1[0]), self.exp_traj(t, t0, tf, x0[1], x1[1]),
-                self.exp_traj(t, t0, tf, x0[2], x1[2]))
-
-    def exp_traj_dt(self, t, t0, tf, x0, xf):
-        """Derivative of exponential trajectory """
-        tn = (t - t0) / (tf - t0)
-        tndot = 1 / (tf - t0).to_sec()
-        if t >= tf:
-            dydt = 0
-        else:
-            try:
-                dydt = (xf - x0) * tndot * (math.exp(1 - tn) - tn * math.exp(1 - tn))
-            except exceptions.ZeroDivisionError:
-                dydt = 0
-        return dydt
-
-    def exp_traj3_dt(self, t, t0, tf, x0, x1):
-        """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_dt(t, t0, tf, x0[0], x1[0]), self.exp_traj_dt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_dt(t, t0, tf, x0[2], x1[2]))
-
-    def exp_traj_ddt(self, t, t0, tf, x0, xf):
-        """Derivative of exponential trajectory """
-        tn = (t - t0) / (tf - t0)
-        tndot = 1 / (tf - t0).to_sec()
-        if t >= tf:
-            ddydt = 0
-        else:
-            try:
-                ddydt = (xf - x0) * tndot ** 2 * (tn * math.exp(1 - tn) - 2 * math.exp(1 - tn))
-            except exceptions.ZeroDivisionError:
-                ddydt = 0
-        return ddydt
-
-    def exp_traj3_ddt(self, t, t0, tf, x0, x1):
-        """Return 3D vector derivative of 3D exponential trajectory"""
-        return (self.exp_traj_ddt(t, t, tf, x0[0], x1[0]), self.exp_traj_ddt(t, t, tf, x0[1], x1[1]),
-                self.exp_traj_ddt(t, t, tf, x0[2], x1[2]))
-
+    ## Trajectory for initial MPC iteration
     def smooth_setp(self, t, t0, tf, x0, xf):
         tn = (t - t0) / (tf - t0)
 
@@ -293,7 +253,7 @@ class Robot():
 if __name__ == '__main__':
     try:
         p_init = np.array([0.0, 0.0, 0.0])
-        p_final = np.array([0.0, 2.0, 5.0])
+        p_final = np.array([0.0, 2.0, 4.0])
         drone = Robot()
         drone.gotopoint(p_init=p_init, p_final=p_final, tduration=5.)
     except rospy.ROSInterruptException:

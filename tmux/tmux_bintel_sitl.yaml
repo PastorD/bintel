@@ -1,0 +1,30 @@
+session_name: bintel_sitl_session   # Run this script to do a SITL simulation of bintel
+suppress_history: false
+windows:
+  - window_name: bintel_sitl
+    layout: tiled
+    shell_command_before:
+    - roscd bintel_ros
+    panes:
+      - shell_command:
+        - cd ~/src/Firmware
+        - no_sim=1 make px4_sitl_default gazebo
+      - shell_command:
+        - cd ~/src/Firmware
+        - source Tools/setup_gazebo.bash $(pwd) $(pwd)/build/px4_sitl_default
+        - roslaunch gazebo_ros empty_world.launch world_name:=$(pwd)/Tools/sitl_gazebo/worlds/iris.world
+      - shell_command:
+        - sleep 12
+        - roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+      - shell_command:
+        - sleep 10
+        - source bash/increase_rates.sh
+        - rostopic echo /mavros/state
+      - shell_command:
+        - sleep 14
+        - python scripts/squidPX4manager.py
+      - shell_command:
+        - sleep 15
+        - roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
+      - python scripts/gazebo_set_speed.py \
+      - ~/Downloads/QGroundControl.AppImage 
