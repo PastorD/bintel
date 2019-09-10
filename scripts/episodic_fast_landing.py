@@ -6,12 +6,14 @@ from dynamics.goto_land import land
 from mavros import command
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
     fill_between, savefig
+from datetime import datetime
 from numpy import arange, array, concatenate, cos, identity
 from numpy import linspace, ones, sin, tanh, tile, zeros, pi, random, interp, dot, zeros_like
 import numpy as np
 from scipy.io import loadmat, savemat
 import scipy.sparse as sparse
 import position_controller_MPC
+import os
 
 # KEEDMD
 from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
@@ -83,7 +85,6 @@ N_steps = int(MPC_horizon/controller_rate)
 q_d = tile(p_final.reshape((p_final.shape[0],1)), (1, N_steps))
 fixed_point = True
 plot_traj_gen = False  # Plot desired trajectory
-
 
 # %% ========================================       SUPPORTING METHODS        ========================================
 
@@ -218,6 +219,7 @@ handler = DroneHandler(n, m, Nlift, Nep, w, initial_controller, pert_noise, p_in
 keedmd_mdl_lst = []
 track_error = []
 ctrl_effort = []
+
 print('Starting episodic learning...')
 for ep in range(Nep):
     for ww in range(n_waypoints):  #Execute multiple trajectories between training
@@ -257,7 +259,7 @@ for ep in range(Nep):
     print(track_error[-1], ctrl_effort[-1])
     print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n)), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'))
     if plot_episode:
-        fname = 'figures/episodic_KEEDMD/fast_drone_landing/tracking_ep_' + str(ep)
+        fname = 'figures/episodic_KEEDMD/fast_drone_landing/' + folder + '/tracking_ep_' + str(ep)
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=True, filename=fname, episode=ep)
         #fname = 'figures/episodic_KEEDMD/fast_drone_landing/model_ep_' + str(ep)
         #plot_mdl_agreement(X, Xd, U, Unom, t.squeeze(), keedmd_ep, handler,display=True, save=True, filename=fname, episode=ep)
@@ -271,3 +273,5 @@ land()
 #TODO: Save appropriate data
 #TODO: Make summary plot
 #TODO: Set up plots for ICRA Paper
+folder = datetime.now().strftime("%m%d%Y_%H%M%S")
+os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
