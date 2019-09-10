@@ -41,10 +41,10 @@ Bd = sparse.csc_matrix([
 
 # Constraints
 u0 = 10.5916 # Hover Thrust
-umin = np.ones(nu)*9.6 - u0
-umax = np.ones(nu)*11.0 - u0
-xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-1.,
-                 -np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
+umin = np.ones(nu)*8.5 - u0
+umax = np.ones(nu)*11 - u0
+xmin = np.array([-np.pi/6,-np.pi/6,-np.inf,-np.inf,-np.inf,-np.inf,
+                 -np.inf,-np.inf,-10.,-np.inf,-np.inf,-np.inf])
 xmax = np.array([ np.pi/6, np.pi/6, np.inf, np.inf, np.inf, np.inf,
                   np.inf, np.inf, np.inf, np.inf, np.inf, np.inf])
 
@@ -55,7 +55,7 @@ nu = 4
 # Objective function
 Q = sparse.diags([0., 0., 10., 10., 10., 10., 0., 0., 0., 5., 5., 5.])
 QN = Q
-R = 0.1*sparse.eye(nu)
+R = 0.05*sparse.eye(nu)
 
 #%% 
 
@@ -191,6 +191,7 @@ P = Rbd + B.T @ Qbd @ B
 xrQB  = B.T @ np.kron(np.ones(N), Q.dot(xr))
 x0_1 = x0.reshape(x0.shape[0],-1)
 x0aQb = B.T @ Qbd @ a @ x0 #B.T @ np.kron(np.ones(N), Q @ a @ x0) #( (x0_1.T)@(a.T)@(Qbd)@(B) ).squeeze()
+BTQbda =  B.T @ Qbd @ a
 xr_N_flat = np.tile(xr,N)
 """ plt.figure()
 plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
@@ -198,15 +199,15 @@ plt.matshow(xrQB,  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("xrQB")
 plt.show() """
 
-q = x0aQb - xrQB #np.hstack([x0aQb - xrQB]) #np.reshape( x0aQb - xrQB ,(N*nu,)) #,order='F')
+q = x0aQb - xrQB 
 
 #* - input and state constraints
+Aineq_x = B
 Aineq_u = sparse.eye(N*nu)
-Aineq_x   = B
-l = [] #np.hstack([np.kron(np.ones(N), xmin)-a.dot(x0), np.kron(np.ones(N), umin)])
-u = [] #np.hstack([np.kron(np.ones(N), xmax)-a.dot(x0), np.kron(np.ones(N), umax)])
+l = np.hstack([np.kron(np.ones(N), xmin)-a @ x0, np.kron(np.ones(N), umin)])
+u = np.hstack([np.kron(np.ones(N), xmax)-a @ x0, np.kron(np.ones(N), umax)])
 # - OSQP constraints
-A = [] # sparse.vstack([Aineq_x, Aineq_u]).tocsc()
+A = sparse.vstack([Aineq_x, Aineq_u]).tocsc()
 
 # Create an OSQP object
 prob = osqp.OSQP()
@@ -215,7 +216,7 @@ prob = osqp.OSQP()
 #! Visualize Matrices
 fig = plt.figure()
 
-""" fig.suptitle("QP Matrices to solve MP in dense form. N={}, ns={}, nu={}".format(N,ns,nu),fontsize=20)
+fig.suptitle("QP Matrices to solve MP in dense form. N={}, ns={}, nu={}".format(N,ns,nu),fontsize=20)
 plt.subplot(2,4,1,xlabel="Ns*(N+1)", ylabel="Ns*(N+1)")
 plt.imshow(a.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("a in $x=ax_0+bu$")
@@ -248,12 +249,12 @@ plt.title("q in $J=u^TPu+q^Tu$")
 plt.grid()
 plt.tight_layout()
 plt.savefig("Sparse MPC.png",bbox_inches='tight')
-plt.show() """
+#plt.show()
 
 
 
 # Setup workspace
-prob.setup(P, warm_start=True)
+prob.setup(P=P,q=q,A=A,l=l,u=u, warm_start=True)
 
 
 
@@ -264,6 +265,7 @@ nsim = 100
 # Store data Init
 xst = np.zeros((ns,nsim))
 ust = np.zeros((nu,nsim))
+mpc_times = np.zeros((nsim))
 
 t1 = time.clock()
 for i in range(nsim):
@@ -281,14 +283,27 @@ for i in range(nsim):
     # Store Data
     xst[:,i] = x0
     ust[:,i] = ctrl
-
+    mpc_times[i] = res.info.run_time
     # Update initial state
-    x0aQb = x0aQb = B.T @ Qbd @ a @ x0
+    x0aQb = BTQbda @ x0
     q = x0aQb  - xrQB
-    prob.update(q=q)
+    l = np.hstack([np.kron(np.ones(N), xmin)-a @ x0, np.kron(np.ones(N), umin)])
+    u = np.hstack([np.kron(np.ones(N), xmax)-a @ x0, np.kron(np.ones(N), umax)])
+    prob.update(q=q,l=l,u=u)
 
 print(time.clock()-t1)
-#%% Plots
+#%%
+#! Plots
+
+
+plt.figure()
+plt.hist(mpc_times*1000)
+plt.xlabel('Time(ms)')
+plt.title('MPC Run time Histogram')
+plt.grid()
+plt.legend()
+#plt.show()    
+
 
 plt.figure()
 for i in range(ns):
@@ -296,8 +311,8 @@ for i in range(ns):
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.show()    
 plt.savefig('sim_mcp_quad_pos_dense.png')
+#plt.show()    
 
 plt.figure()
 for i in range(nu):
@@ -307,7 +322,8 @@ plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', l
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.show()  
 plt.savefig('sim_mcp_quad_u_dense.png')
+plt.show()  
+
 
 #%%
