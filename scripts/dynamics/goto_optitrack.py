@@ -59,6 +59,7 @@ class MavrosGOTOWaypoint():
             np.array([self.waypoint.pose.position.x-self.local_pose.pose.position.x,
                           self.waypoint.pose.position.y-self.local_pose.pose.position.y,
                           self.waypoint.pose.position.z-self.local_pose.pose.position.z])) > waypoint_ball:
+
             result_mode = self.change_mode(0,"OFFBOARD")
             self.pub_sp.publish(self.waypoint)
             self.rate.sleep()
