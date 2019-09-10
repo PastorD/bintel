@@ -168,7 +168,7 @@ class Robot():
         return model
     
     def save_csv(self):
-        self.file.write("%5.5f, " % (rospy.get_time()-self.t0)  )
+        self.file.write("%5.5f, " % (rospy.get_time()-self.t0) )
         self.file.write(str(self.p.x)+"," \
                        +str(self.p.y)+"," \
                        +str(self.p.z)+"," \
@@ -241,9 +241,6 @@ class Robot():
         dyaw_d = 0.0
         ddyaw_d = 0.0
         self.p_d = p_d
-
-        print('Error {:.2f},{:.2f},{:.2f}'.format(self.p.x-self.p_d.x,self.p.y-self.p_d.y,self.p.z-self.p_d.z))
-
         self.create_trajectory_msg(p_d.x, p_d.y, p_d.z, stamp=rospy.Time.now())
 
         T_d, q_d, omg_d, f_d = self.controller.get_ctrl(p=self.p, q=self.q, v=self.v, omg=self.omg,
