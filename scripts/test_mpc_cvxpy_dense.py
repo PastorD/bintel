@@ -63,7 +63,7 @@ N = 30
 
 # Define problem
 u = cvxpy.Variable((nu, N))
-x = cvxpy.Variable((nx, N+1))
+#x = cvxpy.Variable((nx, N+1))
 x_init = cvxpy.Parameter(nx)
 objective = 0
 constraints = [x[:,0] == x_init]
@@ -100,6 +100,9 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 plt.show()    
+plt.savefig('cvxpy.png')
+
+savemat('cvxpy.mat', {'xst': xst, 't_eval': t_eval, 'ucvxpy': ust})
 
 
 for i in range(nu):
