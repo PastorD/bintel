@@ -68,36 +68,28 @@ def block_diag(M,n):
   """
   return sparse.block_diag([M for i in range(n)])
 
-# Prediction horizon
+#* Prediction horizon
 N = 10
 
-# Initial and reference states
+#* Initial and reference states
 x0 = np.array([0.,0.,20.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 xr = np.array([0.,0.,10.,0.,0.,0.,0.,0.,0.,0.,0.,0.]) #np.array([0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 xrtrj = np.kron(np.ones(N), xr.reshape(xr.shape[0],-1))
 
-# Plot Ad and Bd
-""" plt.figure()
+#* Plot Ad and Bd
+plt.figure()
 plt.subplot(1,2,1,xlabel="Ns", ylabel="Ns")
 plt.imshow(Ad.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("Ad in $x_{k+1}=Adx_k+Bu_k$")
 plt.subplot(1,2,2,xlabel="Nu", ylabel="Ns")
 plt.imshow(Bd.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
 plt.title("Bdd in $x_{k+1}=Adx_k+Bdu_k$")
-plt.show() """
-
 
 #! Cast MPC problem to a QP: x = [u(0),...,u(N-1)) DENSE FORM
 # - quadratic objective, use 
 Rbd = sparse.kron(sparse.eye(N), R)
 Qbd = sparse.kron(sparse.eye(N), Q)
 Bbd = block_diag(Bd,nu)
-
-""" plt.figure()
-plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
-plt.imshow(Bbd.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
-plt.title("Block diagonal B")
-plt.show() """
 
 # Write B:
 diag_AkB = Bd
@@ -117,19 +109,8 @@ for i in range(N):
     diag_AkB = Ad.dot(diag_AkB)
     #diag_AkB = diag_AkB + [Ad.dot(diag_AkB[-1])]
     
-"""     plt.figure()
-    plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
-    plt.imshow(AkB_bd_temp.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
-    plt.title("Block diagonals of B")
-    plt.show() """
 
 B = sparse.coo_matrix((data_list, (row_list, col_list)), shape=(N*ns, N*nu))
-#B = sparse.diags(diag_AkB,[-5,-4,-3,-2,-1,0])
-""" plt.figure()
-plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
-plt.imshow(B.toarray(),  interpolation='nearest', cmap=cm.Greys_r)
-plt.title("B")
-plt.show() """
 
 a = Ad
 Ak = Ad
@@ -137,67 +118,56 @@ for i in range(N-1):
     Ak = Ad.dot(Ad)
     a = sparse.vstack([a,Ak])
 
-#a = sparse.csc_matrix(a)
-
 
 #! Check x=ax0+bu
 # Generate fake data
-""" x0 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
-x00 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
-# Store data Init
-nsim = 100
-xst = np.zeros((ns,nsim))
-ust = np.zeros((nu,nsim))
+check_ab = True
+if check_ab:
+    x0 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+    x00 = np.array([0.,0.,2.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
+    # Store data Init
+    nsim = 100
+    xst = np.zeros((ns,nsim))
+    ust = np.zeros((nu,nsim))
 
-# Simulate in closed loop
+    # Simulate in closed loop
 
-for i in range(nsim):
-    # Fake pd controller
-    ctrl = np.array([-0.1*x0[2],-0.1*x0[1],0.1*x0[2],-0.1*x0[3]])
-    x0 = Ad.dot(x0) + Bd.dot(ctrl)
+    for i in range(nsim):
+        # Fake pd controller
+        ctrl = np.array([-0.1*x0[2],-0.1*x0[1],0.1*x0[2],-0.1*x0[3]])
+        x0 = Ad.dot(x0) + Bd.dot(ctrl)
 
-    # Store Data
-    xst[:,i] = x0
-    ust[:,i] = ctrl
+        # Store Data
+        xst[:,i] = x0
+        ust[:,i] = ctrl
 
-x_dense = np.reshape(a @ x00 + B @ ust.flatten('F'),(N,ns)).T
+    x_dense = np.reshape(a @ x00 + B @ ust.flatten('F'),(N,ns)).T
 
-for i in range(1):
-    plt.plot(range(nsim),xst[i,:],label="sim "+str(i))
-    plt.plot(range(nsim),x_dense[i,:],label="ax+bu "+str(i))
-plt.xlabel('Time(s)')
-plt.grid()
-plt.legend()
-plt.show()    
-
-
-for i in range(nu):
-    plt.plot(range(nsim),ust[i,:],label=str(i))
-plt.xlabel('Time(s)')
-plt.grid()
-plt.legend()
-plt.show()   """
+    for i in range(1):
+        plt.plot(range(nsim),xst[i,:],label="sim "+str(i))
+        plt.plot(range(nsim),x_dense[i,:],label="ax+bu "+str(i))
+    plt.xlabel('Time(s)')
+    plt.grid()
+    plt.legend()
+      
 
 
-#plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
-""" plt.matshow(a.toarray(), cmap=cm.jet) 
-plt.title("a")
-plt.colorbar()
-plt.show() """
+    for i in range(nu):
+        plt.plot(range(nsim),ust[i,:],label=str(i))
+    plt.xlabel('Time(s)')
+    plt.grid()
+    plt.legend()
+    plt.show()  
 
 
 P = Rbd + B.T @ Qbd @ B
 # - linear objective
 xrQB  = B.T @ np.kron(np.ones(N), Q.dot(xr))
 x0_1 = x0.reshape(x0.shape[0],-1)
-x0aQb = B.T @ Qbd @ a @ x0 #B.T @ np.kron(np.ones(N), Q @ a @ x0) #( (x0_1.T)@(a.T)@(Qbd)@(B) ).squeeze()
+x0aQb = B.T @ Qbd @ a @ x0
 BTQbda =  B.T @ Qbd @ a
 xr_N_flat = np.tile(xr,N)
-""" plt.figure()
-plt.subplot(1,1,1,xlabel="Ns", ylabel="Ns")
-plt.matshow(xrQB,  interpolation='nearest', cmap=cm.Greys_r)
-plt.title("xrQB")
-plt.show() """
+
 
 q = x0aQb - xrQB 
 
@@ -249,15 +219,9 @@ plt.title("q in $J=u^TPu+q^Tu$")
 plt.grid()
 plt.tight_layout()
 plt.savefig("Sparse MPC.png",bbox_inches='tight')
-#plt.show()
-
-
 
 # Setup workspace
 prob.setup(P=P,q=q,A=A,l=l,u=u, warm_start=True)
-
-
-
 
 # Simulate in closed loop
 nsim = 100
@@ -284,6 +248,7 @@ for i in range(nsim):
     xst[:,i] = x0
     ust[:,i] = ctrl
     mpc_times[i] = res.info.run_time
+
     # Update initial state
     x0aQb = BTQbda @ x0
     q = x0aQb  - xrQB
@@ -294,27 +259,24 @@ for i in range(nsim):
 print(time.clock()-t1)
 #%%
 #! Plots
-
-
-plt.figure()
+fig = plt.figure()
+fig.suptitle("MPC Linearized Quadrotor simulation using dense form")
+plt.subplot(3,1,1)
 plt.hist(mpc_times*1000)
 plt.xlabel('Time(ms)')
 plt.title('MPC Run time Histogram')
 plt.grid()
 plt.legend()
-#plt.show()    
 
-
-plt.figure()
+plt.subplot(3,1,2)
 for i in range(ns):
   plt.plot(range(nsim),xst[i,:],label=str(i))
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.savefig('sim_mcp_quad_pos_dense.png')
-#plt.show()    
+ 
 
-plt.figure()
+plt.subplot(3,1,3)
 for i in range(nu):
   plt.plot(range(nsim),ust[i,:],label=str(i))
 plt.plot(range(nsim),np.ones(nsim)*umin[1],label='U_{min}',linestyle='dashed', linewidth=1.5, color='black')
@@ -322,7 +284,7 @@ plt.plot(range(nsim),np.ones(nsim)*umax[1],label='U_{max}',linestyle='dashed', l
 plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
-plt.savefig('sim_mcp_quad_u_dense.png')
+plt.savefig('sim_mcp_quad_dense.png')
 plt.show()  
 
 
