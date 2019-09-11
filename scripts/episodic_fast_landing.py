@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
-# Project
-from main_controller_force import Robot
-from dynamics.goto_optitrack import MavrosGOTOWaypoint
-from dynamics.goto_land import land
-from mavros import command
+
+# Python
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
-    fill_between, savefig, text, MaxNLocator
+    fill_between, savefig, close,text, MaxNLocator
 from datetime import datetime
 from numpy import arange, array, concatenate, cos, identity
 from numpy import linspace, ones, sin, tanh, tile, zeros, pi, random, interp, dot, zeros_like
 import numpy as np
 from scipy.io import loadmat, savemat
 import scipy.sparse as sparse
-import position_controller_MPC
 import os
 import dill
+
+# ROS
+from mavros import command
+
+# Project
+from main_controller_force import Robot
+from dynamics.goto_optitrack import MavrosGOTOWaypoint
+from dynamics.goto_land import land
+import position_controller_MPC
+import position_controller_MPC_CORE
+
 
 # KEEDMD
 from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
 from keedmd_code.core.dynamics import LinearSystemDynamics
 from keedmd_code.core.handlers import Handler
+from keedmd_code.core.controllers import MPCControllerDense
 from keedmd_code.core.controllers import OpenLoopController
 
 # %% ===============================================   SET PARAMETERS    ===============================================
@@ -31,10 +39,10 @@ lower_bounds = array([0.0, -4.])  # State constraints
 # Define nominal model and nominal controller:
 simulation = True
 if simulation:
-    hover_thrust = 0.567
+    hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
 else:
-    hover_thrust = 0.65  #TODO: Update with correct bintel thrust
+    hover_thrust = 0.65         #TODO: Update with correct bintel thrust
     K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
@@ -44,12 +52,12 @@ A_cl = A_nom - dot(B_nom, K)
 # Experiment parameters
 duration_low = 1.
 n_waypoints = 1
-controller_rate = 80
+controller_rate = 60
 p_init = np.array([0., 0., 2.25])
 p_final = np.array([0., 0., 0.25])
-pert_noise = 0.05
+pert_noise = 0.025#0.05
 Nep = 2
-w = linspace(0,1,Nep)
+w = [0.1]
 plot_episode = False
 
 
@@ -76,16 +84,22 @@ l1_keedmd = 5e-2
 l2_keedmd = 1e-2
 
 # MPC controller parameters:
-Q = sparse.diags([1000., 100., 50., 50.])
+Q = sparse.diags([10., 1.])
 R = sparse.eye(m)
-QN = sparse.diags([0., 0., 0., 0.])
-umax = 15
-MPC_horizon = 1.0  # [s]
+QN = sparse.diags([0., 0.])
+umax_control = 15.
+xmin=lower_bounds
+xmax=upper_bounds
+MPC_horizon = 0.5  # [s]
 dt = 1/controller_rate
-N_steps = int(MPC_horizon/controller_rate)
-q_d = tile(p_final.reshape((p_final.shape[0],1)), (1, N_steps))
+N_steps = int(MPC_horizon/dt)
+p_final_augment = array([[p_final[2]],[0.]])  # Desired position augmenting controller
+q_d = tile(p_final_augment, (1, N_steps))  #  Trajectory for augmenting controller
+plotMPC = False
 fixed_point = True
 plot_traj_gen = False  # Plot desired trajectory
+
+print("q", q_d.shape)
 
 # %% ========================================       SUPPORTING METHODS        ========================================
 
@@ -130,21 +144,21 @@ class DroneHandler(Handler):
         return X, Xd, U, Unom, t
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
-        #TODO: Verify dimensions and formats of inputs and calls to controllers
         u_vec = zeros((self.m, self.initial_controller._osqp_N))
 
         T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
         for ii in range(len(self.controller_list)):
-            #T_d += self.weights[ii] * self.controller_list[ii].eval(q, p_d.z, u_vec)  #TODO: Call to get control value must be changed
-            T_tmp,_,_,_ = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)  #TODO: Remove when new MPC ready
-            T_d += self.weights[ii]*T_tmp
+            T_d += self.weights[ii] * self.controller_list[ii].eval(q, t) #TODO: Add time varying control constraints
             #u_vec += self.weights[ii] * self.controller_list[ii].get_control_prediction()  #TODO: Must be implemented in new MPC controller
-
         self.Tpert = self.pert_noise*random.randn()
         T_d += self.Tpert
 
         return T_d, q_d, omg_d, f_d
+
+    def plot_thoughts(self,X,U,U_nom,tpred,iEp):
+        for ii in range(len(self.controller_list)):
+            self.initial_controller.finish_plot(X,U,U_nom,tpred,"Ep_"+str(iEp)+"_Controller_"+str(ii)+"_thoughts.png")
 
     def get_last_perturbation(self):
         return self.Tpert
@@ -173,7 +187,8 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
         savefig(filename)
     if display:
         show()
-
+    else:
+        close()
 
 # %% ===========================================    MAIN LEARNING LOOP     ===========================================
 
@@ -182,7 +197,7 @@ bintel = Robot(controller_rate, n, m)
 go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
 initial_controller = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
-                                                                    p_final=p_final, use_learned_model=False)
+                                                        p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
 eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
@@ -211,7 +226,7 @@ for ep in range(Nep):
             raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
     land()  # Land while fitting models
     print("Fitting diffeomorphism...")
-    """eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
+    eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
@@ -222,11 +237,25 @@ for ep in range(Nep):
     handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
     keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
     keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)
-    mpc_ep = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
-                                                                    p_final=p_final, use_learned_model=False)  #TODO: Import and generate new MPC controller
+    print("KEEDMD: ", keedmd_ep.A.shape, keedmd_ep.B.shape, keedmd_ep.C.shape)
+    mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
+                                N=N_steps,
+                                dt=dt,
+                                umin=array([-umax_control]),
+                                umax=array([+umax_control]),
+                                xmin=xmin,
+                                xmax=xmax,
+                                Q=Q,
+                                R=R,
+                                QN=QN,
+                                xr=q_d,
+                                lifting=True,
+                                edmd_object=keedmd_ep,
+                                plotMPC=plotMPC,
+                                name='KEEDMD')
     handler.aggregate_ctrl(mpc_ep)
     initialize_NN = False  # Warm s tart NN after first episode
-"""
+
     # Store data for the episode:
     X_ep.append(X)
     Xd_ep.append(Xd)
@@ -241,6 +270,7 @@ for ep in range(Nep):
     print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'))
     if plot_episode:
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=False, filename=None, episode=ep)
+        handler.plot_thoughts(X,U,Unom,t,ep)
 
 print("Experiments finalized")
 #go_waypoint.gopoint(np.array([0., 0., 0.5]))
@@ -255,7 +285,6 @@ data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort]
 outfile = open(folder + "/episodic_data.pickle", 'wb')
 dill.dump(data_list, outfile)
 outfile.close()
-
 
 track_error = array(track_error)
 track_error_normalized = track_error[0,:]/track_error[0,0]
