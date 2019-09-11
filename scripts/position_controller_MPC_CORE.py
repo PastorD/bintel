@@ -30,8 +30,8 @@ class PositionControllerMPC():
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
         nu = 3 # f_x, f_y, f_z
 
-        kb = 8 #self.g/self.u_hover #11.9
-        umin = np.ones(nu)*0.6-self.u_hover
+        kb = 9.8/self.u_hover #self.g/self.u_hover #11.9
+        umin = np.ones(nu)*0.3-self.u_hover
         umax = np.ones(nu)*0.9-self.u_hover
         xmin = np.array([-5,-5,-0.5,-np.inf,-np.inf,-np.inf])
         xmax = np.array([ 5.0,5.0,15.0,3.,15.,10.])
@@ -53,8 +53,8 @@ class PositionControllerMPC():
         [0.0, 0.0, kb]])
 
 
-        Q = sparse.diags([2., 2., 20., 1., 1., 1.])
-        R = 5.0*sparse.eye(nu)
+        Q = sparse.diags([.5, .5, 2., 0.1, 0.1, 0.1])
+        R = 4.0*sparse.eye(nu)
         plotMPC = True
         
         nominal_sys = LinearSystemDynamics(A=Ac, B=Bc)
@@ -101,6 +101,7 @@ class PositionControllerMPC():
         f_d.x, f_d.y, f_d.z = self.linearlize_mpc_controller.eval(x0, 0)
         print('Time MPC Dense Eval {}ms'.format(1000*(time.time()-time_eval0)))
         f_d.z += self.u_hover
+
 
         return f_d
 
