@@ -249,7 +249,7 @@ for ep in range(Nep):
             raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
     land()  # Land while fitting models
     print("Fitting diffeomorphism...")
-    """eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
+    eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
@@ -264,7 +264,7 @@ for ep in range(Nep):
                                                                     p_final=p_final, use_learned_model=False)  #TODO: Import and generate new MPC controller
     handler.aggregate_ctrl(mpc_ep)
     initialize_NN = False  # Warm s tart NN after first episode
-"""
+
     # Store data for the episode:
     X_ep.append(X)
     Xd_ep.append(Xd)
