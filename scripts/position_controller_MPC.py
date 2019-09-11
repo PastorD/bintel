@@ -157,10 +157,6 @@ class PositionController():
         # Apply first control input to the plant
         [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
-        #if self.first:
-        #self.plot_MPC(_osqp_result)
-        #    self.first = False
-
         # Check solver status
         if _osqp_result.info.status != 'solved':
             print(f_d.z)
