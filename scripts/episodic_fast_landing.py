@@ -37,7 +37,7 @@ lower_bounds = array([0.0, -4.])  # State constraints
 # Define nominal model and nominal controller:
 simulation = True
 if simulation:
-    hover_thrust = 0.567
+    hover_thrust =  0.65
     K = array([[0.8670, 0.9248]])
 else:
     hover_thrust = 0.567         #TODO: Update with correct bintel thrust
