@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-# Project
-from main_controller_force import Robot
-from dynamics.goto_optitrack import MavrosGOTOWaypoint
-from dynamics.goto_land import land
-from mavros import command
+
+# Python
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
     fill_between, savefig
 from datetime import datetime
@@ -12,8 +9,16 @@ from numpy import linspace, ones, sin, tanh, tile, zeros, pi, random, interp, do
 import numpy as np
 from scipy.io import loadmat, savemat
 import scipy.sparse as sparse
-import position_controller_MPC
 import os
+
+# ROS
+from mavros import command
+
+# Project
+from main_controller_force import Robot
+from dynamics.goto_optitrack import MavrosGOTOWaypoint
+from dynamics.goto_land import land
+import position_controller_MPC
 
 # KEEDMD
 from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
@@ -201,7 +206,8 @@ def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, sav
     if display:
         show()
 
-
+folder = datetime.now().strftime("%m%d%Y_%H%M%S")
+os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
 
 # %% ===========================================    MAIN LEARNING LOOP     ===========================================
 
@@ -273,5 +279,4 @@ land()
 #TODO: Save appropriate data
 #TODO: Make summary plot
 #TODO: Set up plots for ICRA Paper
-folder = datetime.now().strftime("%m%d%Y_%H%M%S")
-os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
+
