@@ -2,7 +2,7 @@
 
 # Python
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
-    fill_between, savefig, close
+    fill_between, savefig, close,text, MaxNLocator
 from datetime import datetime
 from numpy import arange, array, concatenate, cos, identity
 from numpy import linspace, ones, sin, tanh, tile, zeros, pi, random, interp, dot, zeros_like
@@ -10,6 +10,7 @@ import numpy as np
 from scipy.io import loadmat, savemat
 import scipy.sparse as sparse
 import os
+import dill
 
 # ROS
 from mavros import command
@@ -54,9 +55,9 @@ controller_rate = 60
 p_init = np.array([0., 0., 2.25])
 p_final = np.array([0., 0., 0.25])
 pert_noise = 0.05
-Nep = 5
+Nep = 2
 w = linspace(0,1,Nep)
-plot_episode = True
+plot_episode = False
 
 
 # Koopman eigenfunction parameters
@@ -187,28 +188,34 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
     else:
         close()
 
-def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, save=False, filename='', episode=0):
-    #TODO: Current plotting does not make sense, think about how model agreement can be checked on the go.
-
-    # Simulate aggregated model and compare against data from previous episode
-    cur_sys = LinearSystemDynamics(A=keedmd_mdl.A, B=keedmd_mdl.B)
-    cur_controller = OpenLoopController(cur_sys, (U-Unom).transpose(), t)
-    z0 = keedmd_mdl.lift(X[:,:1],Xd[:,:1]).squeeze()
-    Zres,_ = cur_sys.simulate(z0, cur_controller, t)
-    Xsim = X + dot(keedmd_mdl.C, Zres.transpose())
-
+def plot_trajectory_error(X, X_d, U, U_nom, t, display=True, save=False, filename='', episode=0):
     # Plot the first simulated trajectory
-    figure(figsize=(4.7,5.5))
-    subplot(1, 1, 1)
-    title('Residual Model agreement with data from episode ' + str(episode))
+    figure(figsize=(4.2,4.5))
+    subplot(2, 1, 1)
+    title('Tracking error and control effort episode  ' + str(episode))
     plot(t, X[0,:], linewidth=2, label='$z$')
-    plot(t, X[1,:], linewidth=2, label='$\\dot{z}$')
-    plot(t, Xsim[0,:], '--', linewidth=2, label='$z_pred$')
-    plot(t, Xsim[1,:], '--', linewidth=2, label='$\\dot{z}_pred$')
-    legend(fontsize=10, loc='upper right', ncol=2)
-    ylim((-5., 5.))
-    ylabel('Altitude (m, m/s)')
+    fill_between(t, X_d[0,:], X[0,:], alpha=0.2)
+    plot(t, X_d[0,:], '--', linewidth=2, label='$z_d$')
+    ylim((0., 3.))
+    legend(fontsize=10, loc="upper right")
+    ylabel('Altitude (m)')
     grid()
+    err_norm = (t[-1]-t[0])*sum((X[0,:]-Xd[0,:])**2)/len(X[0,:])
+    text(0.02, 0.3, "$\int (z-z_d)^2=${0:.2f}".format(err_norm))
+
+
+
+    subplot(2, 1, 2)
+    plot(t, U[0,:], label='$T$')
+    fill_between(t, zeros_like(U[0,:]), U[0,:], alpha=0.2)
+    #plot(t, U_nom[0,:], label='$T_{nom}$')
+    ylabel('Thrust (normalized)')
+    xlabel('Time (sec)')
+    ylim((0.,1.))
+    grid()
+    ctrl_norm = (t[-1]-t[0])*sum((U_nom[0,:])**2)/len(U[0,:])
+    text(0.02, 0.2, "$\int u_n^2=${0:.2f}".format(ctrl_norm))
+
     if save:
         savefig(filename)
     if display:
@@ -221,6 +228,9 @@ os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
 
 
 
+def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, save=False, filename='', episode=0):
+    #TODO: Replace with "thoughts" plots
+    pass
 
 
 # %% ===========================================    MAIN LEARNING LOOP     ===========================================
@@ -236,9 +246,13 @@ eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_lay
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
 handler = DroneHandler(n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt)
 
-keedmd_mdl_lst = []
 track_error = []
 ctrl_effort = []
+X_ep = []
+Xd_ep = []
+U_ep = []
+Unom_ep = []
+t_ep = []
 
 print('Starting episodic learning...')
 for ep in range(Nep):
@@ -253,10 +267,9 @@ for ep in range(Nep):
         X, Xd, U, Unom, t = handler.process(X, p_final, U, Upert, t)
         if n_waypoints > 1:
             raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
-    print("diff fit ", X.shape, t.shape, Xd.shape)
     land()  # Land while fitting models
     print("Fitting diffeomorphism...")
-    eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
+    """eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
@@ -271,26 +284,37 @@ for ep in range(Nep):
                                                                     p_final=p_final, use_learned_model=False)  #TODO: Import and generate new MPC controller
     handler.aggregate_ctrl(mpc_ep)
     initialize_NN = False  # Warm s tart NN after first episode
+"""
+    # Store data for the episode:
+    X_ep.append(X)
+    Xd_ep.append(Xd)
+    U_ep.append(U)
+    Unom_ep.append(Unom)
+    t_ep.append(t)
 
     # Plot episode results and calculate statistics
     track_error.append(np.divide(np.sum(((X-Xd)**2),axis=1),X.shape[1]))
     ctrl_effort.append(np.sum(Unom**2,axis=1))
-    keedmd_mdl_lst.append(keedmd_ep)
     print(track_error[-1], ctrl_effort[-1])
-    print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n)), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'))
+    print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'))
     if plot_episode:
+
         fname = 'figures/episodic_KEEDMD/fast_drone_landing/' + folder + '/tracking_ep_' + str(ep)
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=True, filename=fname, episode=ep)
         handler.plot_thoughts(X,U,Unom,t,ep)
         #fname = 'figures/episodic_KEEDMD/fast_drone_landing/model_ep_' + str(ep)
         #plot_mdl_agreement(X, Xd, U, Unom, t.squeeze(), keedmd_ep, handler,display=True, save=True, filename=fname, episode=ep)
 
-print("Experiments finalized, moving to final point...")
-go_waypoint.gopoint(np.array([0., 0., 0.5]))
-print("Landing...")
-land()
+        plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=False, filename=None, episode=ep)
+
+
+print("Experiments finalized")
+#go_waypoint.gopoint(np.array([0., 0., 0.5]))
+#print("Landing...")
+#land()
 
 # %% ========================================    PLOT AND ANALYZE RESULTS     ========================================
+
 #TODO: Check what data to save
 save_final_data = True
 if save_final_data:
@@ -300,3 +324,34 @@ if save_final_data:
 #TODO: Make summary plot
 #TODO: Set up plots for ICRA Paper
 
+
+folder = "experiments/episodic_KEEDMD/fast_drone_landing/" + datetime.now().strftime("%m%d%Y_%H%M%S")
+os.mkdir(folder)
+
+data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort]
+outfile = open(folder + "/episodic_data", 'wb')
+dill.dump(data_list, outfile)
+outfile.close()
+
+# Plot trajectory and control effort for each episode
+#for ep in range(Nep):
+#    fname = folder + '/tracking_ep_' + str(ep)
+#    plot_trajectory_error(X_ep[ep], Xd_ep[ep], U_ep[ep], Unom_ep[ep], t_ep[ep].squeeze(), display=False, save=True, filename=fname, episode=ep)
+
+track_error = array(track_error)
+track_error_normalized = track_error[0,:]/track_error[0,0]
+ctrl_effort_normalized = ctrl_effort/ctrl_effort[0]
+
+ax=figure(figsize=(5.8,6)).gca()
+subplot(2, 1, 1)
+title('Tracking error and control effort improvement')
+plot(range(Nep), track_error_normalized, linewidth=2, label='$z$')
+ylabel('Altitude (normalized)')
+grid()
+subplot(2, 1, 2)
+title('Tracking error and control effort improvement')
+plot(range(Nep), ctrl_effort_normalized, linewidth=2, label='$z$')
+ylabel('Thrust (normalized)')
+grid()
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+savefig(folder + "/summary_plot")
