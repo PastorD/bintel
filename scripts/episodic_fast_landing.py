@@ -150,7 +150,6 @@ class DroneHandler(Handler):
         return self.Tpert
 
 def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='', episode=0):
-    # Plot the first simulated trajectory
     figure(figsize=(4.7,5.5))
     subplot(2, 1, 1)
     title('Trajectory with MPC, episode ' + str(episode))
@@ -174,43 +173,6 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
         savefig(filename)
     if display:
         show()
-
-def plot_trajectory_error(X, X_d, U, U_nom, t, display=True, save=False, filename='', episode=0):
-    # Plot the first simulated trajectory
-    figure(figsize=(4.2,4.5))
-    subplot(2, 1, 1)
-    title('Tracking error and control effort episode  ' + str(episode))
-    plot(t, X[0,:], linewidth=2, label='$z$')
-    fill_between(t, X_d[0,:], X[0,:], alpha=0.2)
-    plot(t, X_d[0,:], '--', linewidth=2, label='$z_d$')
-    ylim((0., 3.))
-    legend(fontsize=10, loc="upper right")
-    ylabel('Altitude (m)')
-    grid()
-    err_norm = (t[-1]-t[0])*sum((X[0,:]-Xd[0,:])**2)/len(X[0,:])
-    text(0.02, 0.3, "$\int (z-z_d)^2=${0:.2f}".format(err_norm))
-
-
-
-    subplot(2, 1, 2)
-    plot(t, U[0,:], label='$T$')
-    fill_between(t, zeros_like(U[0,:]), U[0,:], alpha=0.2)
-    #plot(t, U_nom[0,:], label='$T_{nom}$')
-    ylabel('Thrust (normalized)')
-    xlabel('Time (sec)')
-    ylim((0.,1.))
-    grid()
-    ctrl_norm = (t[-1]-t[0])*sum((U_nom[0,:])**2)/len(U[0,:])
-    text(0.02, 0.2, "$\int u_n^2=${0:.2f}".format(ctrl_norm))
-
-    if save:
-        savefig(filename)
-    if display:
-        show()
-
-def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, save=False, filename='', episode=0):
-    #TODO: Replace with "thoughts" plots
-    pass
 
 
 # %% ===========================================    MAIN LEARNING LOOP     ===========================================
@@ -290,14 +252,10 @@ folder = "experiments/episodic_KEEDMD/fast_drone_landing/" + datetime.now().strf
 os.mkdir(folder)
 
 data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort]
-outfile = open(folder + "/episodic_data", 'wb')
+outfile = open(folder + "/episodic_data.pickle", 'wb')
 dill.dump(data_list, outfile)
 outfile.close()
 
-# Plot trajectory and control effort for each episode
-#for ep in range(Nep):
-#    fname = folder + '/tracking_ep_' + str(ep)
-#    plot_trajectory_error(X_ep[ep], Xd_ep[ep], U_ep[ep], Unom_ep[ep], t_ep[ep].squeeze(), display=False, save=True, filename=fname, episode=ep)
 
 track_error = array(track_error)
 track_error_normalized = track_error[0,:]/track_error[0,0]
