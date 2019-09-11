@@ -16,5 +16,5 @@ windows:
         - rostopic echo /mavros/state
       - rqt_plot /mavros/local_position/pose/pose/position/z /mavros/setpoint_raw/attitude/thrust /mavros/local_position/velocity_body/twist/linear/z
       - sleep 5; rostopic echo /mavros/local_position/pose 
-      - python3 scripts/episodic_cart_fast_landing.py \
+      - python3 scripts/episodic_fast_landing.py \
       - ~/Downloads/QGroundControl.AppImage 

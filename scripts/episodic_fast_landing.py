@@ -2,7 +2,7 @@
 
 # Python
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
-    fill_between, savefig
+    fill_between, savefig, close
 from datetime import datetime
 from numpy import arange, array, concatenate, cos, identity
 from numpy import linspace, ones, sin, tanh, tile, zeros, pi, random, interp, dot, zeros_like
@@ -19,6 +19,8 @@ from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 import position_controller_MPC
+import position_controller_MPC_CORE
+
 
 # KEEDMD
 from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
@@ -38,7 +40,7 @@ if simulation:
     hover_thrust = 0.567
     K = array([[0.8670, 0.9248]])
 else:
-    hover_thrust = 0.65  #TODO: Update with correct bintel thrust
+    hover_thrust = 0.567         #TODO: Update with correct bintel thrust
     K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
@@ -48,7 +50,7 @@ A_cl = A_nom - dot(B_nom, K)
 # Experiment parameters
 duration_low = 1.
 n_waypoints = 1
-controller_rate = 80
+controller_rate = 60
 p_init = np.array([0., 0., 2.25])
 p_final = np.array([0., 0., 0.25])
 pert_noise = 0.05
@@ -84,7 +86,7 @@ Q = sparse.diags([1000., 100., 50., 50.])
 R = sparse.eye(m)
 QN = sparse.diags([0., 0., 0., 0.])
 umax = 15
-MPC_horizon = 1.0  # [s]
+MPC_horizon = 0.5  # [s]
 dt = 1/controller_rate
 N_steps = int(MPC_horizon/controller_rate)
 q_d = tile(p_final.reshape((p_final.shape[0],1)), (1, N_steps))
@@ -135,7 +137,7 @@ class DroneHandler(Handler):
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         #TODO: Verify dimensions and formats of inputs and calls to controllers
-        u_vec = zeros((self.m, self.initial_controller._osqp_N))
+        u_vec = zeros((self.m, self.initial_controller.N))
 
         T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
@@ -149,6 +151,10 @@ class DroneHandler(Handler):
         T_d += self.Tpert
 
         return T_d, q_d, omg_d, f_d
+
+    def plot_thoughts(self,X,U,U_nom,tpred,iEp):
+        for ii in range(len(self.controller_list)):
+            self.initial_controller.finish_plot(X,U,U_nom,tpred,"Ep_"+str(iEp)+"_Controller_"+str(ii)+"_thoughts.png")
 
     def get_last_perturbation(self):
         return self.Tpert
@@ -178,6 +184,8 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
         savefig(filename)
     if display:
         show()
+    else:
+        close()
 
 def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, save=False, filename='', episode=0):
     #TODO: Current plotting does not make sense, think about how model agreement can be checked on the go.
@@ -205,9 +213,15 @@ def plot_mdl_agreement(X, Xd, U, Unom, t, keedmd_mdl, handler, display=True, sav
         savefig(filename)
     if display:
         show()
+    else:
+        close()
 
 folder = datetime.now().strftime("%m%d%Y_%H%M%S")
 os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
+
+
+
+
 
 # %% ===========================================    MAIN LEARNING LOOP     ===========================================
 
@@ -215,8 +229,8 @@ os.mkdir("figures/episodic_KEEDMD/fast_drone_landing/" + str(folder))
 bintel = Robot(controller_rate, n, m)
 go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
-initial_controller = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
-                                                                    p_final=p_final, use_learned_model=False)
+initial_controller = position_controller_MPC_CORE.PositionControllerMPC(u_hover=hover_thrust, gravity=g, rate=controller_rate,
+                                                                    p_final=p_final, use_learned_model=False, MPC_horizon=MPC_horizon)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
 eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
@@ -267,6 +281,7 @@ for ep in range(Nep):
     if plot_episode:
         fname = 'figures/episodic_KEEDMD/fast_drone_landing/' + folder + '/tracking_ep_' + str(ep)
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=True, filename=fname, episode=ep)
+        handler.plot_thoughts(X,U,Unom,t,ep)
         #fname = 'figures/episodic_KEEDMD/fast_drone_landing/model_ep_' + str(ep)
         #plot_mdl_agreement(X, Xd, U, Unom, t.squeeze(), keedmd_ep, handler,display=True, save=True, filename=fname, episode=ep)
 
@@ -276,7 +291,12 @@ print("Landing...")
 land()
 
 # %% ========================================    PLOT AND ANALYZE RESULTS     ========================================
-#TODO: Save appropriate data
+#TODO: Check what data to save
+save_final_data = True
+if save_final_data:
+    savemat('figures/episodic_KEEDMD/fast_drone_landing/' + folder + 'all.mat', {'track_error':track_error, 'ctrl_effort': ctrl_effort, 'X_agg':handlerX_agg,
+                                                            'Xd_agg':handler.Xd_agg, 'U_agg':handler.U_agg, 'Z_agg': handler.Z_agg})
+
 #TODO: Make summary plot
 #TODO: Set up plots for ICRA Paper
 
