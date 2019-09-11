@@ -3,7 +3,7 @@ import dill
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
     fill_between, savefig, text
 from matplotlib.ticker import MaxNLocator
-from numpy import array, zeros_like
+from numpy import array, zeros_like, divide, mean, std
 
 
 #TODO: Set up relevant flags to customize plotting
@@ -112,23 +112,31 @@ if plot_z_err_ctrl:
 
 # Plot summary of tracking error and control effort VS episode
 if plot_summary:
-    for ii in range(len(X_arr)):
-        track_error = array(track_error_arr[ii])
-        track_error_normalized = track_error[0, :] / track_error[0, 0]
-        ctrl_effort = ctrl_effort_arr[ii]
-        ctrl_effort_normalized = ctrl_effort / ctrl_effort[0]
+        track_error = array(track_error_arr)[:,:,0]
+        ctrl_effort = array(ctrl_effort_arr)[:,:,0]
+
+        track_error_mean = mean(track_error, axis=0)
+        track_error_mean /= track_error_mean[0]  #Normalize
+        track_error_std = std(track_error/track_error_mean[0],axis=0)
+
+        ctrl_effort_mean = mean(ctrl_effort, axis=0)
+        ctrl_effort_mean /= ctrl_effort_mean[0]  # Normalize
+        ctrl_effort_std = std(ctrl_effort / ctrl_effort_mean[0], axis=0)
 
         figure(figsize=(5.8, 6)).gca()
         ax=subplot(2, 1, 1)
         title('Tracking error and control effort improvement')
-        ax.plot(range(len(X_arr[ii])), track_error_normalized, linewidth=2, label='$z$')
+        ax.plot(range(len(track_error_mean)), track_error_mean, linewidth=2, label='$z$')
+        ax.fill_between(range(len(track_error_mean)), track_error_mean-track_error_std, track_error_mean+track_error_std, alpha=0.2)
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ylabel('Altitude (normalized)')
+        ylabel('$\int (z-z_d)^2$ (normalized)')
         grid()
         bx=subplot(2, 1, 2)
-        bx.plot(range(len(X_arr[ii])), ctrl_effort_normalized, linewidth=2, label='$z$')
+        bx.plot(range(len(ctrl_effort_mean)), ctrl_effort_mean, linewidth=2, label='$z$')
+        bx.fill_between(range(len(ctrl_effort_mean)), ctrl_effort_mean - ctrl_effort_std,
+                        ctrl_effort_mean + ctrl_effort_std, alpha = 0.2)
         bx.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ylabel('Thrust (normalized)')
+        ylabel('$\int u_n^2$ (normalized)')
         xlabel('Episode')
         grid()
         savefig(dir_lst[ii] + '/summary_plot')
