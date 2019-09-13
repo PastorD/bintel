@@ -82,7 +82,7 @@ class Robot():
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
-        time_after_converged = 8
+        time_after_converged = 1
         self.init_time = time.time()
         time_converged = self.init_time+6
 
@@ -104,7 +104,7 @@ class Robot():
             #self.pub_traj.publish(self.traj_msg)
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
-            #self.append_dat_traj()
+            self.append_dat_traj()
             self.rate.sleep()
 
         return self.X, self.p_final, self.U, self.Upert, self.t

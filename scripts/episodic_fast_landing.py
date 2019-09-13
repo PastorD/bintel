@@ -35,13 +35,13 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
 else:
-    hover_thrust = 0.6615         #TODO: Update with correct bintel thrust
-    K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
+    hover_thrust = 0.6615
+    K = array([[1.35, 0.81]])
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
 B_nom = array([[0.], [g/hover_thrust]])  # Nominal model of the true system around the origin
@@ -56,7 +56,7 @@ p_final = np.array([0., 0., 0.5])
 pert_noise = 0.00#0.05 #TODO: Increase for experiments
 Nep = 3
 #w = linspace(0, 1, Nep)
-#w /= sum(w
+#w /= sum(w)
 w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
@@ -144,7 +144,7 @@ class DroneHandler(Handler):
         Unom -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
 
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
-        start_altitude = 1.25  # Start altitude in meters  #TODO: Tune for experiment
+        start_altitude = self.p_init[2] - 0.25  # Start altitude in meters  #TODO: Tune for experiment
         max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
         first_ind = np.argwhere(X[0,1:] < start_altitude)[0][0]+1  #First data point is just initializing and excluded
         t = t[:, first_ind:]
