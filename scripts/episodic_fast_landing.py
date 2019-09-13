@@ -63,25 +63,33 @@ plot_episode = False
 
 # Koopman eigenfunction parameters
 plot_eigen = False
-eigenfunction_max_power = 3
+eigenfunction_max_power = 6
 Nlift = (eigenfunction_max_power+1)**n + n
-l2_diffeomorphism = 1e0  # Fix for current architecture
-jacobian_penalty_diffeomorphism = 5e0  # Fix for current architecture
+l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
+jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 100
+diff_n_epochs = 200
 diff_train_frac = 0.9
 diff_n_hidden_layers = 2
-diff_layer_width = 100
+diff_layer_width = 50
 diff_batch_size = 16
 diff_learn_rate = 1e-3  # Fix for current architecture
-diff_learn_rate_decay = 0.995  # Fix for current architecture
+diff_learn_rate_decay = 0.99  # Fix for current architecture
 diff_dropout_prob = 0.5
 
 # KEEDMD parameters
-# Best: 0.024
-l1_keedmd = 5e-2
-l2_keedmd = 1e-2
+load_keedmd_params = True
+params_file = ''
+if load_keedmd_params:
+    infile = open(params_file, 'rb')
+    [_, _, keedmd_model, _] = dill.load(infile)
+    infile.close()
+    l1_keedmd = keedmd_model.l1
+    l1_ratio = keedmd_model.l1_ratio
+else:
+    l1_keedmd = 5e-2
+    l1_ratio  = 0.5
 
 # MPC controller parameters:
 Q = sparse.diags([10., 1.])
@@ -232,7 +240,7 @@ for ep in range(Nep):
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
                                                  batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
     eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
-    keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l2=l2_keedmd,episodic=True)
+    keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l1_ratio=l1_ratio, episodic=True)
     print("Before aggregation: ", X.shape, Xd.shape, U.shape, Unom.shape, t.shape)
     handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
     keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
