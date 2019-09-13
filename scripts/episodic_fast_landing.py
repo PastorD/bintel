@@ -81,16 +81,24 @@ diff_dropout_prob = 0.5
 
 # KEEDMD parameters
 load_keedmd_params = False
-params_file = ''
+params_file = 'model_tuning.pickle'
 if load_keedmd_params:
     infile = open(params_file, 'rb')
     [_, _, keedmd_model, _] = dill.load(infile)
     infile.close()
-    l1_keedmd = keedmd_model.l1
-    l1_ratio = keedmd_model.l1_ratio
+    l1_pos = keedmd_model.l1_pos
+    l1_ratio_pos = keedmd_model.l1_ratio_pos
+    l1_vel = keedmd_model.l1_vel
+    l1_ratio_vel = keedmd_model.l1_ratio_vel
+    l1_eig = keedmd_model.l1_eig
+    l1_ratio_eig = keedmd_model.l1_ratio_eig
 else:
-    l1_keedmd = 1e-2
-    l1_ratio  = 0.5
+    l1_pos = 0.0007505431087052378
+    l1_ratio_pos = 0.5
+    l1_vel = 0.00496783564809029
+    l1_ratio_vel = 0.5
+    l1_eig = 0.0004707203851970303
+    l1_ratio_eig = 0.5
 
 # MPC controller parameters:
 Q = sparse.diags([1., 0.1])
@@ -278,7 +286,8 @@ for ep in range(Nep):
 
     #eigenfunction_basis.plot_eigenfunction_evolution(X.transpose(),Xd.transpose(),t.squeeze())  #TODO: Remove after debug
 
-    keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l1_ratio=l1_ratio,episodic=True)
+    keedmd_ep = Keedmd(eigenfunction_basis,n,l1_pos=l1_pos,l1_ratio_pos=l1_ratio_pos, l1_vel=l1_vel,l1_ratio_vel=l1_ratio_vel,
+                       l1_eig=l1_eig,l1_ratio_eig=l1_ratio_eig,episodic=True)
     handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
     keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
     keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)
