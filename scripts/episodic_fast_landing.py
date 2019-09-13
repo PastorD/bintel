@@ -50,7 +50,7 @@ A_cl = A_nom - dot(B_nom, K)
 # Experiment parameters
 duration_low = 1.
 n_waypoints = 1
-controller_rate = 50
+controller_rate = 60
 p_init = np.array([0., 0., 2.25])
 p_final = np.array([0., 0., 0.25])
 pert_noise = 0.01#0.05
@@ -59,7 +59,7 @@ w = linspace(0, 1, Nep)
 w /= sum(w)
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
-lower_bounds = array([-p_final[2], -4.])  # State constraints
+lower_bounds = array([-p_final[2], -8.])  # State constraints
 
 
 # Koopman eigenfunction parameters
@@ -93,14 +93,14 @@ else:
     l1_ratio  = 0.5
 
 # MPC controller parameters:
-Q = sparse.diags([4., 0.1])
-R = 2*sparse.eye(m)
+Q = sparse.diags([1., 0.1])
+R = 5*sparse.eye(m)
 QN = sparse.diags([0., 0.])
-u_margin = 0.1
+u_margin = 0.3
 umax_control = min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
 xmax=upper_bounds
-MPC_horizon = 0.3 # [s]
+MPC_horizon = 0.4 # [s]
 dt = 1/controller_rate
 N_steps = int(MPC_horizon/dt)
 p_final_augment = array([[p_final[2]],[0.]])  # Desired position augmenting controller
@@ -127,13 +127,13 @@ class DroneHandler(Handler):
         assert (X.shape[0] == self.X_agg.shape[0])
         assert (U.shape[0] == self.U_agg.shape[0])
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
-        #TODO: Implement normaliztion of the data (variance only) Implement in KEEDMD directly (should not be necessary for diffeomorphism)
 
         q_final = array([p_final[2], 0.]).reshape((self.n,1))
         Xd = np.tile(q_final,(1,X.shape[1]))
         Unom = U-Upert
+        U -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
+        Unom -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
 
-        print(X.shape, Xd.shape, U.shape, Upert.shape, t.shape)
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
         start_altitude = 2.  # Start altitude in meters  #TODO: Tune for experiment
         max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
@@ -161,23 +161,25 @@ class DroneHandler(Handler):
         t0 = datetime.now().timestamp()
         #u_vec = zeros((self.m, self.initial_controller._osqp_N))
         #u_vec = zeros((self.m, self.initial_controller.N))
+        # T_d = self.initial_controller.eval(x,0.).squeeze()
+        # q_d = (0.,0.,0.,1.)
+        # omg_d = (0.,0.,0.)
+        # f_d = None
+        # for ii in range(len(self.controller_list)):
+        #   T_d += self.weights[ii] * self.controller_list[ii].eval(x, 0.)[0] #TODO: Feed time as input to allow trajectory tracking, Add time varying control constraints
+        # u_vec += self.weights[ii] * self.controller_list[ii].get_control_prediction()  #TODO: Must be implemented in new MPC controller
+        # T_d += self.hover_thrust + self.Tpert
+
         x = array([p.z, v.z]) - array([self.p_final[2], 0.])
 
-        #T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
-        T_d = self.initial_controller.eval(x,0.).squeeze()
-        #q_d = (0.,0.,0.,1.)
-        #omg_d = (0.,0.,0.)
-        #f_d = None
-        T_d += sum([self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))])
-        #for ii in range(len(self.controller_list)):
-         #   T_d += self.weights[ii] * self.controller_list[ii].eval(x, 0.)[0] #TODO: Feed time as input to allow trajectory tracking, Add time varying control constraints
-            #u_vec += self.weights[ii] * self.controller_list[ii].get_control_prediction()  #TODO: Must be implemented in new MPC controller
+        T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
+        T_d += sum([self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))])
         self.Tpert = self.pert_noise*random.randn()
-        T_d += self.hover_thrust + self.Tpert
+        T_d += self.Tpert
 
         self.comp_time.append((datetime.now().timestamp()-t0))
-        return T_d, (0.,0.,0.,1.), (0.,0.,0.), None
+        return T_d, q_d, omg_d, f_d
 
     def plot_thoughts(self,X,U,U_nom,tpred,iEp):
         for ii in range(len(self.controller_list)):
@@ -276,7 +278,7 @@ for ep in range(Nep):
 
     #eigenfunction_basis.plot_eigenfunction_evolution(X.transpose(),Xd.transpose(),t.squeeze())  #TODO: Remove after debug
 
-    keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l2=l2_keedmd,episodic=True)
+    keedmd_ep = Keedmd(eigenfunction_basis,n,l1=l1_keedmd,l1_ratio=l1_ratio,episodic=True)
     handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
     keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
     keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)

@@ -23,7 +23,7 @@ class PositionController():
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        self.k_p = 0.3 # 0.5 max, 1 too much
+        self.k_p = 0.1 # 0.5 max, 1 too much #was 0.3 #TODO: Move back if not working
         self.k_d = self.k_p*1.0
 
         self.g = gravity
@@ -53,19 +53,19 @@ class PositionController():
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.4-self.u_hover
+        umin = np.ones(nu)*0.2-self.u_hover
         umax = np.ones(nu)*0.8-self.u_hover
-        xmin = np.array([ -np.inf,-np.inf])
-        xmax = np.array([ 15.0,10.])
+        xmin = np.array([s0.0,-5.])  #TODO: Tune/consider when testing on hw
+        xmax = np.array([ 5.0, 5.0])
 
         # Sizes
         self.ns = nx # p_x, p_y, p_z, v_x, v_y, v_z
         self.nu = nu # f_x, f_y, f_z
 
         # Objective function
-        Q = sparse.diags([10., 1.])
+        Q = sparse.diags([5., .5])
         QN = Q
-        R = 5.0*sparse.eye(nu)
+        R = 4.0*sparse.eye(nu)
 
         # Initial and reference states
         x0 = np.array([1.0,0.0])
