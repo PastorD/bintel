@@ -14,10 +14,11 @@ import osqp
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, model=None):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None):
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
+        self.MPC_horizon = MPC_horizon
 
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
@@ -81,7 +82,7 @@ class PositionController():
                        0])
         
         # Prediction horizon
-        N = int(self.rate*4.0)
+        N = int(self.MPC_horizon/self.dt)
         self._osqp_N = N
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
