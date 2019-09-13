@@ -183,7 +183,7 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 #plt.show()    
-plt.savefig('sim_mcp_quad_pos.png')
+plt.savefig('sim_mcp_quad_pos.png', )
 
 
 plt.figure()
@@ -195,6 +195,6 @@ plt.xlabel('Time(s)')
 plt.grid()
 plt.legend()
 #plt.show()  
-plt.savefig('sim_mcp_quad_u.png')
+plt.savefig('sim_mcp_quad_u.pdf',format='pdf', dpi=1200) 
 
 #%%
