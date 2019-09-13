@@ -1,0 +1,27 @@
+<launch>
+	<!-- vim: set ft=xml noet : -->
+
+
+	<arg name="bagfiles_dir" default="(find bintel_ros)/bagfiles" /> <!-- /home/arcl/Desktop/intel_aero/bagfiles" /> -->
+	<param name="blah" command="mkdir -p $(arg bagfiles_dir)/" />
+
+	<node
+		pkg="rosbag"
+		name="rosbag"
+		type="record"
+
+		args="-o $(arg bagfiles_dir)/ 
+			/mavros/imu/data
+			/mavros/imu/data_raw 
+			/mavros/local_position/pose 
+			/mavros/local_position/velocity_local
+			/mavros/rc/in
+			/mavros/rc/out
+			/mavros/setpoint_raw/target_local
+			/mavros/time_reference 
+			/vrpn_client_node/bintel/pose
+			/tf
+			/mavros/vision_pose/pose"
+        />
+
+</launch>

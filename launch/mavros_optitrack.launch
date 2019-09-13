@@ -11,6 +11,7 @@
 		file="$(find bintel_ros)/launch/optitrack_only.launch">
 		<arg name="server" value="192.168.1.2"/>
 	</include>
+	<node name="foo" pkg="bintel_ros" type="increase_rates" />
 	<node
 		pkg = "topic_tools"
 		name= "position_relay2"

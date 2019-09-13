@@ -6,13 +6,15 @@ windows:
     shell_command_before:
     - roscd bintel_ros; export ROS_MASTER_URI=http://192.168.1.61:11311; export ROS_HOSTNAME=http://192.168.1.123 
     panes:
-      - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack.launch
+      - ssh bintel@192.168.1.61; roslaunch bintel_ros mavros_optitrack_px4config.launch
       - shell_command:
         - sleep 5
         - ssh bintel@192.168.1.61
-        - source bash/increase_rates.sh
-        - rostopic echo /mavros/state
+        - roscd bintel_ros
+        - bash bash/increase_rates.sh
+        - roslaunch launch/bag.launch \
+      - sleep 5; rostopic echo /mavros/state
       - sleep 5; rostopic echo /mavros/local_position/pose 
-      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
-      - python scripts/flight_data_collection_MPC.py
+      - python scripts/episodic_fast_landing.py \ 
+      - rqt_plot /mavros/local_position/pose/pose/position/z /mavros/setpoint_raw/attitude/thrust /mavros/local_position/velocity_body/twist/linear/z
       - ~/Downloads/QGroundControl.AppImage 
