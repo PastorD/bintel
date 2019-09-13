@@ -2,33 +2,37 @@
 
 # Python General
 from collections import namedtuple
+import exceptions
+import control
+import timeit
 import matplotlib.pyplot as plt
 
 import math
 import numpy as np
+import scipy as sp
+import scipy.io as sio
 import scipy.sparse as sparse
 import osqp
 
 # ROS
-#import tf
+import tf
+import rospy
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None):
+    def __init__(self, model, rate, use_learned_model):
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
-        self.MPC_horizon = MPC_horizon
 
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        self.g = gravity
-        self.u_hover = u_hover
-        kb = self.g/self.u_hover #11.9
+        g_constant = 9.8 # gravity
+        self.u_hover = 0.567 # Hover Thrust
+        kb = 1/(self.u_hover/g_constant) #17.28 #11.9
         #self.u_hover = 0.567 # Hover Thrust
-        if model is not None:
-            self.model.nom_model.hover_throttle = self.u_hover
+        self.model.nom_model.hover_throttle = self.u_hover
 
         ##  Set the MPC Problem
         # Discrete time model of a quadcopter
@@ -51,24 +55,24 @@ class PositionController():
         self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
         self._osqp_Bd = Bc*self.dt
 
-        self.setup_OSQP(p_final)
+        self.setup_OSQP([0.,0.,3])
 
     def setup_OSQP(self,final_point):
 
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.4-self.u_hover
-        umax = np.ones(nu)*0.8-self.u_hover
-        xmin = np.array([-5,-5,0.1,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 5.0,5.0,15.0,3.,15.,10.])
+        umin = np.ones(nu)*0.3-self.u_hover
+        umax = np.ones(nu)*0.9-self.u_hover
+        xmin = np.array([-np.inf,-np.inf,-np.inf,-np.inf,-np.inf,-np.inf])
+        xmax = np.array([ np.inf,np.inf,3.0,np.inf,np.inf,4])
 
         # Sizes
         ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
         nu = 3 # f_x, f_y, f_z
 
         # Objective function
-        Q = sparse.diags([2., 2., 10., 1., 1., 1.])
+        Q = sparse.diags([1., 1., 3., .1, .1, .1])
         QN = Q
         R = 5.0*sparse.eye(nu)
 
@@ -80,38 +84,38 @@ class PositionController():
                        0.,
                        0.,
                        0])
-        
+
         # Prediction horizon
-        N = int(self.MPC_horizon/self.dt)
+        N = int(self.rate*4.0)
         self._osqp_N = N
+
+        D = sparse.diags([100, 100, 100, 10, 10, 500])
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))
         # - quadratic objective
         P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), QN,
-                            sparse.kron(sparse.eye(N), R)]).tocsc()
+                            sparse.kron(sparse.eye(N), R), sparse.kron(sparse.eye(N+1), D)]).tocsc()
         # - linear objective
         q = np.hstack([np.kron(np.ones(N), -Q.dot(xr)), -QN.dot(xr),
-               np.zeros(N*nu)])
+               np.zeros(N*nu), np.zeros((N+1)*nx)])
         # - linear dynamics
         Ax = sparse.kron(sparse.eye(N+1),-sparse.eye(nx)) + sparse.kron(sparse.eye(N+1, k=-1), self._osqp_Ad)
         Bu = sparse.kron(sparse.vstack([sparse.csc_matrix((1, N)), sparse.eye(N)]), self._osqp_Bd)
-        Aeq = sparse.hstack([Ax, Bu])
+        delta_eq = np.zeros(((N+1)*nx ,(N+1)*nx))
+        Aeq = sparse.hstack([Ax, Bu, delta_eq])
         leq = np.hstack([-x0, np.zeros(N*nx)])
         ueq = leq
         # - input and state constraints
-        nf = 1 # do not add the first nf points to the constraints
-        xminf = -np.ones(nx)*np.inf
-        xmaxf = +np.ones(nx)*np.inf
 
-        Aineq = sparse.eye((N+1)*nx + N*nu)
-        #lineq = np.hstack([np.kron(np.ones(N+1), xmin), np.kron(np.ones(N), umin)])
-        #uineq = np.hstack([np.kron(np.ones(N+1), xmax), np.kron(np.ones(N), umax)])
-        
+        delta_ineq = sparse.vstack([sparse.eye((N+1)*nx),np.zeros((N*nu,(N+1)*nx))])
+        Aineq_hard = sparse.eye((N+1)*nx + N*nu)
+        Aineq = sparse.hstack([Aineq_hard,delta_ineq])
+        lineq = np.hstack([np.kron(np.ones(N+1), xmin), np.kron(np.ones(N), umin)])
+        uineq = np.hstack([np.kron(np.ones(N+1), xmax), np.kron(np.ones(N), umax)])
 
-        lineq = np.hstack([np.kron(np.ones(nf), xminf), np.kron(np.ones(N+1-nf), xmin), np.kron(np.ones(N), umin)])
-        uineq = np.hstack([np.kron(np.ones(nf), xmaxf), np.kron(np.ones(N+1-nf), xmax), np.kron(np.ones(N), umax)])
         # - OSQP constraints
         A = sparse.vstack([Aeq, Aineq]).tocsc()
+        
         self._osqp_l = np.hstack([leq, lineq])
         self._osqp_u = np.hstack([ueq, uineq])
 
@@ -156,7 +160,11 @@ class PositionController():
         N = self._osqp_N
 
         # Apply first control input to the plant
-        [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[(N+1)*nx:(N+1)*nx+nu]#_osqp_result.x[-N*nu:-(N-1)*nu]
+
+        #if self.first:
+        #self.plot_MPC(_osqp_result)
+        #    self.first = False
 
         # Check solver status
         if _osqp_result.info.status != 'solved':
@@ -227,7 +235,7 @@ class PositionController():
             f_d_ach.y = f_d.y*s
             f_d_ach.z = f_d.z*s
 
-        except ZeroDivisionError:
+        except exceptions.ZeroDivisionError:
             if f_d.x**2 + f_d.y**2 + f_d.z**2 > 1e-4:
                 warnings.warn("Got an unexpected divide by zero exception - there's probably a bug")
             f_d_ach.x = f_d.x
@@ -240,19 +248,15 @@ class PositionController():
         return np.linalg.norm(np.array([f_d.x, f_d.y, f_d.z]))
 
     def get_attitude(self, f_d, yaw_d):
-        #import tf
-        from scipy.spatial.transform import Rotation as R
-        r_worldToYawed = R.from_euler('XYZ', [[0, 0, yaw_d]])  #"XYZ" refers to intrinsic xyz, "xyz" refers to extrinsic xyz
+        q_worldToYawed = tf.transformations.quaternion_from_euler(0,0,yaw_d, axes='rxyz')
         rotation_axis = tuple(np.cross((0,0,1), np.array([f_d.x, f_d.y, f_d.z])))
         if np.allclose(rotation_axis, (0.0, 0.0, 0.0)):
             unit_rotation_axis = rotation_axis
         else:
-            unit_rotation_axis = rotation_axis/np.linalg.norm(rotation_axis)
+            unit_rotation_axis = tf.transformations.unit_vector(rotation_axis)
         rotation_angle = math.asin(np.linalg.norm(rotation_axis))
-        r_yawedToBody = R.from_rotvec(rotation_angle*unit_rotation_axis)
+        q_yawedToBody = tf.transformations.quaternion_about_axis(rotation_angle, unit_rotation_axis)
 
-        r_d = r_worldToYawed * r_yawedToBody
-        q_d_raw = r_d.as_quat()
-        q_d = namedtuple("q_d", "w x y z")
-        q_d.x, q_d.y, q_d.z, q_d.w = q_d_raw[0,0], q_d_raw[0,1], q_d_raw[0,2], q_d_raw[0,3]
-        return q_d.x, q_d.y, q_d.z, q_d.w
+        q_d = tf.transformations.quaternion_multiply(q_worldToYawed, q_yawedToBody)
+
+        return q_d
