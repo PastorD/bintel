@@ -22,6 +22,9 @@ class PositionController():
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
+        self.k_p = 0.3 # 0.5 max, 1 too much
+        self.k_d = self.k_p*1.0
+
         self.g = gravity
         self.u_hover = u_hover
         kb = self.g/self.u_hover #11.9
@@ -32,19 +35,11 @@ class PositionController():
         ##  Set the MPC Problem
         # Discrete time model of a quadcopter
         Ac = sparse.csc_matrix([
-        [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+                                [ 0.0, 1.0],
+                                [ 0.0, 0.0]])
         Bc= sparse.csc_matrix([
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [kb, 0.0, 0.0],
-        [0.0, kb, 0.0],
-        [0.0, 0.0, kb]])
+                                [0.0],
+                                [kb]])
         [nx, nu] = Bc.shape
 
         self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
@@ -59,26 +54,21 @@ class PositionController():
         
         umin = np.ones(nu)*0.4-self.u_hover
         umax = np.ones(nu)*0.8-self.u_hover
-        xmin = np.array([-5,-5,0.1,-np.inf,-np.inf,-np.inf])
-        xmax = np.array([ 5.0,5.0,15.0,3.,15.,10.])
+        xmin = np.array([ -np.inf,-np.inf])
+        xmax = np.array([ 15.0,10.])
 
         # Sizes
-        ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
-        nu = 3 # f_x, f_y, f_z
+        self.ns = nx # p_x, p_y, p_z, v_x, v_y, v_z
+        self.nu = nu # f_x, f_y, f_z
 
         # Objective function
-        Q = sparse.diags([2., 2., 10., 1., 1., 1.])
+        Q = sparse.diags([10., 1.])
         QN = Q
         R = 5.0*sparse.eye(nu)
 
         # Initial and reference states
-        x0 = np.array([0.0,0.0,1.0,0.0,0.0,0.0])
-        xr = np.array([final_point[0],
-                       final_point[1],
-                       final_point[2],
-                       0.,
-                       0.,
-                       0])
+        x0 = np.array([1.0,0.0])
+        xr = np.array([final_point[2],0])
         
         # Prediction horizon
         N = int(self.rate*4.0)
@@ -140,12 +130,12 @@ class PositionController():
         #e = np.concatenate((e_p, e_v)).reshape(-1, 1)
         f_d = namedtuple("f_d", "x y z")
 
-        x0 = np.array([p.x,p.y,p.z,v.x,v.y,v.z])
+        x0 = np.array([p.z,v.z])
 
-        nx = 6
-        nu = 3
+        nx = self.ns 
+        nu = self.nu 
 
-        ## Solve MPC Instance
+
         self._osqp_l[:nx] = -x0
         self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
@@ -155,7 +145,7 @@ class PositionController():
         N = self._osqp_N
 
         # Apply first control input to the plant
-        [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
 
         # Check solver status
         if _osqp_result.info.status != 'solved':
@@ -164,10 +154,15 @@ class PositionController():
             raise ValueError('OSQP did not solve the problem!')
 
         # Project f_d into space of achievable force
-        f_d_achievable = f_d #self.project_force_achievable (f_d)
-        f_d_achievable.z = f_d_achievable.z + self.u_hover #self.model.nom_model.hover_throttle
+        
+        f_d.z = f_d.z + self.u_hover #self.model.nom_model.hover_throttle
 
-        return f_d_achievable
+        f_d.x = -self.k_p*e_p[0] - self.k_d*e_v[0]
+        f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
+
+        print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
+
+        return f_d
 
     def plot_MPC(self, _osqp_result):
         # Unpack OSQP results
