@@ -104,11 +104,9 @@ class Robot():
         return self.X, self.p_final, self.U, self.Upert, self.t
 
     def append_dat_traj(self):
-        print("data mats: ", self.X.shape, self.U.shape, self.Upert.shape, self.t.shape)
-        print("inputs: ", self.p.z, self.v.z, self.f_d.z)
         passed_time = time.time()-self.init_time
         self.X = np.append(self.X, np.array([[self.p.z], [self.v.z]]), axis=1)
-        self.U = np.append(self.U, np.array([[self.f_d.z]]), axis=1)
+        self.U = np.append(self.U, np.array([[self.T_d]]), axis=1)
         self.Upert = np.append(self.Upert, np.array([[self.controller.get_last_perturbation()]]), axis=1)
         self.t = np.append(self.t, np.array([[passed_time]]), axis=1)
 

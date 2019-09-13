@@ -1,7 +1,7 @@
 import os
 import dill
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
-    fill_between, savefig, text
+    fill_between, savefig, text, close
 from matplotlib.ticker import MaxNLocator
 from numpy import array, zeros_like, divide, mean, std
 
@@ -20,7 +20,8 @@ dir_lst = []
 #Import data and aggregate
 for root, dirs, files in os.walk("experiments/episodic_KEEDMD/fast_drone_landing"):
     for file in files:
-        if file.endswith("episodic_data"):
+        if file.endswith("episodic_data.pickle"):
+            print("Importing experiment " + str(root))
             infile = open(str(os.path.join(root,file)), 'rb')
             file_lst.append(str(os.path.join(root,file)))
             dir_lst.append(str(root))
@@ -72,6 +73,7 @@ if plot_full_state:
             savefig(dir_lst[ii] + '/states_ctrl_ep_' + str(jj))
             if display_plots:
                 show()
+            close()
 
 # Plot altitude tracking error and control effort with norms for each episode of all experiments
 if plot_z_err_ctrl:
@@ -109,6 +111,7 @@ if plot_z_err_ctrl:
             savefig(dir_lst[ii] + '/track_err_ctrl_ep_' + str(jj))
             if display_plots:
                 show()
+            close()
 
 # Plot summary of tracking error and control effort VS episode
 if plot_summary:
@@ -139,4 +142,5 @@ if plot_summary:
         ylabel('$\int u_n^2$ (normalized)')
         xlabel('Episode')
         grid()
-        savefig(dir_lst[ii] + '/summary_plot')
+        savefig(dir_lst[0] + '/../summary_plot')
+        close()
