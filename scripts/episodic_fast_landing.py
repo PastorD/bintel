@@ -21,7 +21,7 @@ from dynamics.goto_optitrack import MavrosGOTOWaypoint
 from dynamics.goto_land import land
 import position_controller_MPC
 import position_controller_MPC_CORE
-
+from position_controller_MPC_XY import PositionController
 
 # KEEDMD
 from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
@@ -79,7 +79,7 @@ diff_learn_rate_decay = 0.99  # Fix for current architecture
 diff_dropout_prob = 0.5
 
 # KEEDMD parameters
-load_keedmd_params = True
+load_keedmd_params = False
 params_file = ''
 if load_keedmd_params:
     infile = open(params_file, 'rb')
@@ -88,7 +88,7 @@ if load_keedmd_params:
     l1_keedmd = keedmd_model.l1
     l1_ratio = keedmd_model.l1_ratio
 else:
-    l1_keedmd = 5e-2
+    l1_keedmd = 1e-2
     l1_ratio  = 0.5
 
 # MPC controller parameters:
@@ -128,6 +128,7 @@ class DroneHandler(Handler):
         Xd = np.tile(q_final,(1,X.shape[1]))
         Unom = U-Upert
 
+        print(X.shape, Xd.shape, U.shape, Upert.shape, t.shape)
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
         start_altitude = 2.  # Start altitude in meters  #TODO: Tune for experiment
         max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
@@ -204,7 +205,7 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
 bintel = Robot(controller_rate, n, m)
 go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
-initial_controller = position_controller_MPC.PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
+initial_controller = PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
                                                         p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
 eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,

@@ -14,7 +14,8 @@ import osqp
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, model=None):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None):
+        self.mpc_horizon=MPC_horizon
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
@@ -68,10 +69,10 @@ class PositionController():
 
         # Initial and reference states
         x0 = np.array([1.0,0.0])
-        xr = np.array([final_point[2],0])
+        xr = np.array([final_point[2], 0.0])
         
         # Prediction horizon
-        N = int(self.rate*4.0)
+        N = int(self.rate*self.mpc_horizon)
         self._osqp_N = N
 
         # Cast MPC problem to a QP: x = (x(0),x(1),...,x(N),u(0),...,u(N-1))

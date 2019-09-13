@@ -49,7 +49,7 @@ class Robot():
         self.model = None #self.load_model(self.model_file_name)
         self.init_ROS()
         self.controller = position_controller_MPC_XY.PositionController(u_hover=0.567, gravity=9.81, rate=self.main_loop_rate,
-                                                                    p_final=np.array([0., 0., 1.]), use_learned_model=self.use_learned_model)
+                                                                    p_final=np.array([0., 0., 1.]), MPC_horizon=1.0, use_learned_model=self.use_learned_model)
         self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
         self.force_msg = Vector3Stamped()
