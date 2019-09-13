@@ -13,7 +13,7 @@ from mavros_msgs.msg import AttitudeTarget, RCOut
 import time
 
 # Project
-import position_controller_MPC
+import position_controller_MPC_XY
 
 class Robot():
     """
@@ -48,7 +48,7 @@ class Robot():
 
         self.model = None #self.load_model(self.model_file_name)
         self.init_ROS()
-        self.controller = position_controller_MPC.PositionController(u_hover=0.5, gravity=9.81, rate=self.main_loop_rate,
+        self.controller = position_controller_MPC_XY.PositionController(u_hover=0.567, gravity=9.81, rate=self.main_loop_rate,
                                                                     p_final=np.array([0., 0., 1.]), use_learned_model=self.use_learned_model)
         self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
@@ -98,7 +98,7 @@ class Robot():
             #self.pub_traj.publish(self.traj_msg)
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
-            self.append_dat_traj()
+            #self.append_dat_traj()
             self.rate.sleep()
 
         return self.X, self.p_final, self.U, self.Upert, self.t

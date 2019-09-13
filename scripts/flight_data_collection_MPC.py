@@ -17,15 +17,15 @@ class test_trajectory_tracking():
 
         self.duration_low = 1.
         self.n_waypoints = 1
-        self.controller_rate = 80
+        self.controller_rate = 60
 
         # Initialize robot
-        bintel = Robot(self.controller_rate)
+        bintel = Robot(self.controller_rate,3,1)
         go_waypoint = MavrosGOTOWaypoint()
 
         print("Moving to initial point...")
-        p_init = np.array([0., 0., 0.5])
-        p_final = np.array([0., 0., 3.])
+        p_init  = np.array([0.5, 1.0, 0.5])
+        p_final = np.array([0., 0., 4.])
         go_waypoint.gopoint(np.array(p_init))
         for experiment in range(self.n_waypoints):
             print("Waypoint ", experiment, ": ", p_final, ", duration: ", self.duration_low)
