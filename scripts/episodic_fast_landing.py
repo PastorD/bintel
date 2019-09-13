@@ -40,7 +40,7 @@ if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
 else:
-    hover_thrust = 0.65         #TODO: Update with correct bintel thrust
+    hover_thrust = 0.6615         #TODO: Update with correct bintel thrust
     K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
@@ -51,12 +51,13 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 1
 controller_rate = 60
-p_init = np.array([0., 0., 2.25])
-p_final = np.array([0., 0., 0.25])
-pert_noise = 0.01#0.05
-Nep = 10
-w = linspace(0, 1, Nep)
-w /= sum(w)
+p_init = np.array([0., 0., 1.5])
+p_final = np.array([0., 0., 0.5])
+pert_noise = 0.00#0.05 #TODO: Increase for experiments
+Nep = 3
+#w = linspace(0, 1, Nep)
+#w /= sum(w
+w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([-p_final[2], -8.])  # State constraints
@@ -143,7 +144,7 @@ class DroneHandler(Handler):
         Unom -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
 
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
-        start_altitude = 2.  # Start altitude in meters  #TODO: Tune for experiment
+        start_altitude = 1.25  # Start altitude in meters  #TODO: Tune for experiment
         max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
         first_ind = np.argwhere(X[0,1:] < start_altitude)[0][0]+1  #First data point is just initializing and excluded
         t = t[:, first_ind:]

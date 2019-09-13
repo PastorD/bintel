@@ -24,8 +24,8 @@ class test_trajectory_tracking():
         go_waypoint = MavrosGOTOWaypoint()
 
         print("Moving to initial point...")
-        p_init  = np.array([0.5, 1.0, 0.5])
-        p_final = np.array([0., 0., 4.])
+        p_init  = np.array([0., 0., 1.5])
+        p_final = np.array([0., 0., 0.5])
         go_waypoint.gopoint(np.array(p_init))
         for experiment in range(self.n_waypoints):
             print("Waypoint ", experiment, ": ", p_final, ", duration: ", self.duration_low)

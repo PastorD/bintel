@@ -46,9 +46,15 @@ class Robot():
 
         self.main_loop_rate = rate
 
+        simulation = False
+        if simulation:
+            hover = 0.567
+        else:
+            hover = 0.6615
+
         self.model = None #self.load_model(self.model_file_name)
         self.init_ROS()
-        self.controller = position_controller_MPC_XY.PositionController(u_hover=0.567, gravity=9.81, rate=self.main_loop_rate,
+        self.controller = position_controller_MPC_XY.PositionController(u_hover=hover, gravity=9.81, rate=self.main_loop_rate,
                                                                     p_final=np.array([0., 0., 1.]), MPC_horizon=1.0, use_learned_model=self.use_learned_model)
         self.attitude_target_msg = AttitudeTarget()
         self.traj_msg = PoseStamped()
@@ -76,7 +82,7 @@ class Robot():
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
-        time_after_converged = 2
+        time_after_converged = 8
         self.init_time = time.time()
         time_converged = self.init_time+6
 
@@ -98,7 +104,7 @@ class Robot():
             #self.pub_traj.publish(self.traj_msg)
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
-            self.append_dat_traj()
+            #self.append_dat_traj()
             self.rate.sleep()
 
         return self.X, self.p_final, self.U, self.Upert, self.t
