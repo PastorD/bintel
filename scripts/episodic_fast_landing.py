@@ -321,7 +321,7 @@ for ep in range(Nep):
         U_w.append(    U)    
         Unom_w.append( Unom) 
         t_w.append(    t)  
-        osqp_thoughts[ww][ep] = bintel.controller.osqp_thoughts
+        osqp_thoughts[ww][ep] = bintel.osqp_thoughts
 
     land()  # Land while fitting models
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)

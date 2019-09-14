@@ -79,7 +79,6 @@ class Robot():
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
         self.X = np.empty((self.n,1))
         self.U = np.empty((self.m,1))
-        self.osqp_thoughts = np.empty((self.controller.qp_size,1))
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
@@ -91,6 +90,9 @@ class Robot():
             self.controller.setup_OSQP(p_final)
         else:
             self.controller = controller
+        #self.osqp_thoughts = np.empty((self.controller.initial_controller.qp_size,self.controller.controller_list.__len__()+1,1)) # Nqp, Ncontrollers, Nt
+        self.osqp_thoughts = []
+
         
 
         self.t0 = rospy.get_time()
@@ -114,7 +116,16 @@ class Robot():
         passed_time = time.time()-self.init_time
         self.X = np.append(self.X, np.array([[self.p.z], [self.v.z]]), axis=1)
         self.U = np.append(self.U, np.array([[self.T_d]]), axis=1)
-        self.osqp_thoughts = np.append(self.osqp_thoughts, np.array([[self.controller.osqp_result.x]]), axis=1)
+
+        local_thought = [np.array(self.controller.initial_controller._osqp_result.x)]
+        #local_thought = local_thought.reshape(local_thought.shape[0],1)
+        for controller in self.controller.controller_list:
+            #though_1 = np.reshape(controller._osqp_result.x,(controller._osqp_result.x.shape[0],1))
+            local_thought.append(controller._osqp_result.x)
+        #local_thought = local_thought.reshape(local_thought.shape[0],local_thought.shape[1],1)
+
+        self.osqp_thoughts.append(local_thought)
+        #np.append(self.osqp_thoughts, local_thought, axis=2)
         self.Upert = np.append(self.Upert, np.array([[self.controller.get_last_perturbation()]]), axis=1)
         self.t = np.append(self.t, np.array([[passed_time]]), axis=1)
         
