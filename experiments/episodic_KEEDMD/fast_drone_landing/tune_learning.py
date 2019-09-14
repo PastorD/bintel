@@ -15,21 +15,45 @@ from pathlib import Path
 # %%
 # ! ===============================================   SET PARAMETERS    ===============================================
 
+# Tuning parameters
+folder = str(Path().absolute()) + '/experiments/episodic_KEEDMD/fast_drone_landing/'
+datafile_lst = [folder + '09132019_222031/episodic_data.pickle', folder + '09132019_231840/episodic_data.pickle'] #Add multiple paths to list if multiple data files
+
+# Diffeomorphism tuning parameters:
+tune_diffeomorphism = True
+n_search = 10
+n_folds = 5
+diffeomorphism_model_file = 'diff_model'
+NN_parameter_file = 'scripts/NN_parameters.pickle'
+
+l2_diffeomorphism = np.linspace(0.,5., 20)
+jacobian_penalty_diffeomorphism = np.linspace(0.,5., 20)
+diff_n_epochs = [50, 100, 200, 500]
+diff_n_hidden_layers = [1, 2, 3, 4]
+diff_layer_width = [10, 20, 30, 40, 50]
+diff_batch_size = [8, 16, 32]
+diff_learn_rate = np.linspace(1e-5, 1e-1, 20)  # Fix for current architecture
+diff_learn_rate_decay = [0.8, 0.9, 0.95, 0.975, 0.99, 1.0]
+diff_dropout_prob = [0., 0.05, 0.1, 0.25, 0.5]
+
+# KEEDMD tuning parameters
+tune_keedmd = True
+eigenfunction_max_power = 6
+l1_ratio = array([.1, .5, .7, .9, .95, .99, 1])  # Values to test
+
 # Define true system
-print(str(Path().absolute()))
-datafile = (str(Path().absolute()) + '/experiments/episodic_KEEDMD/fast_drone_landing/09112019_204053/episodic_data.pickle')
 n, m = 2, 1  # Number of states and actuators
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([0.0, -4.])  # State constraints
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
 else:
-    hover_thrust = 0.65         #TODO: Update with correct bintel thrust
-    K = array([0.8670, 0.9248])  #TODO: Solve lqr in Matlab with bintel thrust
+    hover_thrust = 0.6615
+    K = array([[1.35, 0.81]])
 g = 9.81
 A_nom = array([[0., 1.], [0., 0.]])  # Nominal model of the true system around the origin
 B_nom = array([[0.], [1./(hover_thrust/g)]])  # Nominal model of the true system around the origin
@@ -43,27 +67,7 @@ dt = 1/controller_rate  # Time step
 N = int(2. / dt)  # Number of time steps
 t_eval = dt * arange(N + 1)  # Simulation time points
 
-# Koopman eigenfunction parameters
-plot_eigen = False
-eigenfunction_max_power = 6
-l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
-jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
-load_diffeomorphism_model = True
-diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 10
-diff_train_frac = 0.9
-diff_n_hidden_layers = 2
-diff_layer_width = 50
-diff_batch_size = 16
-diff_learn_rate = 1e-3  # Fix for current architecture
-diff_learn_rate_decay = 0.99  # Fix for current architecture
-diff_dropout_prob = 0.5
-
-# KEEDMD parameters
-# Best: 0.024
-l1_keedmd = 1e-2#5e-2
-l1_ratio = 0.5
-
+#TODO: Consider removing:
 save_fit = True
 load_fit = not save_fit
 test_open_loop = True
@@ -72,80 +76,132 @@ plot_open_loop = True
 # %%
 # ! ===============================================    LOAD DATA     ==================================================
 # * Load trajectories
-print("Collect data.")
-
 #Import data and aggregate
-infile = open(datafile, 'rb')
-[X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort] = dill.load(infile)
+t_proc = []
+X_proc = []
+Xd_proc = []
+U_proc = []
+Unom_proc = []
+for datafile in datafile_lst:
+    infile = open(datafile, 'rb')
+    [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort] = dill.load(infile)
 
-#Data format X, Xd: (Nepisodes x n x Ntime)
-#Data format U, Unom: (Nepisodes x m x Ntime)
-#Data format t: (Nepisodes x 1 x Ntime)
-#Data format track_err: (Nepisodes x n)
-#Data format ctrl_eff: (Nepisodes)
+    #Data format X, Xd: (Nepisodes x n x Ntime)
+    #Data format U, Unom: (Nepisodes x m x Ntime)
+    #Data format t: (Nepisodes x 1 x Ntime)
+    #Data format track_err: (Nepisodes x n)
+    #Data format ctrl_eff: (Nepisodes)
 
-#Interpolate all data to get consistent dataset to work with:
-t_proc = linspace(0,1.5,int(50*1.5)) #1.5=duration of dataclips, 50=controller rate
-X_proc = zeros((len(X_ep), len(t_proc), n))
-Xd_proc = zeros((len(X_ep), len(t_proc), n))
-U_proc = zeros((len(X_ep), len(t_proc), m))
-Unom_proc = zeros((len(X_ep), len(t_proc), m))
+    #Interpolate all data to get consistent dataset to work with:
+    t_tmp = linspace(0,1.5,int(50*1.5)) #1.5=duration of dataclips, 50=controller rate
+    X_tmp = zeros((len(t_tmp), n))
+    Xd_tmp = zeros((len(t_tmp), n))
+    U_tmp = zeros((len(t_tmp), m))
+    Unom_tmp = zeros((len(t_tmp), m))
 
-for ii in range(len(X_ep)):
-    for jj in range(n):
-        X_proc[ii,:,jj] = interp(t_proc,t_ep[ii].squeeze(),X_ep[ii][jj,:].squeeze())
-        Xd_proc[ii, :, jj] = interp(t_proc, t_ep[ii].squeeze(), Xd_ep[ii][jj, :].squeeze())
-    for jj in range(m):
-        U_proc[ii,:,jj] = interp(t_proc,t_ep[ii].squeeze(),U_ep[ii][jj,:].squeeze()) - hover_thrust  #TODO: Make sure consistent with data collected from controllers
-        Unom_proc[ii, :, jj] = interp(t_proc, t_ep[ii].squeeze(), Unom_ep[ii][jj, :].squeeze()) -hover_thrust #TODO: Make sure consistent with data collected from controllers
+    for ii in range(len(X_ep)):
+        for jj in range(n):
+            X_tmp[:,jj] = interp(t_tmp,t_ep[ii].squeeze(),X_ep[ii][jj,:].squeeze())
+            Xd_tmp[ :, jj] = interp(t_tmp, t_ep[ii].squeeze(), Xd_ep[ii][jj, :].squeeze())
+        for jj in range(m):
+            U_tmp[:,jj] = interp(t_tmp,t_ep[ii].squeeze(),U_ep[ii][jj,:].squeeze()) - hover_thrust  #TODO: Make sure consistent with data collected from controllers
+            Unom_tmp[:, jj] = interp(t_tmp, t_ep[ii].squeeze(), Unom_ep[ii][jj, :].squeeze()) -hover_thrust #TODO: Make sure consistent with data collected from controllers
+
+        t_proc.append(t_tmp)
+        X_proc.append(X_tmp)
+        Xd_proc.append(X_tmp)
+        U_proc.append(U_tmp)
+        Unom_proc.append(Unom_tmp)
+
+t_proc = array(t_proc)
+X_proc = array(X_proc)
+Xd_proc = array(Xd_proc)
+U_proc = array(U_proc)
+Unom_proc = array(Unom_proc)
 
 # %%
-# !  ===============================================     FIT MODELS      ===============================================
+# !  ======================================     TUNE DIFFEOMORPHISM MODEL      ========================================
 t0 = time.process_time()
 
-print("Fitting models:")
-# Construct basis of Koopman eigenfunctions for KEEDMD:
-print(' - Constructing Koopman eigenfunction basis....', end =" ")
-eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=BK)
-eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
-                                               batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
-if load_diffeomorphism_model:
-    eigenfunction_basis.load_diffeomorphism_model(diffeomorphism_model_file)
-else:
-    initialize = True
-    for ii in range(len(X_ep)):
-        eigenfunction_basis.fit_diffeomorphism_model(X=X_proc[ii:ii+1,:,:], t=t_proc, X_d=Xd_proc[ii:ii+1,:,:], l2=l2_diffeomorphism,
-                                                     jacobian_penalty=jacobian_penalty_diffeomorphism,
-                                                     learning_rate=diff_learn_rate,
-                                                     learning_decay=diff_learn_rate_decay, n_epochs=diff_n_epochs,
-                                                     train_frac=diff_train_frac, batch_size=diff_batch_size, initialize=initialize)
-        initialize=False
-    if plot_eigen:
-        eigenfunction_basis.plot_eigenfunction_evolution(X_proc[-1], Xd_proc[-1], t_proc)
+cv_inds = np.arange(start=0, stop=X_proc.shape[0])
+np.random.shuffle(cv_inds)
+val_num = int(np.floor(X_proc.shape[0]/n_folds))
 
-    eigenfunction_basis.save_diffeomorphism_model(diffeomorphism_model_file)
+if tune_diffeomorphism:
+    test_score = []
+    best_score = np.inf
+    for ii in range(n_search):
 
+        # Sample parameters
+        l2 = np.random.choice(l2_diffeomorphism)
+        jac_pen = np.random.choice(jacobian_penalty_diffeomorphism)
+        n_epochs = np.random.choice(diff_n_epochs)
+        n_hidden = np.random.choice(diff_n_hidden_layers)
+        layer_width = np.random.choice(diff_layer_width)
+        batch_size = np.random.choice(diff_batch_size)
+        learn_rate = np.random.choice(diff_learn_rate)
+        rate_decay = np.random.choice(diff_learn_rate_decay)
+        dropout = np.random.choice(diff_dropout_prob)
+
+        fold_score = []
+        for ff in range(n_folds):
+            # Define data matrices:
+            val_inds = cv_inds[ff*val_num:(ff+1)*val_num]
+            train_inds = np.delete(cv_inds,np.linspace(ff*val_num,(ff+1)*val_num-1,val_num, dtype=int))
+            t = t_proc[train_inds,:]
+            X = X_proc[train_inds,:,:]
+            Xd = Xd_proc[train_inds,:,:]
+            t_val = t_proc[val_inds, :]
+            X_val = X_proc[val_inds, :, :]
+            Xd_val = Xd_proc[val_inds, :, :]
+
+            # Fit model with current data set and hyperparameters
+            eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=BK)
+            eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=n_hidden, layer_width=layer_width,
+                                                       batch_size=batch_size, dropout_prob=dropout)
+
+            score_tmp = eigenfunction_basis.fit_diffeomorphism_model(X=X, t=t, X_d=Xd, l2=l2,
+                                                            jacobian_penalty=jac_pen,
+                                                            learning_rate=learn_rate,
+                                                            learning_decay=rate_decay, n_epochs=n_epochs,
+                                                            train_frac=1.0, batch_size=batch_size, initialize=True,
+                                                            verbose=False, X_val=X_val, Xd_val=Xd_val, t_val=t_val)
+            fold_score.append(score_tmp)
+
+        test_score.append(sum(fold_score)/len(fold_score))
+        if test_score[-1] < best_score:
+            best_score = test_score[-1]
+            eigenfunction_basis.save_diffeomorphism_model(diffeomorphism_model_file) #Only save model if it is improving
+            data_list = [l2, jac_pen, n_epochs, n_hidden, layer_width, batch_size, learn_rate, rate_decay, dropout, test_score]
+            outfile = open(NN_parameter_file, 'wb')
+            dill.dump(data_list, outfile)
+            outfile.close()
+
+        print('Experiment ', ii, ' test loss with current configuration: ', test_score[-1], 'best score: ', best_score)
+        print('Current parameters: ', l2, jac_pen, n_epochs, n_hidden, layer_width, batch_size, learn_rate, rate_decay, dropout)
+
+# Load best/stored diffeomorphism model and construct basis:
+eigenfunction_basis.load_diffeomorphism_model(diffeomorphism_model_file)
 eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
-score = eigenfunction_basis.score_eigenfunction_evolution(X_proc[-1], Xd_proc[-1], t_proc)
-print('Diffeomorphism test score: ', score)
-
 
 print('in {:.2f}s'.format(time.process_time() - t0))
+# %%
+# !  =========================================     TUNE KEEDMD MODEL      ===========================================
 t0 = time.process_time()
 
 # Fit KEEDMD model:
 t0 = time.process_time()
 print(' - Fitting KEEDMD model...', end =" ")
 t_proc = tile(t_proc,(len(X_ep),1))
-keedmd_model = Keedmd(eigenfunction_basis, n, l1=l1_keedmd, l1_ratio=l1_ratio, K_p=K[:,:int(n/2)], K_d=K[:,int(n/2):])
+keedmd_model = Keedmd(eigenfunction_basis, n, l1=0., l1_ratio=0., K_p=K[:,:int(n/2)], K_d=K[:,int(n/2):])
 X, X_d, Z, Z_dot, U, U_nom, t = keedmd_model.process(X_proc, Xd_proc, U_proc, Unom_proc, t_proc)
-keedmd_model.tune_fit(X, X_d, Z, Z_dot, U, U_nom)
+keedmd_model.tune_fit(X, X_d, Z, Z_dot, U, U_nom, l1_ratio=l1_ratio)
 print('in {:.2f}s'.format(time.process_time() - t0))
 
 # %%
 # !  ==============================================  EVALUATE PERFORMANCE -- OPEN LOOP =========================================
 
-dill_filename = 'scripts/model_tuning.pickle'
+dill_filename = 'scripts/keedmd_tuning.pickle'
 if save_fit:
     data_list = [Xd_proc, t_proc, keedmd_model, K]
     outfile = open(dill_filename, 'wb')
