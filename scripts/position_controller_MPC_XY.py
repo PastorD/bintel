@@ -123,7 +123,7 @@ class PositionController():
         self.prob = osqp.OSQP()
 
         # Setup workspace
-        self.prob.setup(P, q, A, self._osqp_l, self._osqp_u, warm_start=True)
+        self.prob.setup(P, q, A, self._osqp_l, self._osqp_u, warm_start=True, verbose=False)
         self.first = True
         
 
