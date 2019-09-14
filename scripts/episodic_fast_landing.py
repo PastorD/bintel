@@ -49,7 +49,7 @@ A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
 duration_low = 1.
-n_waypoints = 1
+n_waypoints = 3
 controller_rate = 60
 p_init = np.array([1., -1.5, 1.75])
 p_final = np.array([1., -1.5, 0.5])
@@ -132,7 +132,7 @@ class DroneHandler(Handler):
         self.hover_thrust = hover_thrust
         self.comp_time = []
 
-    def process(self, X, p_final, U, Upert, t):
+    def clean_data(self, X, p_final, U, Upert, t):
         assert (X.shape[0] == self.X_agg.shape[0])
         assert (U.shape[0] == self.U_agg.shape[0])
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
@@ -165,6 +165,29 @@ class DroneHandler(Handler):
         #Numerically calculate acceleration, if above g, remove points
 
         return X, Xd, U, Unom, t
+
+    def aggregate_landings_per_episode(self,X_w, Xd_w, U_w, Unom_w, t_w):
+        nw = X_w.__len__()
+        t_size_min = np.min([t_local.squeeze().shape[0] for t_local in t_w])
+        #dt = 1/60
+        #Nt = int(t_min/dt)
+        t_end = t_w[0].squeeze()[-1]
+        ns = 2
+        nu = 1
+        X    = X_w[0][:,:t_size_min]
+        Xd   = Xd_w[0][:,:t_size_min]
+        U    = U_w[0][:,:t_size_min]
+        Unom = Unom_w[0][:,:t_size_min]
+        t    = np.linspace(0,t_end,t_size_min) 
+        for i in range(1,nw):
+            X    = np.append(X   , X_w[i][:,:t_size_min],axis=1)
+            Xd   = np.append(Xd  , Xd[:,:t_size_min],axis=1)
+            U    = np.append(U   , U_w[i][:,:t_size_min],axis=1)
+            Unom = np.append(Unom, Unom_w[i][:,:t_size_min],axis=1)
+
+
+        return X, Xd, U, Unom, t 
+
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         t0 = datetime.now().timestamp()
@@ -264,6 +287,13 @@ t_ep = []
 
 print('Starting episodic learning...')
 for ep in range(Nep):
+
+    X_w = []
+    Xd_w = []
+    U_w = []
+    Unom_w = []
+    t_w = []
+
     for ww in range(n_waypoints):  #Execute multiple trajectories between training
         print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
         print("Resetting to initial point...")
@@ -272,10 +302,17 @@ for ep in range(Nep):
 
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
-        X, Xd, U, Unom, t = handler.process(X, p_final, U, Upert, t)
-        if n_waypoints > 1:
-            raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+        X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
+
+        X_w.append(    X)    
+        Xd_w.append(   Xd)   
+        U_w.append(    U)    
+        Unom_w.append( Unom) 
+        t_w.append(    t)  
+        # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+
     land()  # Land while fitting models
+    X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
     print("Fitting diffeomorphism...")
     eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,

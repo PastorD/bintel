@@ -175,7 +175,7 @@ class PositionController():
         f_d.x = -self.k_p*e_p[0] - self.k_d*e_v[0]
         f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
 
-        print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
+        #print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
 
         return f_d
 
