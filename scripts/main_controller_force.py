@@ -65,14 +65,17 @@ class Robot():
 
 
 
-    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None):
+    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None, hover=True, time_hover=2, time_after_converged=3):
         """
         Go to p_final
         """
         # Trajectory:
         self.file = file_csv
         self.p_init = p_init
-        self.p_final = p_final
+        if hover:
+            self.p_final = p_init
+        else:
+            self.p_final = p_final
         self.t_init = rospy.Time.now()
         self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
@@ -82,18 +85,26 @@ class Robot():
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
-        time_after_converged = 2
         self.init_time = time.time()
-        time_converged = self.init_time+6
+        time_converged = self.init_time+8 # just in case so it stops
 
         if controller is None:
-            self.controller.setup_OSQP(p_final)
+            self.controller.setup_OSQP(self.p_final)
         else:
             self.controller = controller
         
+        self.controller.p_final = self.p_final
+        self.controller.setup_OSQP(self.p_final)
+
 
         self.t0 = rospy.get_time()
         while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
+
+            if ( time.time() - self.init_time > time_hover ):
+                self.p_final = p_final
+                self.update_pfinal(p_final)
+                self.hover = False
+                self.init_time = time.time()
             if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.1 and not converged):
                 converged = True
                 time_converged = time.time()
@@ -104,7 +115,8 @@ class Robot():
             #self.pub_traj.publish(self.traj_msg)
             #self.create_force_msg(stamp=rospy.Time.now())
             #self.pub_force.publish(self.force_msg)
-            self.append_dat_traj()
+            if not hover:
+                self.append_dat_traj()
             self.rate.sleep()
 
         return self.X, self.p_final, self.U, self.Upert, self.t

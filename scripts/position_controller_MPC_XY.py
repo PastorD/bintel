@@ -126,6 +126,11 @@ class PositionController():
         self.prob.setup(P, q, A, self._osqp_l, self._osqp_u, warm_start=True, verbose=False)
         self.first = True
         
+    def update_pfinal(self,final_point):
+        q = np.hstack([np.kron(np.ones(self.N), -Q.dot(final_point)), -QN.dot(final_point),
+               np.zeros(self.N*self.nu)])
+
+        self.prob.update(q=q)
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         # Compute desired controller

@@ -53,6 +53,9 @@ n_waypoints = 3
 controller_rate = 60
 p_init = np.array([1., -1.5, 1.25])
 p_final = np.array([1., -1.5, 0.5])
+time_hover = 2
+time_after_converged = 2
+initial_hover = True
 pert_noise = 0.03 #0.05 #TODO: Increase for experiments
 Nep = 10
 w = linspace(0, 1, Nep)
@@ -264,7 +267,7 @@ bintel = Robot(controller_rate, n, m)
 go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
 initial_controller = PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
-                                                        p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False)
+                                        p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False)
 # Define nominal model and nominal controller:
 #nominal_sys = LinearSystemDynamics(A=A_nom, B=B_nom)
 #initial_controller = MPCControllerDense(linear_dynamics=nominal_sys,
@@ -311,7 +314,8 @@ for ep in range(Nep):
         go_waypoint.gopoint(np.array(p_init))
 
         print("Executing fast landing with current controller...")
-        X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
+        X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler,
+                                                  hover=initial_hover, time_hover=time_hover, time_after_converged=time_after_converged)
         X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
 
         X_w.append(    X)    
