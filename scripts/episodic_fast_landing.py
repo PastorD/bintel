@@ -294,6 +294,7 @@ Xd_ep = []
 U_ep = []
 Unom_ep = []
 t_ep = []
+osqp_thoughts =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
 
 print('Starting episodic learning...')
 for ep in range(Nep):
@@ -314,12 +315,13 @@ for ep in range(Nep):
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
         X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
 
+        # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
         X_w.append(    X)    
         Xd_w.append(   Xd)   
         U_w.append(    U)    
         Unom_w.append( Unom) 
         t_w.append(    t)  
-        # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+        osqp_thoughts[ww][ep] = bintel.controller.osqp_thoughts
 
     land()  # Land while fitting models
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
