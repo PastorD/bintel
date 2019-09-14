@@ -263,7 +263,7 @@ Unom_ep = []
 t_ep = []
 
 print('Starting episodic learning...')
-for ep in range(Nep):
+for ep in range(Nep+2):
     for ww in range(n_waypoints):  #Execute multiple trajectories between training
         print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
         print("Resetting to initial point...")
