@@ -13,7 +13,7 @@ plot_full_state = True
 plot_z_err_ctrl = True
 plot_summary = True
 
-X_arr, Xd_arr, U_arr, Unom_arr, t_arr, track_error_arr, ctrl_effort_arr = [], [], [], [], [], [], []
+X_arr, Xd_arr, U_arr, Unom_arr, t_arr, Xval_arr, Uval_arr, tval_arr, track_error_arr, ctrl_effort_arr = [], [], [], [], [], [], [], [], [], []
 file_lst = []
 dir_lst = []
 
@@ -25,13 +25,16 @@ for root, dirs, files in os.walk("experiments/episodic_KEEDMD/fast_drone_landing
             infile = open(str(os.path.join(root,file)), 'rb')
             file_lst.append(str(os.path.join(root,file)))
             dir_lst.append(str(root))
-            [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort] = dill.load(infile)
+            [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort] = dill.load(infile)
             infile.close()
             X_arr.append(X_ep)
             Xd_arr.append(Xd_ep)
             U_arr.append(U_ep)
             Unom_arr.append(Unom_ep)
             t_arr.append(t_ep)
+            Xval_arr.append(Xval_ep)
+            Uval_arr.append(Uval_ep)
+            tval_arr.append(tval_ep)
             track_error_arr.append(track_error)
             ctrl_effort_arr.append(ctrl_effort)
 
@@ -79,11 +82,10 @@ if plot_full_state:
 if plot_z_err_ctrl:
     for ii in range(len(X_arr)):
         for jj in range(len(X_arr[0])):
-            X = X_arr[ii][jj]
-            Xd = Xd_arr[ii][jj]
-            U = U_arr[ii][jj]
-            Unom = Unom_arr[ii][jj]
-            t = t_arr[ii][jj].squeeze()
+            X = Xval_arr[ii][jj]
+            Xd = zeros_like(X)
+            U = Uval_arr[ii][jj]
+            t = tval_arr[ii][jj].squeeze()
 
             figure(figsize=(4.2,4.5))
             subplot(2, 1, 1)
@@ -106,7 +108,7 @@ if plot_z_err_ctrl:
             xlabel('Time (sec)')
             ylim((0.,1.))
             grid()
-            ctrl_norm = (t[-1]-t[0])*sum((Unom[0,:])**2)/len(U[0,:])
+            ctrl_norm = (t[-1]-t[0])*sum((U[0,:])**2)/len(U[0,:])
             text(0.02, 0.2, "$\int u_n^2=${0:.2f}".format(ctrl_norm))
             savefig(dir_lst[ii] + '/track_err_ctrl_ep_' + str(jj))
             if display_plots:
@@ -115,8 +117,9 @@ if plot_z_err_ctrl:
 
 # Plot summary of tracking error and control effort VS episode
 if plot_summary:
-        track_error = array(track_error_arr)[:,:,0]
+        track_error = array(track_error_arr)
         ctrl_effort = array(ctrl_effort_arr)[:,:,0]
+        print(track_error.shape, ctrl_effort.shape)
 
         track_error_mean = mean(track_error, axis=0)
         track_error_mean /= track_error_mean[0]  #Normalize

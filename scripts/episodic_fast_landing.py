@@ -35,7 +35,7 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = False
+simulation = True
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
@@ -53,8 +53,8 @@ n_waypoints = 3
 controller_rate = 60
 p_init = np.array([1., -1.5, 1.25])
 p_final = np.array([1., -1.5, 0.5])
-pert_noise = 0.03 #0.05 #TODO: Increase for experiments
-Nep = 10
+pert_noise = 0.002
+Nep = 5
 w = linspace(0, 1, Nep)
 w /= (6*sum(w))
 #w = zeros((Nep,))
@@ -71,7 +71,7 @@ l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 5
+diff_n_epochs = 50
 diff_train_frac = 0.9
 diff_n_hidden_layers = 2
 diff_layer_width = 50
@@ -125,7 +125,7 @@ print("q", q_d.shape)
 class DroneHandler(Handler):
     def __init__(self, n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt, hover_thrust):
         super(DroneHandler, self).__init__(n, m, Nlift, Nep, w, initial_controller, pert_noise)
-        self.Tpert = 0.
+        self.Tpert = 0. # Brownian noise
         self.p_init = p_init
         self.p_final = p_final
         self.dt = dt
@@ -217,7 +217,7 @@ class DroneHandler(Handler):
         T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
         T_d += sum([self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))])
-        self.Tpert = self.pert_noise*random.randn()
+        self.Tpert += self.pert_noise*random.randn()
         T_d += self.Tpert
 
         self.comp_time.append((datetime.now().timestamp()-t0))
@@ -265,44 +265,46 @@ go_waypoint = MavrosGOTOWaypoint()
 initialize_NN = True  #  Initializes the weights of the NN when set to true
 initial_controller = PositionController(u_hover=hover_thrust, gravity=g, rate=controller_rate,
                                                         p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False)
-# Define nominal model and nominal controller:
-#nominal_sys = LinearSystemDynamics(A=A_nom, B=B_nom)
-#initial_controller = MPCControllerDense(linear_dynamics=nominal_sys,
-#                                N=N_steps,
-#                                dt=dt,
-#                                umin=array([-umax_control]),
-#                                umax=array([+umax_control]),
-#                                xmin=xmin,
-#                                xmax=xmax,
-#                                Q=Q,
-#                                R=R,
-#                                QN=QN,
-#                                xr=q_d,
-#                                lifting=False,
-#                                plotMPC=plotMPC,
-#                                name='Nominal')
-
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
 eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
 handler = DroneHandler(n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt, hover_thrust)
 
-track_error = []
-ctrl_effort = []
 X_ep = []
 Xd_ep = []
 U_ep = []
 Unom_ep = []
 t_ep = []
 
-print('Starting episodic learning...')
-for ep in range(Nep):
+Xval_ep = []
+Uval_ep = []
+tval_ep = []
+track_error = []
+ctrl_effort = []
 
+
+print('Starting episodic learning...')
+for ep in range(Nep+1):
+    # Run single landing with no perturbation for validation plots:
+    print("Executing trajectory with no perturbation noise...")
+    print("Resetting to initial point...")
+    handler.pert_noise = 0.
+    command.arming(True)
+    go_waypoint.gopoint(np.array(p_init))
+    X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
+    X_val, Xd_val, U_val, _, t_val = handler.clean_data(X, p_final, U, Upert, t)
+    land()
+    handler.pert_noise = pert_noise
+
+    # Run training loop:
     X_w = []
     Xd_w = []
     U_w = []
     Unom_w = []
     t_w = []
+    if ep == Nep:
+        # Only run validation landing to evaluate performance after final episode
+        continue
 
     for ww in range(n_waypoints):  #Execute multiple trajectories between training
         print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
@@ -314,11 +316,11 @@ for ep in range(Nep):
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
         X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
 
-        X_w.append(    X)    
-        Xd_w.append(   Xd)   
-        U_w.append(    U)    
-        Unom_w.append( Unom) 
-        t_w.append(    t)  
+        X_w.append(X)
+        Xd_w.append(Xd)
+        U_w.append(U)
+        Unom_w.append(Unom)
+        t_w.append(t)
         # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
 
     land()  # Land while fitting models
@@ -355,6 +357,7 @@ for ep in range(Nep):
                                 plotMPC=plotMPC,
                                 name='KEEDMD')
     handler.aggregate_ctrl(mpc_ep)
+    handler.Tpert = 0. # Reset Brownian noise
     initialize_NN = False  # Warm s tart NN after first episode
 
     # Store data for the episode:
@@ -365,8 +368,11 @@ for ep in range(Nep):
     t_ep.append(t)
 
     # Plot episode results and calculate statistics
-    track_error.append((t[0,-1]-t[0,0])*np.divide(np.sum(((X-Xd)**2),axis=1),X.shape[1]))
-    ctrl_effort.append((t[0,-1]-t[0,0])*np.sum(Unom**2,axis=1)/Unom.shape[1])
+    Xval_ep.append(X_val)
+    Uval_ep.append(U_val)
+    tval_ep.append(t_val)
+    track_error.append((t_val[0,-1]-t_val[0,0])*np.sum(((X_val[0,:]-Xd_val[0,:])**2)/X_val.shape[1]))
+    ctrl_effort.append((t_val[0,-1]-t_val[0,0])*np.sum(U_val**2,axis=1)/U_val.shape[1])
     print(track_error[-1], ctrl_effort[-1])
     #print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
     handler.comp_time = []
@@ -383,7 +389,7 @@ print("Experiments finalized")
 folder = "experiments/episodic_KEEDMD/fast_drone_landing/" + datetime.now().strftime("%m%d%Y_%H%M%S")
 os.mkdir(folder)
 
-data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, track_error, ctrl_effort]
+data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort]
 outfile = open(folder + "/episodic_data.pickle", 'wb')
 dill.dump(data_list, outfile)
 outfile.close()
