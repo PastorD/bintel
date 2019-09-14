@@ -24,7 +24,7 @@ class PositionController():
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        self.k_p = 0.1 # 0.5 max, 1 too much #was 0.3 #TODO: Move back if not working
+        self.k_p = 0.15 # 0.5 max, 1 too much #was 0.3 #TODO: Move back if not working
         self.k_d = self.k_p*1.0
 
         self.g = gravity
@@ -167,7 +167,7 @@ class PositionController():
         if self._osqp_result.info.status != 'solved':
             print(f_d.z)
             #[f_d.x, f_d.y, f_d.z] = np.array([0.,0.,self.u_hover])
-            raise ValueError('OSQP did not solve the problem!')
+            raise ValueError('POSITION XY OSQP did not solve the problem!')
 
         # Project f_d into space of achievable force
         

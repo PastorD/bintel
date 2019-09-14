@@ -35,7 +35,7 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
@@ -51,13 +51,13 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 3
 controller_rate = 60
-p_init = np.array([1., -1.5, 1.25])
+p_init = np.array([1., -1.5, 1.75])
 p_final = np.array([1., -1.5, 0.5])
 pert_noise = 0.002
 Nep = 5
 w = linspace(0, 1, Nep)
 w /= (6*sum(w))
-#w = zeros((Nep,))
+w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([-p_final[2], -8.])  # State constraints
@@ -66,11 +66,12 @@ lower_bounds = array([-p_final[2], -8.])  # State constraints
 # Koopman eigenfunction parameters
 plot_eigen = False
 eigenfunction_max_power = 6
+Nlift = (eigenfunction_max_power + 1)**2 + n
 l2_diffeomorphism = 3.9473684210526314#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 0.7894736842105263#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 500
+diff_n_epochs = 50
 diff_train_frac = 0.99
 diff_n_hidden_layers = 4
 diff_layer_width = 20
