@@ -1,0 +1,19 @@
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 8.004973648051077, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 3.6927312917166546, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 10.817238364959962, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 6.631491226357753, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 5.435434448062779, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+/usr/local/lib/python3.5/dist-packages/sklearn/linear_model/coordinate_descent.py:462: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations. Duality gap: 3.7451392854914047, tolerance: 1.0034597755872303
+  coef_, l1_reg, l2_reg, X, y, max_iter, tol, rng, random)
+KEEDMD l1 strength:  0.017582694701237512 0.0017041798326924297 0.0028479542354489067
+in 890.10s
+mse KEEDMD:  7.493915613784151e+27 mse nominal:  53.92661651348678
+pos:  0.017582694701237512 0.1
+vel:  0.0017041798326924297 0.99
+eig:  0.0028479542354489067 0.95
+Sparsity fraction:  0.3333333333333333

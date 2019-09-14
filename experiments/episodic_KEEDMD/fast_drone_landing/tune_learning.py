@@ -21,12 +21,12 @@ datafile_lst = [folder + '09132019_222031/episodic_data.pickle', folder + '09132
 
 # Diffeomorphism tuning parameters:
 tune_diffeomorphism = True
-n_search = 10
-n_folds = 5
+n_search = 1
+n_folds = 2
 diffeomorphism_model_file = 'diff_model'
 NN_parameter_file = 'scripts/NN_parameters.pickle'
 
-l2_diffeomorphism = np.linspace(0.,5., 20)
+'''l2_diffeomorphism = np.linspace(0.,5., 20)
 jacobian_penalty_diffeomorphism = np.linspace(0.,5., 20)
 diff_n_epochs = [50, 100, 200, 500]
 diff_n_hidden_layers = [1, 2, 3, 4]
@@ -34,12 +34,21 @@ diff_layer_width = [10, 20, 30, 40, 50]
 diff_batch_size = [8, 16, 32]
 diff_learn_rate = np.linspace(1e-5, 1e-1, 20)  # Fix for current architecture
 diff_learn_rate_decay = [0.8, 0.9, 0.95, 0.975, 0.99, 1.0]
-diff_dropout_prob = [0., 0.05, 0.1, 0.25, 0.5]
+diff_dropout_prob = [0., 0.05, 0.1, 0.25, 0.5]'''
+l2_diffeomorphism = [3.9473684210526314]
+jacobian_penalty_diffeomorphism = [0.7894736842105263]
+diff_n_epochs = [500]
+diff_n_hidden_layers = [4]
+diff_layer_width = [20]
+diff_batch_size = [8]
+diff_learn_rate = [0.08947473684210526] # Fix for current architecture
+diff_learn_rate_decay = [0.8]
+diff_dropout_prob = [0.]
 
 # KEEDMD tuning parameters
 tune_keedmd = True
 eigenfunction_max_power = 6
-l1_ratio = array([.1, .5, .7, .9, .95, .99, 1])  # Values to test
+l1_ratio = [.5]#array([.1, .5, .7, .9, .95, .99, 1])  # Values to test
 
 # Define true system
 n, m = 2, 1  # Number of states and actuators
@@ -181,7 +190,7 @@ if tune_diffeomorphism:
         print('Current parameters: ', l2, jac_pen, n_epochs, n_hidden, layer_width, batch_size, learn_rate, rate_decay, dropout)
 
 # Load best/stored diffeomorphism model and construct basis:
-eigenfunction_basis.load_diffeomorphism_model(diffeomorphism_model_file)
+#eigenfunction_basis.load_diffeomorphism_model(diffeomorphism_model_file)
 eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
 
 print('in {:.2f}s'.format(time.process_time() - t0))
@@ -192,10 +201,13 @@ t0 = time.process_time()
 # Fit KEEDMD model:
 t0 = time.process_time()
 print(' - Fitting KEEDMD model...', end =" ")
-t_proc = tile(t_proc,(len(X_ep),1))
-keedmd_model = Keedmd(eigenfunction_basis, n, l1=0., l1_ratio=0., K_p=K[:,:int(n/2)], K_d=K[:,int(n/2):])
+#t_proc = tile(t_proc,(X_proc.shape[0],1))
+print(t_proc.shape, X_proc.shape)
+keedmd_model = Keedmd(eigenfunction_basis, n, l1_pos=0., l1_ratio_pos=0.5, l1_vel=0., l1_ratio_vel=0.5, l1_eig=0., l1_ratio_eig=0.5, K_p=K[:,:int(n/2)], K_d=K[:,int(n/2):])
 X, X_d, Z, Z_dot, U, U_nom, t = keedmd_model.process(X_proc, Xd_proc, U_proc, Unom_proc, t_proc)
-keedmd_model.tune_fit(X, X_d, Z, Z_dot, U, U_nom, l1_ratio=l1_ratio)
+keedmd_model.tune_fit(X, X_d, Z, Z_dot, U, U_nom)
+
+print('KEEDMD l1 strength: ', keedmd_model.l1_pos, keedmd_model.l1_vel, keedmd_model.l1_eig)
 print('in {:.2f}s'.format(time.process_time() - t0))
 
 # %%
