@@ -49,15 +49,15 @@ A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
 duration_low = 1.
-n_waypoints = 1
+n_waypoints = 3
 controller_rate = 60
-p_init = np.array([0., 0., 1.5])
-p_final = np.array([0., 0., 0.5])
-pert_noise = 0.00#0.05 #TODO: Increase for experiments
-Nep = 3
-#w = linspace(0, 1, Nep)
-#w /= sum(w)
-w = zeros((Nep,))
+p_init = np.array([1., -1.5, 1.25])
+p_final = np.array([1., -1.5, 0.5])
+pert_noise = 0.03 #0.05 #TODO: Increase for experiments
+Nep = 10
+w = linspace(0, 1, Nep)
+w /= (6*sum(w))
+#w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([-p_final[2], -8.])  # State constraints
@@ -71,7 +71,7 @@ l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 200
+diff_n_epochs = 5
 diff_train_frac = 0.9
 diff_n_hidden_layers = 2
 diff_layer_width = 50
@@ -109,7 +109,7 @@ u_margin = 0.3
 umax_control = min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
 xmax=upper_bounds
-MPC_horizon = 0.4 # [s]
+MPC_horizon = 0.5 # [s]
 dt = 1/controller_rate
 N_steps = int(MPC_horizon/dt)
 p_final_augment = array([[p_final[2]],[0.]])  # Desired position augmenting controller
@@ -132,7 +132,7 @@ class DroneHandler(Handler):
         self.hover_thrust = hover_thrust
         self.comp_time = []
 
-    def process(self, X, p_final, U, Upert, t):
+    def clean_data(self, X, p_final, U, Upert, t):
         assert (X.shape[0] == self.X_agg.shape[0])
         assert (U.shape[0] == self.U_agg.shape[0])
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
@@ -144,7 +144,7 @@ class DroneHandler(Handler):
         Unom -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
 
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
-        start_altitude = self.p_init[2] - 0.25  # Start altitude in meters  #TODO: Tune for experiment
+        start_altitude = self.p_init[2] - 0.4  # Start altitude in meters  #TODO: Tune for experiment
         max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
         first_ind = np.argwhere(X[0,1:] < start_altitude)[0][0]+1  #First data point is just initializing and excluded
         t = t[:, first_ind:]
@@ -165,6 +165,39 @@ class DroneHandler(Handler):
         #Numerically calculate acceleration, if above g, remove points
 
         return X, Xd, U, Unom, t
+
+    def aggregate_landings_per_episode(self,X_w, Xd_w, U_w, Unom_w, t_w):
+        nw = X_w.__len__()
+        t_size_min = np.min([t_local.squeeze().shape[0] for t_local in t_w])
+        #dt = 1/60
+        #Nt = int(t_min/dt)
+        t_end = t_w[0].squeeze()[-1]
+        ns = 2
+        nu = 1
+        # X    = X_w[0][:,:t_size_min]
+        # Xd   = Xd_w[0][:,:t_size_min]
+        # U    = U_w[0][:,:t_size_min]
+        # Unom = Unom_w[0][:,:t_size_min]
+        # t    = np.linspace(0,t_end,t_size_min) 
+        # for i in range(1,nw):
+        #     X    = np.append(X   , X_w[i][:,:t_size_min],axis=1)
+        #     Xd   = np.append(Xd  , Xd[:,:t_size_min],axis=1)
+        #     U    = np.append(U   , U_w[i][:,:t_size_min],axis=1)
+        #     Unom = np.append(Unom, Unom_w[i][:,:t_size_min],axis=1)
+        X    = np.zeros((X_w[0].shape[0],t_size_min,nw))
+        Xd   = np.zeros((Xd_w[0].shape[0],t_size_min,nw))
+        U    = np.zeros((U_w[0].shape[0],t_size_min,nw))
+        Unom = np.zeros((Unom_w[0].shape[0],t_size_min,nw))
+        t    = np.zeros((t_size_min,nw)) #np.linspace(0,t_end,t_size_min) 
+        for i in range(nw):
+            X[:,:,i]    = X_w[i][:,:t_size_min]
+            Xd[:,:,i]   = Xd_w[i][:,:t_size_min]
+            U[:,:,i]    = U_w[i][:,:t_size_min]
+            Unom[:,:,i] = Unom_w[i][:,:t_size_min]
+            t[:,i] = t_w[i][0,:t_size_min]
+
+        return X, Xd, U, Unom, t 
+
 
     def get_ctrl(self, p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d):
         t0 = datetime.now().timestamp()
@@ -263,7 +296,14 @@ Unom_ep = []
 t_ep = []
 
 print('Starting episodic learning...')
-for ep in range(Nep+2):
+for ep in range(Nep):
+
+    X_w = []
+    Xd_w = []
+    U_w = []
+    Unom_w = []
+    t_w = []
+
     for ww in range(n_waypoints):  #Execute multiple trajectories between training
         print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
         print("Resetting to initial point...")
@@ -272,12 +312,19 @@ for ep in range(Nep+2):
 
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
-        X, Xd, U, Unom, t = handler.process(X, p_final, U, Upert, t)
-        if n_waypoints > 1:
-            raise Exception("Error: multiple waypoints within episode not implemented")  # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+        X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
+
+        X_w.append(    X)    
+        Xd_w.append(   Xd)   
+        U_w.append(    U)    
+        Unom_w.append( Unom) 
+        t_w.append(    t)  
+        # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+
     land()  # Land while fitting models
+    X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
     print("Fitting diffeomorphism...")
-    eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
+    eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
@@ -321,7 +368,7 @@ for ep in range(Nep+2):
     track_error.append((t[0,-1]-t[0,0])*np.divide(np.sum(((X-Xd)**2),axis=1),X.shape[1]))
     ctrl_effort.append((t[0,-1]-t[0,0])*np.sum(Unom**2,axis=1)/Unom.shape[1])
     print(track_error[-1], ctrl_effort[-1])
-    print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
+    #print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
     handler.comp_time = []
     if plot_episode:
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=False, filename=None, episode=ep)
