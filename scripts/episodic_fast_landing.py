@@ -55,9 +55,9 @@ p_init = np.array([1., -1.5, 1.75])
 p_final = np.array([1., -1.5, 0.5])
 pert_noise = 0.03 #0.05 #TODO: Increase for experiments
 Nep = 10
-w = linspace(0, 1, Nep)
-w /= (6*sum(w))
-#w = zeros((Nep,))
+#w = linspace(0, 1, Nep)
+#w /= (6*sum(w))
+w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([-p_final[2], -8.])  # State constraints
@@ -66,19 +66,18 @@ lower_bounds = array([-p_final[2], -8.])  # State constraints
 # Koopman eigenfunction parameters
 plot_eigen = False
 eigenfunction_max_power = 6
-Nlift = (eigenfunction_max_power+1)**n + n
-l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
-jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
+l2_diffeomorphism = 3.9473684210526314#1e0  # Fix for current architecture
+jacobian_penalty_diffeomorphism = 0.7894736842105263#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 200
-diff_train_frac = 0.9
-diff_n_hidden_layers = 2
-diff_layer_width = 50
-diff_batch_size = 16
-diff_learn_rate = 1e-3  # Fix for current architecture
-diff_learn_rate_decay = 0.99  # Fix for current architecture
-diff_dropout_prob = 0.5
+diff_n_epochs = 500
+diff_train_frac = 0.99
+diff_n_hidden_layers = 4
+diff_layer_width = 20
+diff_batch_size = 8
+diff_learn_rate = 0.08947473684210526  # Fix for current architecture
+diff_learn_rate_decay = 0.8  # Fix for current architecture
+diff_dropout_prob = 0.0
 
 # KEEDMD parameters
 load_keedmd_params = False
@@ -94,12 +93,16 @@ if load_keedmd_params:
     l1_eig = keedmd_model.l1_eig
     l1_ratio_eig = keedmd_model.l1_ratio_eig
 else:
-    l1_pos = 0.0007505431087052378
+    l1_pos = 0.017582694701237512
     l1_ratio_pos = 0.5
-    l1_vel = 0.00496783564809029
+    l1_vel = 0.0017041798326924297
     l1_ratio_vel = 0.5
-    l1_eig = 0.0004707203851970303
+    l1_eig = 0.0028479542354489067
     l1_ratio_eig = 0.5
+
+
+
+
 
 # MPC controller parameters:
 Q = sparse.diags([1., 0.1])
