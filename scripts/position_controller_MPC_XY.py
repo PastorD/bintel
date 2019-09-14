@@ -119,6 +119,7 @@ class PositionController():
         self._osqp_l = np.hstack([leq, lineq])
         self._osqp_u = np.hstack([ueq, uineq])
 
+        self.qp_size = P.shape[0]
         # Create an OSQP object
         self.prob = osqp.OSQP()
 
@@ -155,15 +156,15 @@ class PositionController():
         self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
         
-        _osqp_result = self.prob.solve()
+        self._osqp_result = self.prob.solve()
 
         N = self._osqp_N
 
         # Apply first control input to the plant
-        [f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.z] = self._osqp_result.x[-N*nu:-(N-1)*nu]
 
         # Check solver status
-        if _osqp_result.info.status != 'solved':
+        if self._osqp_result.info.status != 'solved':
             print(f_d.z)
             #[f_d.x, f_d.y, f_d.z] = np.array([0.,0.,self.u_hover])
             raise ValueError('OSQP did not solve the problem!')
@@ -175,7 +176,7 @@ class PositionController():
         f_d.x = -self.k_p*e_p[0] - self.k_d*e_v[0]
         f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
 
-        print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
+        #print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
 
         return f_d
 
