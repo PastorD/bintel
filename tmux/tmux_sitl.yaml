@@ -15,6 +15,5 @@ windows:
         - source bash/increase_rates.sh
         - rostopic echo /mavros/state
       - sleep 5; rostopic echo /mavros/local_position/pose 
-      - sleep 5; roslaunch launch/cast_models.launch robot_urdf:=urdf/inteldrone_down.urdf
       - python scripts/flight_data_collection_MPC.py \
       - ~/Downloads/QGroundControl.AppImage 
