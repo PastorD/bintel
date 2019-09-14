@@ -51,7 +51,7 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 3
 controller_rate = 60
-p_init = np.array([1., -1.5, 1.75])
+p_init = np.array([1., -1.5, 1.25])
 p_final = np.array([1., -1.5, 0.5])
 pert_noise = 0.03 #0.05 #TODO: Increase for experiments
 Nep = 10
@@ -71,7 +71,7 @@ l2_diffeomorphism = 1e-2#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 1e-1#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 200
+diff_n_epochs = 5
 diff_train_frac = 0.9
 diff_n_hidden_layers = 2
 diff_layer_width = 50
@@ -174,17 +174,27 @@ class DroneHandler(Handler):
         t_end = t_w[0].squeeze()[-1]
         ns = 2
         nu = 1
-        X    = X_w[0][:,:t_size_min]
-        Xd   = Xd_w[0][:,:t_size_min]
-        U    = U_w[0][:,:t_size_min]
-        Unom = Unom_w[0][:,:t_size_min]
-        t    = np.linspace(0,t_end,t_size_min) 
-        for i in range(1,nw):
-            X    = np.append(X   , X_w[i][:,:t_size_min],axis=1)
-            Xd   = np.append(Xd  , Xd[:,:t_size_min],axis=1)
-            U    = np.append(U   , U_w[i][:,:t_size_min],axis=1)
-            Unom = np.append(Unom, Unom_w[i][:,:t_size_min],axis=1)
-
+        # X    = X_w[0][:,:t_size_min]
+        # Xd   = Xd_w[0][:,:t_size_min]
+        # U    = U_w[0][:,:t_size_min]
+        # Unom = Unom_w[0][:,:t_size_min]
+        # t    = np.linspace(0,t_end,t_size_min) 
+        # for i in range(1,nw):
+        #     X    = np.append(X   , X_w[i][:,:t_size_min],axis=1)
+        #     Xd   = np.append(Xd  , Xd[:,:t_size_min],axis=1)
+        #     U    = np.append(U   , U_w[i][:,:t_size_min],axis=1)
+        #     Unom = np.append(Unom, Unom_w[i][:,:t_size_min],axis=1)
+        X    = np.zeros((X_w[0].shape[0],t_size_min,nw))
+        Xd   = np.zeros((Xd_w[0].shape[0],t_size_min,nw))
+        U    = np.zeros((U_w[0].shape[0],t_size_min,nw))
+        Unom = np.zeros((Unom_w[0].shape[0],t_size_min,nw))
+        t    = np.zeros((t_size_min,nw)) #np.linspace(0,t_end,t_size_min) 
+        for i in range(nw):
+            X[:,:,i]    = X_w[i][:,:t_size_min]
+            Xd[:,:,i]   = Xd_w[i][:,:t_size_min]
+            U[:,:,i]    = U_w[i][:,:t_size_min]
+            Unom[:,:,i] = Unom_w[i][:,:t_size_min]
+            t[:,i] = t_w[i][0,:t_size_min]
 
         return X, Xd, U, Unom, t 
 
@@ -314,7 +324,7 @@ for ep in range(Nep):
     land()  # Land while fitting models
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
     print("Fitting diffeomorphism...")
-    eigenfunction_basis.fit_diffeomorphism_model(X=array([X.transpose()]), t=t.squeeze(), X_d=array([Xd.transpose()]), l2=l2_diffeomorphism,
+    eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
                                                  jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
@@ -358,7 +368,7 @@ for ep in range(Nep):
     track_error.append((t[0,-1]-t[0,0])*np.divide(np.sum(((X-Xd)**2),axis=1),X.shape[1]))
     ctrl_effort.append((t[0,-1]-t[0,0])*np.sum(Unom**2,axis=1)/Unom.shape[1])
     print(track_error[-1], ctrl_effort[-1])
-    print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
+    #print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
     handler.comp_time = []
     if plot_episode:
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=False, filename=None, episode=ep)
