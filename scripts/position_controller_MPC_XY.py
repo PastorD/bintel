@@ -8,6 +8,7 @@ import math
 import numpy as np
 import scipy.sparse as sparse
 import osqp
+import scipy.signal as sp
 
 # ROS
 #import tf
@@ -35,16 +36,29 @@ class PositionController():
 
         ##  Set the MPC Problem
         # Discrete time model of a quadcopter
-        Ac = sparse.csc_matrix([
-                                [ 0.0, 1.0],
-                                [ 0.0, 0.0]])
-        Bc= sparse.csc_matrix([
-                                [0.0],
-                                [kb]])
+#        Ac = sparse.csc_matrix([               #TODO: Delete
+#                                [ 0.0, 1.0],
+#                                [ 0.0, 0.0]])
+#        Bc= sparse.csc_matrix([
+#                                [0.0],
+#                                [kb]])
+        Ac = np.array([
+            [0.0, 1.0],
+            [0.0, 0.0]])
+        Bc = np.array([
+            [0.0],
+            [kb]])
         [nx, nu] = Bc.shape
 
-        self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
-        self._osqp_Bd = Bc*self.dt
+        #self._osqp_Ad = sparse.eye(nx)+Ac*self.dt
+        #self._osqp_Bd = Bc*self.dt
+
+        #Discretize dynamics:
+        C = np.eye(nx)
+        D = np.zeros((nx,))
+        lin_model_d = sp.cont2discrete((Ac,Bc,C,D),self.dt)
+        self._osqp_Ad = sparse.csc_matrix(lin_model_d[0]) #TODO: If bad behavior, delete this
+        self._osqp_Bd = sparse.csc_matrix(lin_model_d[1]) #TODO: If bad behavior, delete this
 
         self.setup_OSQP(p_final)
 
