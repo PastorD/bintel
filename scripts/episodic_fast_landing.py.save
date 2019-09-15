@@ -56,7 +56,7 @@ p_final = np.array([1., -1.5, 0.5])
 pert_noise = 0.002
 Nep =  4
 w = linspace(0, 1, Nep)
-#w /= (1*sum(w))
+w /= (1*sum(w))
 #w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
@@ -135,7 +135,6 @@ class DroneHandler(Handler):
         self.dt = dt
         self.hover_thrust = hover_thrust
         self.comp_time = []
-        self.ctrl_history = []
 
     def clean_data(self, X, p_final, U, Upert, t):
         assert (X.shape[0] == self.X_agg.shape[0])
@@ -221,11 +220,10 @@ class DroneHandler(Handler):
 
         T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
-        ctrl_lst = [self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))]
-        T_d += sum(ctrl_lst)
+        ctrl_lst = 
+        T_d += sum [self.weights[ii]*self.controller_list[ii].eval(([self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))])
         self.Tpert += self.pert_noise*random.randn()
         T_d += self.Tpert
-        self.ctrl_history.append(ctrl_lst)
 
         self.comp_time.append((datetime.now().timestamp()-t0))
         return T_d, q_d, omg_d, f_d
@@ -282,7 +280,7 @@ Xd_ep = []
 U_ep = []
 Unom_ep = []
 t_ep = []
-ctrl_history_ep =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
+osqp_thoughts =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
 
 Xval_ep = []
 Uval_ep = []
@@ -330,10 +328,7 @@ for ep in range(Nep+1):
         Xd_w.append(   Xd)   
         U_w.append(    U)    
         Unom_w.append( Unom) 
-        t_w.append(    t) 
-        ctrl_history_ep[ep][ww] = handler.ctrl_history
-        handler.ctrl_history = [] 
-        
+        t_w.append(    t)  
         #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
 
     land()  # Land while fitting models
@@ -403,7 +398,7 @@ print("Experiments finalized")
 folder = "experiments/episodic_KEEDMD/fast_drone_landing/" + datetime.now().strftime("%m%d%Y_%H%M%S")
 os.mkdir(folder)
 
-data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort, ctrl_history_ep]
+data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort]
 outfile = open(folder + "/episodic_data.pickle", 'wb')
 dill.dump(data_list, outfile)
 outfile.close()
