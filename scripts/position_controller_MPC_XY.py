@@ -15,11 +15,13 @@ import scipy.signal as sp
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None, soft=False, D=None):
         self.mpc_horizon=MPC_horizon
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
+        self.soft = soft
+        self.D = D
 
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
@@ -119,6 +121,17 @@ class PositionController():
         self._osqp_l = np.hstack([leq, lineq])
         self._osqp_u = np.hstack([ueq, uineq])
 
+        Nx = (N+1)*nx
+        Nu = N*nu
+
+        if self.soft:
+            Pdelta = sparse.kron(sparse.eye(N+1), self.D)
+            P = sparse.block_diag([P,Pdelta])
+            qdelta = np.zeros(Nx)
+            q = np.hstack([q,qdelta])
+            Adelta = sparse.csc_matrix(np.vstack([np.zeros((Nx,Nx)),np.eye(Nx),np.zeros((Nu,Nx))]))
+            A = sparse.hstack([A, Adelta])
+
         self.qp_size = P.shape[0]
         # Create an OSQP object
         self.prob = osqp.OSQP()
@@ -151,7 +164,6 @@ class PositionController():
         nx = self.ns 
         nu = self.nu 
 
-
         self._osqp_l[:nx] = -x0
         self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
@@ -160,31 +172,29 @@ class PositionController():
 
         N = self._osqp_N
 
+        Nx = (N+1)*nx
+
         # Apply first control input to the plant
-        [f_d.z] = self._osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.z] = self._osqp_result.x[Nx:Nx+nu]
 
         # Check solver status
         if self._osqp_result.info.status != 'solved':
-            print(f_d.z)
-            #[f_d.x, f_d.y, f_d.z] = np.array([0.,0.,self.u_hover])
+            print('U was {}, x:{}'.format(f_d.z,x0))
             raise ValueError('POSITION XY OSQP did not solve the problem!')
 
-        # Project f_d into space of achievable force
         
         f_d.z = f_d.z + self.u_hover #self.model.nom_model.hover_throttle
 
         f_d.x = -self.k_p*e_p[0] - self.k_d*e_v[0]
         f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
 
-        #print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
-
         return f_d
 
     def plot_MPC(self, _osqp_result):
         # Unpack OSQP results
 
-        ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
-        nu = 3 # f_x, f_y, f_z
+        ns = self.ns # p_x, p_y, p_z, v_x, v_y, v_z
+        nu = self.nu # f_x, f_y, f_z
         N = self._osqp_N
 
         osqp_sim_state = np.reshape( _osqp_result.x[:(N+1)*ns], (N+1,ns))
