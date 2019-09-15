@@ -158,9 +158,10 @@ class PositionController():
         _osqp_result = self.prob.solve()
 
         N = self._osqp_N
+        Nx = (N+1)*nx
 
         # Apply first control input to the plant
-        [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[(N+1)*nx:(N+1)*nx+nu]#_osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.x,f_d.y ,f_d.z] = _osqp_result.x[Nx:Nx+nu]#_osqp_result.x[-N*nu:-(N-1)*nu]
 
         #if self.first:
         #self.plot_MPC(_osqp_result)
