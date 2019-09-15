@@ -71,7 +71,7 @@ class PositionController():
         
         umin = np.ones(nu)*0.2-self.u_hover
         umax = np.ones(nu)*0.8-self.u_hover
-        xmin = np.array([0.0,-5.])  #TODO: Tune/consider when testing on hw
+        xmin = np.array([0.25,-5.])  #TODO: Tune/consider when testing on hw
         xmax = np.array([ 5.0, 5.0])
 
         # Sizes

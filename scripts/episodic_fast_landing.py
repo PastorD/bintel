@@ -35,7 +35,7 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
@@ -51,8 +51,8 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 3
 controller_rate = 60
-p_init = np.array([1., -1.5, 2.75])
-p_final = np.array([1., -1.5, 0.0])
+p_init = np.array([1., -1.5, 2.00])
+p_final = np.array([1., -1.5, 0.3])
 pert_noise = 0.002
 Nep =  4
 w = linspace(0, 1, Nep)
@@ -60,7 +60,7 @@ w = linspace(0, 1, Nep)
 #w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([5.0, 4.])  # State constraints
-lower_bounds =  array([0.1, -3.]) #array([-p_final[2], -8.])  # State constraints
+lower_bounds = array([-0.05, -3.])  # State constraints
 
 
 # Koopman eigenfunction parameters
@@ -71,7 +71,7 @@ l2_diffeomorphism = 3.9473684210526314#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 0.7894736842105263#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 50
+diff_n_epochs = 200
 diff_train_frac = 0.99
 diff_n_hidden_layers = 4
 diff_layer_width = 20
@@ -149,8 +149,8 @@ class DroneHandler(Handler):
         Unom -= self.hover_thrust  #TODO: Make sure this is consistent with data collected if changing initial controller
 
         # Trim beginning and end of dataset until certain altitude is reached and duration has passed
-        start_altitude = self.p_init[2] - 0.4  # Start altitude in meters  #TODO: Tune for experiment
-        max_dur = 1.5  # Max duration in seconds  #TODO: Tune for experiment
+        start_altitude = self.p_init[2] - 0.3  # Start altitude in meters  #TODO: Tune for experiment
+        max_dur = 2.0  # Max duration in seconds  #TODO: Tune for experiment
         first_ind = np.argwhere(X[0,1:] < start_altitude)[0][0]+1  #First data point is just initializing and excluded
         t = t[:, first_ind:]
         t -= t[:,0]

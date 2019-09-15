@@ -82,7 +82,7 @@ class Robot():
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
-        time_after_converged = 2
+        time_after_converged = 4
         self.init_time = time.time()
         time_converged = self.init_time+6
 
@@ -97,7 +97,7 @@ class Robot():
 
         self.t0 = rospy.get_time()
         while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
-            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.1 and not converged):
+            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.2  and not converged):
                 converged = True
                 time_converged = time.time()
 
