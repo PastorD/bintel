@@ -141,7 +141,6 @@ class DroneHandler(Handler):
         assert (X.shape[0] == self.X_agg.shape[0])
         assert (U.shape[0] == self.U_agg.shape[0])
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
-
         q_final = array([p_final[2], 0.]).reshape((self.n,1))
         Xd = np.tile(q_final,(1,X.shape[1]))
         Unom = U-Upert
@@ -163,8 +162,7 @@ class DroneHandler(Handler):
         Unom = Unom[:, first_ind:first_ind+end_ind]
         t = t[:,:end_ind]
         if ctrl_hist is not None:
-            ctrl_hist = ctrl_hist[:,:first_ind:end_ind]
-
+            ctrl_hist = ctrl_hist[first_ind-1:first_ind+end_ind-1]
         # Filter out data points that are likely stemming from impacts with the ground
         #print("Before filter:", X.shape, t.shape )
         #accel = differentiate(X[1,:],t[0,:])
@@ -304,7 +302,7 @@ for ep in range(Nep+1):
     go_waypoint.gopoint(np.array(p_init))
     X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
     #land()
-    X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=ctrl_hist)
+    X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=handler.ctrl_history)
     handler.pert_noise = pert_noise
     ctrl_history_ep.append(ctrl_hist)
 
