@@ -1,19 +1,21 @@
 import os
 import dill
 from matplotlib.pyplot import figure, grid, legend, plot, show, subplot, suptitle, title, ylim, xlabel, ylabel, \
-    fill_between, savefig, text, close
+    fill_between, savefig, text, close, bar
 from matplotlib.ticker import MaxNLocator
 from numpy import array, zeros_like, divide, mean, std
 
 
 #TODO: Set up relevant flags to customize plotting
 # Plotting parameters
-display_plots = False  #Showing plots is not recommended as a large number of plots is generated
-plot_full_state = True
-plot_z_err_ctrl = True
-plot_summary = True
+display_plots = True  #Showing plots is not recommended as a large number of plots is generated
+plot_full_state = False
+plot_z_err_ctrl = False
+plot_summary = False
+plot_ctrl_augmentation = True
+hover_thrust = 0.663
 
-X_arr, Xd_arr, U_arr, Unom_arr, t_arr, Xval_arr, Uval_arr, tval_arr, track_error_arr, ctrl_effort_arr = [], [], [], [], [], [], [], [], [], []
+X_arr, Xd_arr, U_arr, Unom_arr, t_arr, Xval_arr, Uval_arr, tval_arr, track_error_arr, ctrl_effort_arr, ctrl_history_arr = [], [], [], [], [], [], [], [], [], [], []
 file_lst = []
 dir_lst = []
 
@@ -25,7 +27,7 @@ for root, dirs, files in os.walk("experiments/episodic_KEEDMD/fast_drone_landing
             infile = open(str(os.path.join(root,file)), 'rb')
             file_lst.append(str(os.path.join(root,file)))
             dir_lst.append(str(root))
-            [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort] = dill.load(infile)
+            [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort, ctrl_history] = dill.load(infile)
             infile.close()
             X_arr.append(X_ep)
             Xd_arr.append(Xd_ep)
@@ -37,6 +39,7 @@ for root, dirs, files in os.walk("experiments/episodic_KEEDMD/fast_drone_landing
             tval_arr.append(tval_ep)
             track_error_arr.append(track_error)
             ctrl_effort_arr.append(ctrl_effort)
+            ctrl_history_arr.append(ctrl_history)
 
 #Data format X_arr, Xd_arr: (Nexperiments x Nepisodes x n x Ntime)
 #Data format U_arr, Unom_arr: (Nexperiments x Nepisodes x m x Ntime)
@@ -119,7 +122,6 @@ if plot_z_err_ctrl:
 if plot_summary:
         track_error = array(track_error_arr)
         ctrl_effort = array(ctrl_effort_arr)[:,:,0]
-        print(track_error.shape, ctrl_effort.shape)
 
         track_error_mean = mean(track_error, axis=0)
         track_error_mean /= track_error_mean[0]  #Normalize
@@ -146,4 +148,42 @@ if plot_summary:
         xlabel('Episode')
         grid()
         savefig(dir_lst[0] + '/../summary_plot')
+        close()
+
+# Plot size of augmenting control for each episode
+if plot_ctrl_augmentation:
+    for ii in range(len(X_arr)): #Data set
+        ep = -1
+        U = Uval_arr[ii][ep] #Last index is waypoint
+        ctrl = array(ctrl_history_arr[ii][ep][0])  # (dataset, last ep, first waypoint)
+
+        ctrl = ctrl[:U.shape[1],:].transpose()  # TODO: Improve data collection so this step is unecessary (and is currently wrong)
+        t = t_arr[ii][ep].squeeze()
+
+        U = U + hover_thrust
+        ctrl_pos = zeros_like(ctrl)
+        ctrl_neg = zeros_like(ctrl)
+        for jj in range(ctrl.shape[0]):
+            ctrl_pos[jj,:] = array([max(0., ctrl[jj, ii]) for ii in range(ctrl.shape[1])])
+            ctrl_neg[jj,:] = array([min(0., ctrl[jj, ii]) for ii in range(ctrl.shape[1])])
+
+        figure(figsize=(5.8, 4))
+        a = 0.6
+        title('Contribution of each controller final episode')
+        fill_between(t[:-1,0],zeros_like(U[0,:]), U[0,:], label='$MPC_{nom}$', alpha=a)
+        fill_between(t[:-1, 0], U[0, :], U[0,:] + ctrl_pos[0,:], label='$MPC_1$', color='g', alpha=a)
+        fill_between(t[:-1, 0], U[0, :] + ctrl_pos[0, :], U[0, :] + ctrl_pos[0, :] + ctrl_pos[1,:], label='$MPC_2$', color='r', alpha=a)
+        fill_between(t[:-1, 0], U[0, :] + ctrl_pos[0, :] + ctrl_pos[1, :], U[0, :] + ctrl_pos[0, :] + ctrl_pos[1, :] + ctrl_pos[2,:],
+                     label='$MPC_3$', color='y', alpha=a)
+
+        fill_between(t[:-1, 0], ctrl_neg[0,:], zeros_like(U[0, :]), color='g', alpha=a)
+        fill_between(t[:-1, 0], ctrl_neg[0, :]+ctrl_neg[1,:], ctrl_neg[0,:], color='r', alpha=a)
+        fill_between(t[:-1, 0], ctrl_neg[0, :] + ctrl_neg[1, :] + ctrl_neg[2,:], ctrl_neg[0, :] + ctrl_neg[1, :], color='y', alpha=a)
+        legend(fontsize=10, loc='upper right', ncol=2)
+
+        xlabel('Time (sec)')
+        ylabel('Thrust (normalized)')
+        savefig(dir_lst[ii] + '/states_ctrl__augment')
+        if display_plots:
+            show()
         close()

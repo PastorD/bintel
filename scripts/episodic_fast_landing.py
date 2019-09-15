@@ -138,11 +138,10 @@ class DroneHandler(Handler):
         self.comp_time = []
         self.ctrl_history = []
 
-    def clean_data(self, X, p_final, U, Upert, t):
+    def clean_data(self, X, p_final, U, Upert, t, ctrl_hist=None):
         assert (X.shape[0] == self.X_agg.shape[0])
         assert (U.shape[0] == self.U_agg.shape[0])
         assert (Upert.shape[0] == self.Unom_agg.shape[0])
-
         q_final = array([p_final[2], 0.]).reshape((self.n,1))
         Xd = np.tile(q_final,(1,X.shape[1]))
         Unom = U-Upert
@@ -163,14 +162,15 @@ class DroneHandler(Handler):
         U = U[:, first_ind:first_ind+end_ind]
         Unom = Unom[:, first_ind:first_ind+end_ind]
         t = t[:,:end_ind]
-
+        if ctrl_hist is not None:
+            ctrl_hist = ctrl_hist[first_ind-1:first_ind+end_ind-1]
         # Filter out data points that are likely stemming from impacts with the ground
         #print("Before filter:", X.shape, t.shape )
         #accel = differentiate(X[1,:],t[0,:])
         #print(accel)
         #Numerically calculate acceleration, if above g, remove points
 
-        return X, Xd, U, Unom, t
+        return X, Xd, U, Unom, t, ctrl_hist
 
     def aggregate_landings_per_episode(self,X_w, Xd_w, U_w, Unom_w, t_w):
         nw = X_w.__len__()
@@ -284,7 +284,7 @@ Xd_ep = []
 U_ep = []
 Unom_ep = []
 t_ep = []
-ctrl_history_ep =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
+ctrl_history_ep =  []
 
 Xval_ep = []
 Uval_ep = []
@@ -298,13 +298,15 @@ for ep in range(Nep+1):
     # Run single landing with no perturbation for validation plots:
     print("Executing trajectory with no perturbation noise...")
     print("Resetting to initial point...")
+    handler.ctrl_history = []
     handler.pert_noise = 0.
     command.arming(True)
     go_waypoint.gopoint(np.array(p_init))
     X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
     #land()
-    X_val, Xd_val, U_val, _, t_val = handler.clean_data(X, p_final, U, Upert, t)
+    X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=handler.ctrl_history)
     handler.pert_noise = pert_noise
+    ctrl_history_ep.append(ctrl_hist)
 
     # Run training loop:
     X_w = []
@@ -325,16 +327,14 @@ for ep in range(Nep+1):
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
         land()     
-        X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
+        X, Xd, U, Unom, t, _ = handler.clean_data(X, p_final, U, Upert, t)
 
         # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
         X_w.append(    X)    
         Xd_w.append(   Xd)   
         U_w.append(    U)    
         Unom_w.append( Unom) 
-        t_w.append(    t) 
-        ctrl_history_ep[ep][ww] = handler.ctrl_history
-        handler.ctrl_history = [] 
+        t_w.append(    t)
         
         #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
 
