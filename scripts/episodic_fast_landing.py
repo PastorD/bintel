@@ -54,10 +54,10 @@ controller_rate = 60
 p_init = np.array([1., -1.5, 1.75])
 p_final = np.array([1., -1.5, 0.5])
 pert_noise = 0.002
-Nep = 5
+Nep =  4
 w = linspace(0, 1, Nep)
-w /= (6*sum(w))
-w = zeros((Nep,))
+w /= (1*sum(w))
+#w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([3.0, 4.])  # State constraints
 lower_bounds = array([-p_final[2], -8.])  # State constraints
@@ -71,7 +71,7 @@ l2_diffeomorphism = 3.9473684210526314#1e0  # Fix for current architecture
 jacobian_penalty_diffeomorphism = 0.7894736842105263#5e0  # Fix for current architecture
 load_diffeomorphism_model = True
 diffeomorphism_model_file = 'diff_model'
-diff_n_epochs = 50
+diff_n_epochs = 200
 diff_train_frac = 0.99
 diff_n_hidden_layers = 4
 diff_layer_width = 20
@@ -135,6 +135,7 @@ class DroneHandler(Handler):
         self.dt = dt
         self.hover_thrust = hover_thrust
         self.comp_time = []
+        self.ctrl_history = []
 
     def clean_data(self, X, p_final, U, Upert, t):
         assert (X.shape[0] == self.X_agg.shape[0])
@@ -220,9 +221,11 @@ class DroneHandler(Handler):
 
         T_d, q_d, omg_d, f_d = self.initial_controller.get_ctrl(p, q, v, omg, p_d, v_d, a_d, yaw_d, dyaw_d, ddyaw_d)
 
-        T_d += sum([self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))])
+        ctrl_lst = [self.weights[ii]*self.controller_list[ii].eval(x, 0.)[0] for ii in range(len(self.controller_list))]
+        T_d += sum(ctrl_lst)
         self.Tpert += self.pert_noise*random.randn()
         T_d += self.Tpert
+        self.ctrl_history.append(ctrl_lst)
 
         self.comp_time.append((datetime.now().timestamp()-t0))
         return T_d, q_d, omg_d, f_d
@@ -279,7 +282,7 @@ Xd_ep = []
 U_ep = []
 Unom_ep = []
 t_ep = []
-osqp_thoughts =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
+ctrl_history_ep =  [[0 for i in range(n_waypoints)] for j in range(Nep)] # 2d list of np arrays
 
 Xval_ep = []
 Uval_ep = []
@@ -297,8 +300,8 @@ for ep in range(Nep+1):
     command.arming(True)
     go_waypoint.gopoint(np.array(p_init))
     X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
+    #land()
     X_val, Xd_val, U_val, _, t_val = handler.clean_data(X, p_final, U, Upert, t)
-    land()
     handler.pert_noise = pert_noise
 
     # Run training loop:
@@ -319,6 +322,7 @@ for ep in range(Nep+1):
 
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
+        land()     
         X, Xd, U, Unom, t = handler.clean_data(X, p_final, U, Upert, t)
 
         # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
@@ -326,8 +330,11 @@ for ep in range(Nep+1):
         Xd_w.append(   Xd)   
         U_w.append(    U)    
         Unom_w.append( Unom) 
-        t_w.append(    t)  
-        osqp_thoughts[ww][ep] = bintel.osqp_thoughts
+        t_w.append(    t) 
+        ctrl_history_ep[ep][ww] = handler.ctrl_history
+        handler.ctrl_history = [] 
+        
+        #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
 
     land()  # Land while fitting models
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
@@ -379,8 +386,9 @@ for ep in range(Nep+1):
     tval_ep.append(t_val)
     track_error.append((t_val[0,-1]-t_val[0,0])*np.sum(((X_val[0,:]-Xd_val[0,:])**2)/X_val.shape[1]))
     ctrl_effort.append((t_val[0,-1]-t_val[0,0])*np.sum(U_val**2,axis=1)/U_val.shape[1])
-    print(track_error[-1], ctrl_effort[-1])
+    #print(track_error[-1], ctrl_effort[-1])
     #print('Episode ', ep, ': Average MSE: ',format(float(sum(track_error[-1])/n), "08f"), ', control effort: ',format(float(sum(ctrl_effort[-1])/m), '08f'), ', avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)), '08f'))
+    print('avg compt time ctrl: ',format(float(sum(handler.comp_time)/len(handler.comp_time)*1000), '08f'))
     handler.comp_time = []
     if plot_episode:
         plot_trajectory_ep(X, Xd, U, Unom, t.squeeze(), display=True, save=False, filename=None, episode=ep)
@@ -395,7 +403,7 @@ print("Experiments finalized")
 folder = "experiments/episodic_KEEDMD/fast_drone_landing/" + datetime.now().strftime("%m%d%Y_%H%M%S")
 os.mkdir(folder)
 
-data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort]
+data_list = [X_ep, Xd_ep, U_ep, Unom_ep, t_ep, Xval_ep, Uval_ep, tval_ep, track_error, ctrl_effort, ctrl_history_ep]
 outfile = open(folder + "/episodic_data.pickle", 'wb')
 dill.dump(data_list, outfile)
 outfile.close()
