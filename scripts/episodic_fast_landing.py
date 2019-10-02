@@ -51,8 +51,8 @@ A_cl = A_nom - dot(B_nom, K)
 duration_low = 1.
 n_waypoints = 3
 controller_rate = 60
-p_init = np.array([1., -1.5, 2.00])
-p_final = np.array([1., -1.5, 0.3])
+p_init = np.array([1.23, 0.088, 2.00])
+p_final = np.array([1.23, 0.088, 0.28])
 pert_noise = 0.002
 Nep =  4
 w = linspace(0, 1, Nep)
@@ -60,8 +60,8 @@ w = linspace(0, 1, Nep)
 #w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([5.0, 4.])  # State constraints
-lower_bounds = array([-0.05, -3.])  # State constraints
-
+lower_bounds = array([-0.02, -3.])  # State constraints
+lower_bounds_nominal = array([0.3,-2.])
 
 # Koopman eigenfunction parameters
 plot_eigen = False
@@ -107,14 +107,14 @@ else:
 
 # MPC controller parameters:
 Q = sparse.diags([1., 0.1])
-R = 5*sparse.eye(m)
+R = 6*sparse.eye(m)
 QN = sparse.diags([0., 0.])
-Dsoft = sparse.diags([500,100])
+Dsoft = sparse.diags([400,50])
 u_margin = 0.3
-umax_control = min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
+umax_control = 0.1 #min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
 xmax=upper_bounds
-MPC_horizon = 0.5 # [s]
+MPC_horizon = 1.0 # [s]
 dt = 1/controller_rate
 N_steps = int(MPC_horizon/dt)
 p_final_augment = array([[p_final[2]],[0.]])  # Desired position augmenting controller
@@ -326,7 +326,7 @@ for ep in range(Nep+1):
 
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
-        land()     
+        #land()     
         X, Xd, U, Unom, t, _ = handler.clean_data(X, p_final, U, Upert, t)
 
         # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
