@@ -15,6 +15,9 @@ import dill
 # ROS
 from mavros import command
 
+import sys
+print( "n version is pytho {}".format(sys.version_info[0] ))
+
 # Project
 from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
@@ -24,7 +27,7 @@ import position_controller_MPC_CORE
 from position_controller_MPC_XY import PositionController
 
 # KEEDMD
-from keedmd_code.core.learning_keedmd import KoopmanEigenfunctions, Keedmd, differentiate
+from keedmd_code.core.learning import KoopmanEigenfunctions, Keedmd, differentiate
 from keedmd_code.core.dynamics import LinearSystemDynamics
 from keedmd_code.core.handlers import Handler
 from keedmd_code.core.controllers import MPCControllerFast as MPCControllerDense
@@ -54,7 +57,7 @@ controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
 p_final = np.array([1.23, 0.088, 0.28])
 pert_noise = 0.002
-Nep =  4
+Nep =  2
 w = linspace(0, 1, Nep)
 #w /= (1*sum(w))
 #w = zeros((Nep,))
