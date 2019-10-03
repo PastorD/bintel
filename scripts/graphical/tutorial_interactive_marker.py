@@ -5,7 +5,7 @@ from visualization_msgs.msg import *
 
 def processFeedback(feedback):
     p = feedback.pose.position
-    print feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z)
+    print (feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z))
 
 if __name__=="__main__":
     rospy.init_node("simple_marker")

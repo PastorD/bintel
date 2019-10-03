@@ -144,7 +144,7 @@ class goThrust():
         [self.cpitch,self.croll,self.cyaw,self.cheight] =  \
                     self.controller.genQUADcontrol(self.local_pose.pose,self.waypoint.pose)
 
-        print 'y command %5.2f, x command %5.2f, yaw command %5.2f, thrust %5.2f' % (self.croll, self.cpitch, self.cyaw, self.cheight + self.hoverth) 
+        #print 'y command %5.2f, x command %5.2f, yaw command %5.2f, thrust %5.2f' % (self.croll, self.cpitch, self.cyaw, self.cheight + self.hoverth) 
         self.AttitudeTarget = AttitudeTarget()
         self.AttitudeTarget.orientation = Quaternion(*quaternion_from_euler(self.croll,self.cpitch,self.cyaw))
         self.AttitudeTarget.thrust = self.cheight + self.hoverth
