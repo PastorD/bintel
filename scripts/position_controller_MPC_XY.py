@@ -189,6 +189,18 @@ class PositionController():
         f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
 
         return f_d
+    
+    def get_control(self):
+        """get_control Return the optimized MPC control time vector
+        
+        Returns:
+            numpy array[nu*N] -- control time vector
+        """
+        N = self._osqp_N
+        nx = self.ns
+        Nx = (N+1)*nx
+        nu = self.nu
+        return self._osqp_result.x[Nx:Nx+N*nu]
 
     def plot_MPC(self, _osqp_result):
         # Unpack OSQP results
@@ -196,9 +208,11 @@ class PositionController():
         ns = self.ns # p_x, p_y, p_z, v_x, v_y, v_z
         nu = self.nu # f_x, f_y, f_z
         N = self._osqp_N
+        nx = self.ns
+        Nx = (N+1)*nx
 
         osqp_sim_state = np.reshape( _osqp_result.x[:(N+1)*ns], (N+1,ns))
-        osqp_sim_forces = np.reshape( _osqp_result.x[-N*nu:], (N,nu))
+        osqp_sim_forces = np.reshape( _osqp_result.x[Nx:Nx+nu*N], (N,nu))
 
         # Plot 
         plt.plot(range(N+1),osqp_sim_state)
@@ -216,8 +230,7 @@ class PositionController():
         plt.grid()
         plt.legend(['fx','fy','fz'])
         plt.savefig('mpc_debugging_fz_2.png')
-        plt.show()  
-        
+        plt.show()          
     
     def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")
