@@ -15,16 +15,18 @@ import scipy.signal as sp
 
 class PositionController():
 
-    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None):
+    def __init__(self, u_hover, gravity, rate, use_learned_model, p_final, MPC_horizon, model=None, soft=False, D=None):
         self.mpc_horizon=MPC_horizon
         self.model = model
         self.rate = rate
         self.use_learned_model = use_learned_model
+        self.soft = soft
+        self.D = D
 
         self.dt = 1.0/rate #Timestep of controller
         self.max_pitch_roll = math.pi/3        
 
-        self.k_p = 0.1 # 0.5 max, 1 too much #was 0.3 #TODO: Move back if not working
+        self.k_p = 0.15 # 0.5 max, 1 too much #was 0.3 #TODO: Move back if not working
         self.k_d = self.k_p*1.0
 
         self.g = gravity
@@ -67,9 +69,9 @@ class PositionController():
         [nx, nu] = self._osqp_Bd.shape
         # Constraints
         
-        umin = np.ones(nu)*0.2-self.u_hover
-        umax = np.ones(nu)*0.8-self.u_hover
-        xmin = np.array([0.0,-5.])  #TODO: Tune/consider when testing on hw
+        umin = np.ones(nu)*0.3-self.u_hover
+        umax = np.ones(nu)*0.9-self.u_hover
+        xmin = np.array([0.28,-2.])  #TODO: Tune/consider when testing on hw
         xmax = np.array([ 5.0, 5.0])
 
         # Sizes
@@ -119,6 +121,18 @@ class PositionController():
         self._osqp_l = np.hstack([leq, lineq])
         self._osqp_u = np.hstack([ueq, uineq])
 
+        Nx = (N+1)*nx
+        Nu = N*nu
+
+        if self.soft:
+            Pdelta = sparse.kron(sparse.eye(N+1), self.D)
+            P = sparse.block_diag([P,Pdelta])
+            qdelta = np.zeros(Nx)
+            q = np.hstack([q,qdelta])
+            Adelta = sparse.csc_matrix(np.vstack([np.zeros((Nx,Nx)),np.eye(Nx),np.zeros((Nu,Nx))]))
+            A = sparse.hstack([A, Adelta])
+
+        self.qp_size = P.shape[0]
         # Create an OSQP object
         self.prob = osqp.OSQP()
 
@@ -155,44 +169,55 @@ class PositionController():
         nx = self.ns 
         nu = self.nu 
 
-
         self._osqp_l[:nx] = -x0
         self._osqp_u[:nx] = -x0
         self.prob.update(l=self._osqp_l, u=self._osqp_u)
         
-        _osqp_result = self.prob.solve()
+        self._osqp_result = self.prob.solve()
 
         N = self._osqp_N
 
+        Nx = (N+1)*nx
+
         # Apply first control input to the plant
-        [f_d.z] = _osqp_result.x[-N*nu:-(N-1)*nu]
+        [f_d.z] = self._osqp_result.x[Nx:Nx+nu]
 
         # Check solver status
-        if _osqp_result.info.status != 'solved':
-            print(f_d.z)
-            #[f_d.x, f_d.y, f_d.z] = np.array([0.,0.,self.u_hover])
-            raise ValueError('OSQP did not solve the problem!')
+        if self._osqp_result.info.status != 'solved':
+            print('U was {}, x:{}'.format(f_d.z,x0))
+            raise ValueError('POSITION XY OSQP did not solve the problem!')
 
-        # Project f_d into space of achievable force
         
         f_d.z = f_d.z + self.u_hover #self.model.nom_model.hover_throttle
 
         f_d.x = -self.k_p*e_p[0] - self.k_d*e_v[0]
         f_d.y = -self.k_p*e_p[1] - self.k_d*e_v[1]
 
-        #print('force is [{},{},{}]'.format(f_d.x,f_d.y,f_d.z))
-
         return f_d
+    
+    def get_control(self):
+        """get_control Return the optimized MPC control time vector
+        
+        Returns:
+            numpy array[nu*N] -- control time vector
+        """
+        N = self._osqp_N
+        nx = self.ns
+        Nx = (N+1)*nx
+        nu = self.nu
+        return self._osqp_result.x[Nx:Nx+N*nu]
 
     def plot_MPC(self, _osqp_result):
         # Unpack OSQP results
 
-        ns = 6 # p_x, p_y, p_z, v_x, v_y, v_z
-        nu = 3 # f_x, f_y, f_z
+        ns = self.ns # p_x, p_y, p_z, v_x, v_y, v_z
+        nu = self.nu # f_x, f_y, f_z
         N = self._osqp_N
+        nx = self.ns
+        Nx = (N+1)*nx
 
         osqp_sim_state = np.reshape( _osqp_result.x[:(N+1)*ns], (N+1,ns))
-        osqp_sim_forces = np.reshape( _osqp_result.x[-N*nu:], (N,nu))
+        osqp_sim_forces = np.reshape( _osqp_result.x[Nx:Nx+nu*N], (N,nu))
 
         # Plot 
         plt.plot(range(N+1),osqp_sim_state)
@@ -210,8 +235,7 @@ class PositionController():
         plt.grid()
         plt.legend(['fx','fy','fz'])
         plt.savefig('mpc_debugging_fz_2.png')
-        plt.show()  
-        
+        plt.show()          
     
     def project_force_achievable(self, f_d):
         f_d_ach = namedtuple("f_d_ach", "x y z")

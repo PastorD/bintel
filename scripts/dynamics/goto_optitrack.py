@@ -8,6 +8,7 @@ from visualization_msgs.msg import Marker
 import mavros
 from mavros import command
 import numpy as np
+import time
 
 class MavrosGOTOWaypoint():
     def __init__(self):
@@ -54,11 +55,17 @@ class MavrosGOTOWaypoint():
         self.publish_waypoint()
 
         self.pub_sp.publish(self.waypoint)
-       
-        while not rospy.is_shutdown() and np.linalg.norm(
-            np.array([self.waypoint.pose.position.x-self.local_pose.pose.position.x,
+        time_converged = time.time()+10
+        
+        time_after_converged = 3.
+        while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged:
+        
+        
+            if np.linalg.norm( np.array([self.waypoint.pose.position.x-self.local_pose.pose.position.x,
                           self.waypoint.pose.position.y-self.local_pose.pose.position.y,
                           self.waypoint.pose.position.z-self.local_pose.pose.position.z])) > waypoint_ball:
+                time_converged = time.time()
+
 
             result_mode = self.change_mode(0,"OFFBOARD")
             self.pub_sp.publish(self.waypoint)
