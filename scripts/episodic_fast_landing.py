@@ -54,7 +54,7 @@ n_waypoints = 2
 controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
 p_final = np.array([1.23, 0.088, 0.28])
-pert_noise = 0.002
+pert_noise = 0.02
 Nep =  2
 w = linspace(0, 1, Nep)
 #w /= (1*sum(w))
@@ -112,7 +112,7 @@ R = 6*sparse.eye(m)
 QN = sparse.diags([0., 0.])
 Dsoft = sparse.diags([400,50])
 u_margin = 0.3
-umax_control = 0.1 #min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
+umax_control = 0.3 #min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
 xmax=upper_bounds
 MPC_horizon = 1.0 # [s]
@@ -138,6 +138,8 @@ class DroneHandler(Handler):
         self.hover_thrust = hover_thrust
         self.comp_time = []
         self.ctrl_history = []
+        self.time_history = []
+
 
     def clean_data(self, X, p_final, U, Upert, t, ctrl_hist=None):
         assert (X.shape[0] == self.X_agg.shape[0])
@@ -237,7 +239,9 @@ class DroneHandler(Handler):
         T_d += sum(ctrl_lst)
         self.Tpert += self.pert_noise*random.randn()
         T_d += self.Tpert
+        self.time_history.append(t0)
         self.ctrl_history.append(ctrl_lst)
+        
 
         self.comp_time.append((datetime.now().timestamp()-t0))
         return T_d, q_d, omg_d, f_d
@@ -248,6 +252,24 @@ class DroneHandler(Handler):
 
     def get_last_perturbation(self):
         return self.Tpert
+
+    def plot_control_ep(self, display=True, save=False, filename='', episode=0):
+        figure(figsize=(4.7,5.5))
+        nep = len(self.controller_list)
+        for i in range(nep):
+            subplot(nep, 1, i+1)
+            plot(self.time_history, [ctrl[i] for ctrl in self.ctrl_history], label='$T$')
+            legend(fontsize=10, loc='lower right', ncol=2)
+            ylabel('Thrust (normalized)')
+            xlabel('Time (sec)')
+            #ylim((0.,1.))
+            grid()
+        if save:
+            savefig(filename)
+        if display:
+            show()
+        else:
+            close()
 
 def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='', episode=0):
     figure(figsize=(4.7,5.5))
@@ -310,6 +332,7 @@ for ep in range(Nep+1):
     print("Executing trajectory with no perturbation noise...")
     print("Resetting to initial point...")
     handler.ctrl_history = []
+    handler.time_history = []
     handler.pert_noise = 0.
     command.arming(True)
     go_waypoint.gopoint(np.array(p_init))
@@ -318,6 +341,8 @@ for ep in range(Nep+1):
     X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=handler.ctrl_history)
     handler.pert_noise = pert_noise
     ctrl_history_ep.append(ctrl_hist)
+
+    handler.plot_control_ep()
 
     # Run training loop:
     X_w = []
@@ -334,6 +359,8 @@ for ep in range(Nep+1):
         print("Resetting to initial point...")
         command.arming(True)
         go_waypoint.gopoint(np.array(p_init))
+        
+        
 
         print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
@@ -348,6 +375,7 @@ for ep in range(Nep+1):
         t_w.append(    t)
         
         #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
+
 
     land()  # Land while fitting models
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
