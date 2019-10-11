@@ -83,6 +83,8 @@ class PositionController():
         QN = Q
         R = 4.0*sparse.eye(nu)
 
+        self.Q = Q
+        self.QN = QN
         # Initial and reference states
         x0 = np.array([1.0,0.0])
         xr = np.array([final_point[2], 0.0])
@@ -140,9 +142,10 @@ class PositionController():
         self.prob.setup(P, q, A, self._osqp_l, self._osqp_u, warm_start=True, verbose=False)
         self.first = True
         
-    def update_pfinal(self,final_point):
-        q = np.hstack([np.kron(np.ones(self.N), -Q.dot(final_point)), -QN.dot(final_point),
-               np.zeros(self.N*self.nu)])
+    def set_p_final(self,final_point):
+        xr = np.array([final_point[2], 0.0])
+        q = np.hstack([np.kron(np.ones(self._osqp_N), -self.Q.dot(xr)), -self.QN.dot(xr),
+               np.zeros(self._osqp_N*self.nu)])
 
         self.prob.update(q=q)
 

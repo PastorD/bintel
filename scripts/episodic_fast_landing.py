@@ -15,7 +15,6 @@ import dill
 # ROS
 from mavros import command
 
-
 # Project
 from main_controller_force import Robot
 from dynamics.goto_optitrack import MavrosGOTOWaypoint
@@ -49,16 +48,16 @@ B_nom = array([[0.], [g/hover_thrust]])  # Nominal model of the true system arou
 A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
-duration_low = 1.
+duration_low = 10.
 n_waypoints = 2
 controller_rate = 60
 
-time_hover = 2
-time_after_converged = 2
+time_hover = 10
+time_after_converged = 10
 initial_hover = True
 
 p_init = np.array([1.23, 0.088, 2.00])
-p_final = np.array([1.23, 0.088, 0.28])
+p_final = np.array([1.23, 0.088, 2.00])
 pert_noise = 0.02
 Nep =  2
 
@@ -109,9 +108,6 @@ else:
     l1_ratio_eig = 0.5
 
 
-
-
-
 # MPC controller parameters:
 Q = sparse.diags([1., 0.1])
 R = 6*sparse.eye(m)
@@ -132,7 +128,7 @@ plot_traj_gen = False  # Plot desired trajectory
 
 print("q", q_d.shape)
 
-# %% ========================================       SUPPORTING METHODS        ========================================
+#! %% ========================================       SUPPORTING METHODS        ========================================
 
 class DroneHandler(Handler):
     def __init__(self, n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt, hover_thrust):
@@ -237,6 +233,9 @@ class DroneHandler(Handler):
             # Update control sequence
             N = self.controller_list[ii].N
             nu = self.controller_list[ii].nu
+            
+
+
             #self.controller_list[ii].update(umin=self.controller_list[ii].u_min_flat - T_d_time,
             #                                umax=self.controller_list[ii].u_max_flat - T_d_time)
             ctrl_lst[ii] = self.weights[ii]*self.controller_list[ii].eval(x,0.)[0]
@@ -258,6 +257,18 @@ class DroneHandler(Handler):
 
     def get_last_perturbation(self):
         return self.Tpert
+
+    def set_p_final(self,p_final):
+        """set_p_final set final points
+        
+        Arguments:
+            p_final {numpy array [3,]} -- final point 
+        """
+        self.p_final = p_final
+        self.initial_controller.set_p_final(p_final)
+        xr =  np.array([p_final[2], 0.0])
+        for ii in range(len(self.controller_list)):
+            self.controller_list[ii].set_p_final(xr)
 
     def plot_control_ep(self, display=True, save=False, filename='', episode=0):
         figure(figsize=(4.7,5.5))
@@ -304,7 +315,7 @@ def plot_trajectory_ep(X, X_d, U, U_nom, t, display=True, save=False, filename='
     else:
         close()
 
-# %% ===========================================    MAIN LEARNING LOOP     ===========================================
+#! %% ===========================================    MAIN LEARNING LOOP     ===========================================
 
 # Initialize robot
 bintel = Robot(controller_rate, n, m)
@@ -364,8 +375,7 @@ for ep in range(Nep+1):
         print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
         print("Resetting to initial point...")
         command.arming(True)
-        go_waypoint.gopoint(np.array(p_init))
-        
+        #go_waypoint.gopoint(np.array(p_init))        
         
 
         print("Executing fast landing with current controller...")

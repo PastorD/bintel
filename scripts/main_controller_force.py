@@ -65,7 +65,7 @@ class Robot():
 
 
 
-    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None, hover=True, time_hover=2, time_after_converged=3):
+    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None, hover=False, time_hover=20, time_after_converged=3):
         """
         Go to p_final
         """
@@ -87,38 +87,34 @@ class Robot():
         converged = False
         time_after_converged = 4
         self.init_time = time.time()
-        time_converged = self.init_time+8 # just in case so it stops
+        time_converged = self.init_time+100 # just in case so it stops
 
         if controller is None:
-            self.controller.setup_OSQP(self.p_final)
+            self.controller.setup_OSQP(p_final)
         else:
             self.controller = controller
+
         #self.osqp_thoughts = np.empty((self.controller.initial_controller.qp_size,self.controller.controller_list.__len__()+1,1)) # Nqp, Ncontrollers, Nt
         self.osqp_thoughts = []
 
-        
-        self.controller.p_final = self.p_final
-        self.controller.setup_OSQP(self.p_final)
-
+        th_convergence = 0.1
+        #self.controller.set_p_final(self.p_final)
 
         self.t0 = rospy.get_time()
-        while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
+        while (not rospy.is_shutdown()) and (time.time()-time_converged<time_after_converged): # 
 
-            if ( time.time() - self.init_time > time_hover ):
+            if ( time.time() - self.init_time > time_hover and hover ):
                 self.p_final = p_final
-                self.update_pfinal(p_final)
+                self.controller.set_p_final(self.p_final)
                 self.hover = False
                 self.init_time = time.time()
-            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.1 and not converged):
+            if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < th_convergence and not converged):
                 converged = True
                 time_converged = time.time()
 
             self.update_ctrl()
             self.create_attitude_msg(stamp=rospy.Time.now())
             self.pub_sp.publish(self.attitude_target_msg)
-            #self.pub_traj.publish(self.traj_msg)
-            #self.create_force_msg(stamp=rospy.Time.now())
-            #self.pub_force.publish(self.force_msg)
             if not hover:
                 self.append_dat_traj()
             self.rate.sleep()
@@ -129,6 +125,8 @@ class Robot():
         passed_time = time.time()-self.init_time
         self.X = np.append(self.X, np.array([[self.p.z], [self.v.z]]), axis=1)
         self.U = np.append(self.U, np.array([[self.T_d]]), axis=1)
+
+        
 
         #local_thought = [np.array(self.controller.initial_controller._osqp_result.x)]
         #local_thought = local_thought.reshape(local_thought.shape[0],1)
@@ -141,6 +139,7 @@ class Robot():
         #np.append(self.osqp_thoughts, local_thought, axis=2)
         self.Upert = np.append(self.Upert, np.array([[self.controller.get_last_perturbation()]]), axis=1)
         self.t = np.append(self.t, np.array([[passed_time]]), axis=1)
+        
         
 
     def load_model(self, model_file_name):
