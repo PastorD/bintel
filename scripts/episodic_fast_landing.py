@@ -49,14 +49,19 @@ B_nom = array([[0.], [g/hover_thrust]])  # Nominal model of the true system arou
 A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
+n_waypoints = 2 
+n_blocks_per_episode = 5
+Nep =  3
+total_landings = Nep*n_waypoints*n_blocks_per_episode
+
 duration_low = 1.
-n_waypoints = 2
+pert_noise = 0.002
 controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
 p_final = np.array([1.23, 0.088, 0.28])
-pert_noise = 0.02
-Nep =  2
 w = linspace(0, 1, Nep)
+
+
 #w /= (1*sum(w))
 #w = zeros((Nep,))
 plot_episode = False
@@ -329,72 +334,81 @@ ctrl_effort = []
 print('Starting episodic learning...')
 for ep in range(Nep+1):
     # Run single landing with no perturbation for validation plots:
-    print("Executing trajectory with no perturbation noise...")
-    print("Resetting to initial point...")
-    handler.ctrl_history = []
-    handler.time_history = []
-    handler.pert_noise = 0.
-    command.arming(True)
-    go_waypoint.gopoint(np.array(p_init))
-    X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
-    #land()
-    X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=handler.ctrl_history)
-    handler.pert_noise = pert_noise
-    ctrl_history_ep.append(ctrl_hist)
+    for nb in range(n_blocks_per_episode):
 
-    handler.plot_control_ep()
-
-    # Run training loop:
-    X_w = []
-    Xd_w = []
-    U_w = []
-    Unom_w = []
-    t_w = []
-    if ep == Nep:
-        # Only run validation landing to evaluate performance after final episode
-        continue
-
-    for ww in range(n_waypoints):  #Execute multiple trajectories between training
-        print("Executing trajectory ", ww+1, " out of ", n_waypoints, "in episode ", ep)
+        print("Executing trajectory with no perturbation noise...")
         print("Resetting to initial point...")
+        handler.ctrl_history = []
+        handler.time_history = []
+        handler.pert_noise = 0.
         command.arming(True)
         go_waypoint.gopoint(np.array(p_init))
-        
-        
-
-        print("Executing fast landing with current controller...")
         X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
-        #land()     
-        X, Xd, U, Unom, t, _ = handler.clean_data(X, p_final, U, Upert, t)
+        #land()
+        X_val, Xd_val, U_val, _, t_val, ctrl_hist = handler.clean_data(X, p_final, U, Upert, t, ctrl_hist=handler.ctrl_history)
+        handler.pert_noise = pert_noise
+        ctrl_history_ep.append(ctrl_hist)
 
-        # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
-        X_w.append(    X)    
-        Xd_w.append(   Xd)   
-        U_w.append(    U)    
-        Unom_w.append( Unom) 
-        t_w.append(    t)
-        
-        #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
+        #handler.plot_control_ep()
+
+        print("Starting Block ", nb, " out of ", n_blocks_per_episode, "blocks in episode ", ep)
+
+        # Run training loop:
+        X_w = []
+        Xd_w = []
+        U_w = []
+        Unom_w = []
+        t_w = []
+        if ep == Nep:
+            # Only run validation landing to evaluate performance after final episode
+            continue
+
+        for ww in range(n_waypoints):  #Execute multiple trajectories between training
+            print("Executing trajectory ", ww+1, " out of ", n_waypoints, " waypoints in block ", nb ," in episode ", ep)
+            print("Resetting to initial point...")
+            command.arming(True)
+            go_waypoint.gopoint(np.array(p_init))
+            
+            
+
+            print("Executing fast landing with current controller...")
+            X, p_final, U, Upert, t = bintel.gotopoint(p_init, p_final, duration_low, controller=handler)
+            #land()     
+            X, Xd, U, Unom, t, _ = handler.clean_data(X, p_final, U, Upert, t)
+
+            # Must locally aggregate data from each waypoint and feed aggregated matrices to fit_diffeomorphism
+            X_w.append(    X)    
+            Xd_w.append(   Xd)   
+            U_w.append(    U)    
+            Unom_w.append( Unom) 
+            t_w.append(    t)
+            
+            #osqp_thoughts[ww][ep] = bintel.osqp_thoughts
 
 
-    land()  # Land while fitting models
-    X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
-    print("Fitting diffeomorphism...")
-    eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
-                                                 jacobian_penalty=jacobian_penalty_diffeomorphism,
-                                                 learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
-                                                 n_epochs=diff_n_epochs, train_frac=diff_train_frac,
-                                                 batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
-    eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
+        land()  # Land while fitting models
+        X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
+        print("Fitting diffeomorphism...")
+        eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
+                                                    jacobian_penalty=jacobian_penalty_diffeomorphism,
+                                                    learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
+                                                    n_epochs=diff_n_epochs, train_frac=diff_train_frac,
+                                                    batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
+        eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
 
 
-    #eigenfunction_basis.plot_eigenfunction_evolution(X.transpose(),Xd.transpose(),t.squeeze())  #TODO: Remove after debug
+        #eigenfunction_basis.plot_eigenfunction_evolution(X.transpose(),Xd.transpose(),t.squeeze())  #TODO: Remove after debug
 
-    keedmd_ep = Keedmd(eigenfunction_basis,n,l1_pos=l1_pos,l1_ratio_pos=l1_ratio_pos, l1_vel=l1_vel,l1_ratio_vel=l1_ratio_vel,
-                       l1_eig=l1_eig,l1_ratio_eig=l1_ratio_eig,episodic=True)
-    handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
-    keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
-    keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)
+        keedmd_ep = Keedmd(eigenfunction_basis,n,l1_pos=l1_pos,l1_ratio_pos=l1_ratio_pos, l1_vel=l1_vel,l1_ratio_vel=l1_ratio_vel,
+                        l1_eig=l1_eig,l1_ratio_eig=l1_ratio_eig,episodic=True)
+        handler.aggregate_data(X,Xd,U,Unom,t,keedmd_ep)
+        keedmd_ep.fit(handler.X_agg, handler.Xd_agg, handler.Z_agg, handler.Zdot_agg, handler.U_agg, handler.Unom_agg)
+        keedmd_sys = LinearSystemDynamics(A=keedmd_ep.A, B=keedmd_ep.B)
+        handler.Tpert = 0. # Reset Brownian noise
+        initialize_NN = False  # Warm s tart NN after first episode
+
+
+    # Add a new controller after every episode ends    
     mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
                                 N=N_steps,
                                 dt=dt,
@@ -413,8 +427,6 @@ for ep in range(Nep+1):
                                 soft=True,
                                 D=Dsoft)
     handler.aggregate_ctrl(mpc_ep)
-    handler.Tpert = 0. # Reset Brownian noise
-    initialize_NN = False  # Warm s tart NN after first episode
 
     # Store data for the episode:
     X_ep.append(X)
