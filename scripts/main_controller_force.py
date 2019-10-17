@@ -65,7 +65,7 @@ class Robot():
 
 
 
-    def gotopoint(self, p_init, p_final, tduration, file_csv="", controller=None):
+    def gotopoint(self, p_init, p_final, time_after_converged, file_csv="", controller=None):
         """
         Go to p_final
         """
@@ -74,7 +74,7 @@ class Robot():
         self.p_init = p_init
         self.p_final = p_final
         self.t_init = rospy.Time.now()
-        self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
+        #self.t_final = rospy.Time(secs=(self.t_init + rospy.Duration(tduration)).to_sec())
         self.t_last_msg = self.t_init
         self.p_d = namedtuple("p_d", "x y z")  # For publishing desired pos
         self.X = np.empty((self.n,1))
@@ -82,7 +82,7 @@ class Robot():
         self.Upert = np.empty((self.m,1))
         self.t = np.empty((1,1))
         converged = False
-        time_after_converged = 4
+        #time_after_converged = 4
         self.init_time = time.time()
         time_converged = self.init_time+6
 
@@ -96,7 +96,7 @@ class Robot():
         
 
         self.t0 = rospy.get_time()
-        while not rospy.is_shutdown() and time.time()-time_converged<time_after_converged: # 
+        while not rospy.is_shutdown() and time.time()-time_converged < time_after_converged: # 
             if ( np.linalg.norm(np.array(self.p_final) - np.array([self.p.x, self.p.y, self.p.z])) < 0.2  and not converged):
                 converged = True
                 time_converged = time.time()

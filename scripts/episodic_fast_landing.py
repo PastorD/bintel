@@ -49,12 +49,12 @@ B_nom = array([[0.], [g/hover_thrust]])  # Nominal model of the true system arou
 A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
-duration_low = 1.
+duration_low = 5.
 n_waypoints = 2
 controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
-p_final = np.array([1.23, 0.088, 0.28])
-pert_noise = 0.02
+p_final = np.array([1.23, 0.088, 3.28])
+pert_noise = 0.002
 Nep =  2
 w = linspace(0, 1, Nep)
 #w /= (1*sum(w))
