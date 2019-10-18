@@ -308,7 +308,7 @@ initial_controller = PositionController(u_hover=hover_thrust, gravity=g, rate=co
                                         p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False,
                                         soft=True,D=Dsoft)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
-eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
+eigenfunction_basis.build_diffeomorphism_model(jacobian_penalty=jacobian_penalty_diffeomorphism, n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
 handler = DroneHandler(n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt, hover_thrust)
 
@@ -381,10 +381,9 @@ for ep in range(Nep+1):
     X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
     print("Fitting diffeomorphism...")
     eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
-                                                 jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                  learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                  n_epochs=diff_n_epochs, train_frac=diff_train_frac,
-                                                 batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
+                                                 batch_size=diff_batch_size,initialize=initialize_NN, verbose=True)
     eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
 
 
