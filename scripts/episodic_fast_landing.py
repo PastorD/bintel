@@ -392,7 +392,7 @@ for ep in range(Nep+1):
         eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
                                                     learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                     n_epochs=diff_n_epochs, train_frac=diff_train_frac,
-                                                    batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
+                                                    batch_size=diff_batch_size,initialize=initialize_NN, verbose=True)
         eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
 
 
@@ -406,26 +406,29 @@ for ep in range(Nep+1):
         handler.Tpert = 0. # Reset Brownian noise
         initialize_NN = False  # Warm s tart NN after first episode
 
-
-    # Add a new controller after every episode ends    
-    mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
-                                N=N_steps,
-                                dt=dt,
-                                umin=array([-umax_control]),
-                                umax=array([+umax_control]),
-                                xmin=xmin,
-                                xmax=xmax,
-                                Q=Q,
-                                R=R,
-                                QN=QN,
-                                xr=q_d,
-                                lifting=True,
-                                edmd_object=keedmd_ep,
-                                plotMPC=plotMPC,
-                                name='KEEDMD',
-                                soft=True,
-                                D=Dsoft)
-    handler.aggregate_ctrl(mpc_ep)
+        
+        # Add a new controller after every episode ends    
+        mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
+                                    N=N_steps,
+                                    dt=dt,
+                                    umin=array([-umax_control]),
+                                    umax=array([+umax_control]),
+                                    xmin=xmin,
+                                    xmax=xmax,
+                                    Q=Q,
+                                    R=R,
+                                    QN=QN,
+                                    xr=q_d,
+                                    lifting=True,
+                                    edmd_object=keedmd_ep,
+                                    plotMPC=plotMPC,
+                                    name='KEEDMD',
+                                    soft=True,
+                                    D=Dsoft)
+        if nb==0:
+            handler.aggregate_ctrl(mpc_ep)
+        else:
+            handler.controller_list[-1] = mpc_ep
 
     # Store data for the episode:
     X_ep.append(X)
