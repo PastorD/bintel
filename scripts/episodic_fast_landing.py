@@ -36,7 +36,7 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
@@ -50,15 +50,15 @@ A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
 n_waypoints = 2 
-n_blocks_per_episode = 5
-Nep =  3
+n_blocks_per_episode = 8
+Nep =  2
 total_landings = Nep*n_waypoints*n_blocks_per_episode
 
-duration_low = 1.
+duration_low = .5
 pert_noise = 0.002
 controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
-p_final = np.array([1.23, 0.088, 0.28])
+p_final = np.array([1.23, 0.088, 0.32])
 w = linspace(0, 1, Nep)
 
 
@@ -66,7 +66,7 @@ w = linspace(0, 1, Nep)
 #w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([5.0, 4.])  # State constraints
-lower_bounds = array([-0.02, -3.])  # State constraints
+lower_bounds = array([-0.05, -3.])  # State constraints
 lower_bounds_nominal = array([0.3,-2.])
 
 # Koopman eigenfunction parameters
@@ -82,7 +82,7 @@ diff_train_frac = 0.99
 diff_n_hidden_layers = 4
 diff_layer_width = 20
 diff_batch_size = 8
-diff_learn_rate = 0.08947473684210526  # Fix for current architecture
+diff_learn_rate = 0.04947473684210526  # Fix for current architecture
 diff_learn_rate_decay = 0.8  # Fix for current architecture
 diff_dropout_prob = 0.0
 
@@ -115,7 +115,7 @@ else:
 Q = sparse.diags([1., 0.1])
 R = 6*sparse.eye(m)
 QN = sparse.diags([0., 0.])
-Dsoft = sparse.diags([400,50])
+Dsoft = sparse.diags([50,20])
 u_margin = 0.3
 umax_control = 0.3 #min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
@@ -313,7 +313,7 @@ initial_controller = PositionController(u_hover=hover_thrust, gravity=g, rate=co
                                         p_final=p_final, MPC_horizon=MPC_horizon, use_learned_model=False,
                                         soft=True,D=Dsoft)
 eigenfunction_basis = KoopmanEigenfunctions(n=n, max_power=eigenfunction_max_power, A_cl=A_cl, BK=None)
-eigenfunction_basis.build_diffeomorphism_model(n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
+eigenfunction_basis.build_diffeomorphism_model(jacobian_penalty=jacobian_penalty_diffeomorphism, n_hidden_layers=diff_n_hidden_layers, layer_width=diff_layer_width,
                                                batch_size=diff_batch_size, dropout_prob=diff_dropout_prob)
 handler = DroneHandler(n, m, Nlift, Nep, w, initial_controller, pert_noise, p_init, p_final, dt, hover_thrust)
 
@@ -361,7 +361,7 @@ for ep in range(Nep+1):
         t_w = []
         if ep == Nep:
             # Only run validation landing to evaluate performance after final episode
-            continue
+            break 
 
         for ww in range(n_waypoints):  #Execute multiple trajectories between training
             print("Executing trajectory ", ww+1, " out of ", n_waypoints, " waypoints in block ", nb ," in episode ", ep)
@@ -390,10 +390,9 @@ for ep in range(Nep+1):
         X, Xd, U, Unom, t = handler.aggregate_landings_per_episode(X_w, Xd_w, U_w, Unom_w, t_w)
         print("Fitting diffeomorphism...")
         eigenfunction_basis.fit_diffeomorphism_model(X=array(X.transpose()), t=t.transpose(), X_d=array(Xd.transpose()), l2=l2_diffeomorphism,
-                                                    jacobian_penalty=jacobian_penalty_diffeomorphism,
                                                     learning_rate=diff_learn_rate, learning_decay=diff_learn_rate_decay,
                                                     n_epochs=diff_n_epochs, train_frac=diff_train_frac,
-                                                    batch_size=diff_batch_size,initialize=initialize_NN, verbose=False)
+                                                    batch_size=diff_batch_size,initialize=initialize_NN, verbose=True)
         eigenfunction_basis.construct_basis(ub=upper_bounds, lb=lower_bounds)
 
 
@@ -407,33 +406,37 @@ for ep in range(Nep+1):
         handler.Tpert = 0. # Reset Brownian noise
         initialize_NN = False  # Warm s tart NN after first episode
 
+        
+        # Add a new controller after every episode ends    
+        mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
+                                    N=N_steps,
+                                    dt=dt,
+                                    umin=array([-umax_control]),
+                                    umax=array([+umax_control]),
+                                    xmin=xmin,
+                                    xmax=xmax,
+                                    Q=Q,
+                                    R=R,
+                                    QN=QN,
+                                    xr=q_d,
+                                    lifting=True,
+                                    edmd_object=keedmd_ep,
+                                    plotMPC=plotMPC,
+                                    name='KEEDMD',
+                                    soft=True,
+                                    D=Dsoft)
+        if nb==0:
+            handler.aggregate_ctrl(mpc_ep)
+        else:
+            handler.controller_list[-1] = mpc_ep
 
-    # Add a new controller after every episode ends    
-    mpc_ep = MPCControllerDense(linear_dynamics=keedmd_sys,
-                                N=N_steps,
-                                dt=dt,
-                                umin=array([-umax_control]),
-                                umax=array([+umax_control]),
-                                xmin=xmin,
-                                xmax=xmax,
-                                Q=Q,
-                                R=R,
-                                QN=QN,
-                                xr=q_d,
-                                lifting=True,
-                                edmd_object=keedmd_ep,
-                                plotMPC=plotMPC,
-                                name='KEEDMD',
-                                soft=True,
-                                D=Dsoft)
-    handler.aggregate_ctrl(mpc_ep)
-
-    # Store data for the episode:
-    X_ep.append(X)
-    Xd_ep.append(Xd)
-    U_ep.append(U)
-    Unom_ep.append(Unom)
-    t_ep.append(t)
+    if not ep==Nep:
+        # Store data for the episode:
+        X_ep.append(X)
+        Xd_ep.append(Xd)
+        U_ep.append(U)
+        Unom_ep.append(Unom)
+        t_ep.append(t)
 
     # Plot episode results and calculate statistics
     Xval_ep.append(X_val)
