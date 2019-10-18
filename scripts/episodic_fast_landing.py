@@ -36,7 +36,7 @@ from keedmd_code.core.controllers import OpenLoopController
 n, m = 2, 1  # Number of states and actuators
 
 # Define nominal model and nominal controller:
-simulation = True
+simulation = False
 if simulation:
     hover_thrust =  0.563
     K = array([[0.8670, 0.9248]])
@@ -50,8 +50,8 @@ A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
 n_waypoints = 2 
-n_blocks_per_episode = 15
-Nep =  1
+n_blocks_per_episode = 8
+Nep =  2
 total_landings = Nep*n_waypoints*n_blocks_per_episode
 
 duration_low = .5
@@ -361,7 +361,7 @@ for ep in range(Nep+1):
         t_w = []
         if ep == Nep:
             # Only run validation landing to evaluate performance after final episode
-            continue
+            break 
 
         for ww in range(n_waypoints):  #Execute multiple trajectories between training
             print("Executing trajectory ", ww+1, " out of ", n_waypoints, " waypoints in block ", nb ," in episode ", ep)
@@ -430,12 +430,13 @@ for ep in range(Nep+1):
         else:
             handler.controller_list[-1] = mpc_ep
 
-    # Store data for the episode:
-    X_ep.append(X)
-    Xd_ep.append(Xd)
-    U_ep.append(U)
-    Unom_ep.append(Unom)
-    t_ep.append(t)
+    if not ep==Nep:
+        # Store data for the episode:
+        X_ep.append(X)
+        Xd_ep.append(Xd)
+        U_ep.append(U)
+        Unom_ep.append(Unom)
+        t_ep.append(t)
 
     # Plot episode results and calculate statistics
     Xval_ep.append(X_val)
