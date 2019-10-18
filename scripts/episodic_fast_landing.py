@@ -50,8 +50,8 @@ A_cl = A_nom - dot(B_nom, K)
 
 # Experiment parameters
 n_waypoints = 2 
-n_blocks_per_episode = 5
-Nep =  3
+n_blocks_per_episode = 15
+Nep =  1
 total_landings = Nep*n_waypoints*n_blocks_per_episode
 
 duration_low = .5
