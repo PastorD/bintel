@@ -54,11 +54,11 @@ n_blocks_per_episode = 5
 Nep =  3
 total_landings = Nep*n_waypoints*n_blocks_per_episode
 
-duration_low = 1.
+duration_low = .5
 pert_noise = 0.002
 controller_rate = 60
 p_init = np.array([1.23, 0.088, 2.00])
-p_final = np.array([1.23, 0.088, 0.28])
+p_final = np.array([1.23, 0.088, 0.32])
 w = linspace(0, 1, Nep)
 
 
@@ -66,7 +66,7 @@ w = linspace(0, 1, Nep)
 #w = zeros((Nep,))
 plot_episode = False
 upper_bounds = array([5.0, 4.])  # State constraints
-lower_bounds = array([-0.02, -3.])  # State constraints
+lower_bounds = array([-0.05, -3.])  # State constraints
 lower_bounds_nominal = array([0.3,-2.])
 
 # Koopman eigenfunction parameters
@@ -82,7 +82,7 @@ diff_train_frac = 0.99
 diff_n_hidden_layers = 4
 diff_layer_width = 20
 diff_batch_size = 8
-diff_learn_rate = 0.08947473684210526  # Fix for current architecture
+diff_learn_rate = 0.04947473684210526  # Fix for current architecture
 diff_learn_rate_decay = 0.8  # Fix for current architecture
 diff_dropout_prob = 0.0
 
@@ -115,7 +115,7 @@ else:
 Q = sparse.diags([1., 0.1])
 R = 6*sparse.eye(m)
 QN = sparse.diags([0., 0.])
-Dsoft = sparse.diags([400,50])
+Dsoft = sparse.diags([50,20])
 u_margin = 0.3
 umax_control = 0.3 #min(1.-u_margin-hover_thrust,hover_thrust-u_margin)
 xmin=lower_bounds
